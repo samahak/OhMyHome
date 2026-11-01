@@ -8,7 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 실행 — 정적 파일 서버를 띄우고 브라우저를 연다 (기본 포트 8190)
 ./run_ohmyhome.sh           # macOS / Linux  (PORT=9000 ./run_ohmyhome.sh 로 변경)
 run_ohmyhome.bat            # Windows
-python3 -m http.server 8190 # 직접 띄울 때
+python3 serve.py 8190      # 직접 띄울 때 (no-cache 헤더를 붙이는 정적 서버, 기본 127.0.0.1만)
+HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
+
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·LICENSE만.
+#   README와 sample의 png는 넣지 않는다. 브라우저 localStorage의 작업 데이터는 애초에 파일에 없다)
+./build_ohmyhome.sh         # macOS / Linux
+build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
+
+# 사용 가이드 PDF — docs/guide/guide.html(+ img/ 화면 캡처)을 Chrome으로 인쇄해 docs/OhMyHome_Guide.pdf를 만든다.
+# 화면·기능이 바뀌면 guide.html을 고치고 다시 만들어 함께 커밋한다(빌드 스크립트는 이 PDF가 없으면 멈춘다)
+docs/guide/make_pdf.sh
 
 # 문법 검사 (Node 22+는 import 문을 보고 ES 모듈로 알아서 읽는다)
 for f in js/*.js; do node --check "$f"; done
@@ -45,8 +55,14 @@ js/plan2d.js           2D 도면 편집기 (캔버스, 도구별 마우스 입�
 js/view3d.js           3D 보기 + 가구 끌기 (three.js, OrbitControls, CSS2DRenderer)
 js/models3d.js         샘플 가구 3D 모양 (박스·원기둥 조합)
 js/furniturePhoto.js   가구 사진 → 크기 측정 대화상자
+js/tour.js             둘러보기 — 현관문 열기 · 1인칭 카메라 · 자동 동선 · 직접 걷기 · 화면 안내판
+js/walkGrid.js         둘러보기용 걸을 수 있는 칸 지도 · A* 길 찾기 · 들를 곳 고르기             (DOM 없음)
+js/fixtures.js         현관·욕실·주방 설비 자동 배치 (신발장·변기·세면대·욕조·주방 싱크대)          (DOM 없음)
+js/windows.js          창 자동 찾기 — 도면 이미지에서 벽 위의 연한 구간 + 바깥벽 틈                 (DOM 없음)
+js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 먼 산, 하늘
 js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
-sample/                실제 세대 예시 — 55㎡ A-2형 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
+docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
+sample/                실제 세대 예시 — 55㎡ A-2형 · A-1형(좌우 반전)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
 ```
 
 ### 좌표와 단위
@@ -61,13 +77,14 @@ sample/                실제 세대 예시 — 55㎡ A-2형 2D·3D 이미지와
 ### 상태 (`store.js`)
 
 ```
-state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, walls[], rooms[], wallHeight }
+state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], wallHeight, floor }
   scaleRef      { a, b, mm } | null — 축척을 맞춘 기준 치수선 (2D에 주황 점선으로 그린다)
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
-  room          { id, name, pts:[{x,y}] }
+  room          { id, name, pts:[{x,y}], hidden? }
+  window        { id, a, b, t, sill, h, auto } — a–b는 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이 (mm)
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto }
 state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
-ui.selection    { kind: 'furniture'|'wall'|'room', id } | null   (저장하지 않는다)
+ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저장하지 않는다)
 ```
 
 - 화면들은 `on('plan' | 'furniture' | 'library' | 'selection')`을 듣고 다시 그린다. 상태를 바꾼 쪽이 `emit()`한다.
@@ -126,6 +143,66 @@ ui.selection    { kind: 'furniture'|'wall'|'room', id } | null   (저장하지 �
 **기준 물체 선**을 그으면 mm/px를 구해 가로·높이를 함께 잰다. 깊이는 고른 모양의 `defaultsFor(type).d`로 채운다.
 사진은 영역만 잘라 긴 변 512px JPEG로 `library[].image`에 넣는다.
 
+### 둘러보기 (`tour.js`, `walkGrid.js`)
+
+출발점은 `state.plan.entrance`(현관문 틈 `{ a, b, t, out }`)다. 없으면 2D에서 `entrance` 도구로 문 자리를 누르게 하고,
+`G.findDoorGap()`이 벽 끝에서 쏜 반직선으로 틈과 바깥 방향을 찾는다. `setScale()`은 entrance도 함께 옮긴다.
+
+- `walkGrid.buildGrid()`: 100mm 칸, 벽·가구(높이 1.2m 아래)에서 몸 반지름 220mm 안쪽 칸을 막는다. **벽들의 바깥 사각형 밖은
+  모두 막는다** — 이미지에서 인식한 벽은 창 자리가 틈이라 그대로 두면 창으로 걸어 나간다.
+- 둘러보기 중에는 **현관문 틈을 벽으로 막은 지도**를 쓴다. 막지 않으면 들를 곳이 공용 홀(밖)까지 잡힌다.
+  현관 앞 → 문 → 현관 안쪽 구간은 지도를 쓰지 않고 정해진 직선으로 걷는다.
+- 들를 곳(`roomCenters`)은 거리 변환의 봉우리다. 벽만 있는 지도(`sightGrid`)에서 서로 보이고 3.2m 안이면 같은 방으로 묶는다.
+  이름은 그 점이 든 방(`rooms`) 이름이고, 같은 이름은 한 번만 들른다. **이름 붙은 방은 봉우리가 안 잡혀도 꼭 들른다**
+  (`Tour.roomSpot` — 욕실은 설비가 차서 봉우리가 안 생긴다). 순서는 `orderByWalk`(걷는 칸 수 기준 욕심 순서 + 2-opt).
+- 둘러보기를 시작할 때 `fixtures.autoFixtures()`가 설비를 놓는다(일반 가구로 들어가 되돌리기·삭제 가능). 그 방에 같은 종류가
+  이미 있으면 건너뛰고, 벽·가구와 겹치는 설비(`findCollisions`)는 빼고 놓는다.
+  - 신발장(`shoe_cabinet`): 방 이름 없이 `plan.entrance`만 본다. 현관문 안쪽 옆벽에 문틀부터 세우되, 문 폭 바깥이고
+    통로 800mm가 남는 쪽, 벽이 곧게 이어지는 길이(최대 1,200)만큼. 3m 안에 신발장(종류 또는 이름 '신발')이 있으면 건너뛴다.
+    둘러보기 문짝은 경첩이 a 끝이지만, 신발장이 a 쪽이면 b 끝으로 옮겨 열린 문짝이 신발장을 가리지 않게 한다(`buildScene`).
+  - 욕실/화장실: 변기·세면대. 이름이 부부·안방·마스터·파우더가 아닌 욕실 가운데 **가장 큰 한 곳**에는 욕조를 문 없는 짧은 벽에
+    벽 끝까지 대고, 맞닿은 막힌 옆벽에 욕조 쪽부터 세면대 → 변기 순으로 놓는다. 안 들어가면 변기·세면대만 안쪽 벽에.
+  - 주방/부엌: 주방 싱크대(개수대·인덕션 3구·상부장·후드).
+  - 놓을 벽은 방 안쪽 상자(`innerBox`, 가운데에서 `spanAt`)의 네 변 가운데 **벽 면 25mm 바깥**이 가장 많이 비어 있는 변
+    (=문 쪽)의 반대편이다. 25mm보다 멀리 재면 60mm 샤프트 벽을 넘어가 '열린 변'으로 잘못 읽는다.
+  - 방 이름이 없는 도면은 욕실·주방을 알 수 없어 신발장만 놓고, 상태줄에 방 이름을 붙이라고 안내한다(`hasFixtureRooms`).
+- 우물천장은 **거실만**: 안쪽 상자에서 450mm 들어온 자리를 천장 판에 구멍(`Shape.holes`)으로 뚫고,
+  150mm 위에 판·옆면·간접조명 띠를 붙인다. 거실은 `Tour.findLiving()`이 고른다:
+  이름이 '거실'인 방 → 없으면 **아래 바깥벽에 닿은 공간 가운데 가로가 가장 넓은 곳**(가로·세로 2.4m 미만 제외).
+  방 영역이 있으면 방들 중에서(`innerBox`), 없으면 아래 바깥벽 80cm 안쪽 줄을 가로로 훑어 벽 사이 구간 중에서 고른다.
+  방 가운데에서 좌우로 재면 문 틈으로 옆방까지 새므로 이렇게 한다. 깊이는 가로의 1.2배(최소 3m)까지(위가 주방으로 트인 경우).
+  고른 칸 안의 들를 곳은 이름이 '공간 n'이면 '거실'로 바꾼다.
+- 나머지 방은 천장 가운데 네모 LED 방등(`buildLeds`, 방 짧은 변 2.6m↑ 600 / 1.6m↑ 450 / 그 밖 300mm)과 그 아래 약한
+  PointLight(열 개까지). 방이 없는 도면은 들를 곳 자리에 단다. 칸 크기(`spanBox`)는 창·현관문 틈을 막은 벽으로, 축마다
+  **짧은 쪽 거리**로 잰다 — 반대쪽은 문 틈으로 새어 옆방 벽까지 잴 수 있다.
+- 방 영역의 `hidden: true`는 "도면 이미지에 이미 그려진 방"이라 2D·3D에 색과 이름표를 그리지 않는다(이름·면적용).
+- `view3d.setTourMode(true)`는 나무 바닥·천장 높이 벽·이름표 숨김으로 다시 그린다. 문짝·문 위 벽·천장·실내등은
+  `Tour.group`에 따로 두고 나갈 때 치운다. 둘러보기 중 키 입력은 `tour.js`가 capture 단계에서 받고, `main.js` 단축키는 쉰다.
+
+### 창 (`windows.js`, `G.findWindowGaps`)
+
+- 창은 벽과 따로 `plan.windows`에 둔다. 3D는 벽 상자를 창 자리만큼 잘라(`G.windowSpanOnWall`) 토막으로 세우고,
+  창 쪽에서 창 아래·위 벽과 창틀·유리(`models3d.buildWindow`)를 채운다. 그래서 **창이 벽 위에 있든 벽 틈에 있든** 똑같이 그려진다.
+- 자동 창(`auto: true`)은 벽 인식 뒤와 둘러보기 시작 때마다 `findWindows()`로 다시 찾는다. 지금 찾은 자리에 없는 예전 자동 창은
+  지우고, `auto: false`(🪟 창문 도구로 낸 창, 샘플 JSON의 창)는 건드리지 않는다. `auto`가 없는 창도 자동 창으로 본다.
+  - 이미지의 연한 구간: 벽 중심선을 20mm 간격으로 따라가며 벽 두께 안쪽 다섯 점 밝기의 중앙값을 재고, 전체 벽 밝기 중앙값보다
+    45 이상(또는 남은 밝기의 30%) 밝은 구간을 창으로 본다. 벽 양 끝에 닿은 구간은 벽이 그림과 어긋난 것으로 보고 뺀다.
+  - 바깥벽 틈: 벽 끝에서 쏜 반직선이 **같은 줄의 나란한 벽**에 닿는 틈.
+  - 둘 다 **한쪽이 집 바깥이어야** 창이다. 바깥은 벽과 모든 틈을 막은 40mm 칸 지도에서 테두리부터 채워 구한다(`G.outsideTester`).
+    반직선 한 줄로 재면 다른 문·창 틈으로 새어 나가 안쪽 문을 창으로 막는다 — 그러면 둘러보기가 그 방에 못 들어간다.
+  - 현관문 가운데에서 300mm 안을 지나는 구간은 뺀다.
+- 둘러보기 길 찾기·설비 배치는 창을 벽으로 친다(틈에 낸 창으로 걸어 나가지 않게).
+- 둘러보기 지도는 둘이다. 자동 진행(`grid`)은 현관문을 막은 지도라 다시 밖으로 나가지 않고, 직접 걷기(`walkGrid`)는
+  현관문이 열린 지도다 — 막힌 지도를 쓰면 현관 앞(벽 사각형 안의 빈 칸)에서 문으로 못 들어간다. 직접 걷기가 막히면
+  ±15°씩 60°까지 비껴 그 방향 40cm 앞이 비었는지 보고 움직여서, 문을 정확히 겨누지 않아도 문 안으로 끌려 들어간다.
+- `G.distToSegment()`는 숫자가 아니라 `{ dist, t, x, y }`를 돌려준다. 거리 비교는 `.dist`로 한다.
+- 둘러보기 창밖은 `scenery.buildScenery()`가 만든다(`Tour.group`에 넣어 나갈 때 함께 치운다). 우리 층 바닥이 y=0이고 땅은
+  `(plan.floor - 1) × 2.8m + 1m` 아래. 도면 아래쪽(+z)을 앞으로 보고 앞 30m에 4차로 도로, 길 건너 빌라, 사방에 아파트 동,
+  반지름 320~900m 시가지, 1.5·2.3·3.2km에 산 능선 세 겹, 하늘 둥근 지붕을 놓는다. 고정 씨앗 난수라 늘 같은 풍경이다.
+  창 텍스처는 캔버스 한 장(8층 × 8칸)을 건물마다 `clone()`해 repeat만 바꾼다(같은 source라 GPU에는 한 번만 올라간다).
+- 둘러보기 중에는 `camera.far = 6000`, `scene.fog`(500~4200m)를 쓰고 나갈 때 되돌린다. **`view3d`의 화면 크기 변경 처리는
+  둘러보기 중 `resetCamera()`를 부르지 않는다** — 부르면 far가 500m로 돌아가 하늘·산이 잘리고 엉뚱한 삼각형이 보인다.
+
 ### 3D (`view3d.js`, `models3d.js`)
 
 - 가구 메시는 `syncFurniture()`가 id별로 들고 있다. **크기·모양·색·사진·선택·겹침 여부를 이어 붙인 `key`가 바뀔 때만**
@@ -133,6 +210,13 @@ ui.selection    { kind: 'furniture'|'wall'|'room', id } | null   (저장하지 �
 - 새 샘플 모양을 더하려면 `catalog.js`의 `SHAPES`(+ 필요하면 `CATALOG`)와 `models3d.js`의 `BUILDERS`에 함께 넣는다.
   모양 함수는 m 단위 `(group, W, D, H, color)`를 받고, 바닥 가운데를 원점으로 앞면을 +z로 그린다.
   `SHAPES[type].photoFront`는 사진 대화상자에서 '앞면에 사진 입히기'의 기본값이다.
+- **숫자 하나로 크기를 정하는 가구**(TV 인치, 소파 인원, 식탁 인원)는 `catalog.SIZE_PRESETS` 한 표로 다룬다. 가구 항목에
+  `f[key]`(`inch`, `seats`)를 남기고 `size(v)`로 크기를 바꾼다. 속성 패널의 입력칸·빠른 선택 버튼도 이 표를 보고 그린다.
+  `affects`에 든 칸(가로 등)을 직접 고치면 `f[key]`를 지우고, 화면에는 `guess(f)`로 짐작한 값을 보여 준다.
+  이름이 `namePattern`(예: `65인치 TV`, `3인 소파`) 꼴일 때만 이름도 따라 바꾼다. 새 항목은 이 표에만 더하면 된다.
+- 모양 함수는 다섯째 인자로 가구 항목 `f`도 받는다(소파 쿠션 수 = `f.seats`). 모양에 영향을 주는 값을 새로 쓰면
+  `view3d.syncFurniture()`의 `key`에도 넣어야 다시 그려진다.
+- 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
 - 박스 지오메트리는 하나를 공유하고 `scale`로 키운다. `disposeObject()`는 그 공유 지오메트리를 버리지 않는다.
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
@@ -145,6 +229,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room', id } | null   (저장하지 �
 - 새 가구는 `dropPoint()`가 화면 가운데에서 나선형으로 돌며 벽·가구와 겹치지 않는 첫 자리에 놓는다.
 - 겹침 판정은 `G.findCollisions()` 하나다. 맞닿기만 한 것은 겹침이 아니도록 꼭짓점을 1~2mm 안쪽으로 줄여 잰다.
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
+  **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
+  (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 사진 대화상자가 열려 있으면 무시한다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
   먹지 않는다. 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.
