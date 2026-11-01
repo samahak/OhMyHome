@@ -82,6 +82,11 @@ export const SIZE_PRESETS = {
   },
 };
 
+/** 창 기본 높이(mm) — sill: 바닥에서 창 아래까지, h: 창 높이. 폭 2.6m 이상인 창은 바닥까지 내려오는 큰 창(거실·발코니)으로 본다 */
+export function windowDefaults(width) {
+  return width >= 2600 ? { sill: 0, h: 2100 } : { sill: 900, h: 1200 };
+}
+
 export const CATALOG = [
   { type: 'fridge_side', name: '양문형 냉장고', icon: '🧊', w: 912, d: 928, h: 1793, color: '#c9ced6' },
   { type: 'fridge_top', name: '일반 냉장고', icon: '🧊', w: 700, d: 700, h: 1800, color: '#e8eaee' },
