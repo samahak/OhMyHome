@@ -10,6 +10,7 @@ import { View3D } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
+import { autoFixtures, hasFixtureRooms } from './fixtures.js';
 import { findWindows } from './windows.js';
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +32,7 @@ const editor = new PlanEditor($('plan-canvas'), {
     document.querySelectorAll('.tool-btn').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
   },
   pickColor: (p) => pickWallColor(p),
+  pickEntrance: (p) => setEntrance(p),
   spanAt: (p) => spanAt(p),
   openMeasure: (lines, sx, sy, missing) => openMeasure(lines, sx, sy, missing),
   closeMeasure: () => { $('measure-pop').hidden = true; },
@@ -65,6 +67,16 @@ $('floor-image').addEventListener('change', (e) => view.setFloorImage(e.target.c
 $('low-walls').addEventListener('change', (e) => view.setLowWalls(e.target.checked));
 $('img-opacity').addEventListener('input', (e) => { editor.imageOpacity = +e.target.value; editor.draw(); });
 $('show-dims').addEventListener('change', (e) => { editor.showDims = e.target.checked; editor.draw(); });
+
+$('floor-num').value = state.plan.floor;
+$('floor-num').addEventListener('change', (e) => {
+  const v = Math.round(+e.target.value);
+  if (!(v >= 1 && v <= 80)) { e.target.value = state.plan.floor; return; }
+  checkpoint();
+  state.plan.floor = v;
+  emit('plan');
+  status(`${v}층으로 정했습니다. 둘러보기에서 창밖이 ${v}층 높이로 보입니다.`);
+});
 
 $('wall-height').value = state.plan.wallHeight;
 $('wall-height').addEventListener('change', (e) => {
@@ -118,7 +130,7 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.mmPerPx = mmPerPx;
   p.scaleSet = scaleSet;
   p.scaleRef = null;
-  if (clear) { p.walls = []; p.rooms = []; p.windows = []; }
+  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.entrance = null; }
   ui.selection = null;
   emit('plan', 'selection');
   editor.fit();
@@ -692,6 +704,12 @@ function duplicateSelected() {
   select({ kind: 'furniture', id: c.id });
 }
 
+/* ---------- 둘러보기 ---------- */
+let viewBeforeTour = null;
+const currentViewMode = () => document.querySelector('#view-mode button.active')?.dataset.view || 'split';
+
+$('btn-tour').addEventListener('click', () => startTour());
+
 /**
  * 자동 창을 다시 찾는다. 직접 낸 창(auto: false)은 그대로 두고, 예전 자동 창 가운데 지금 찾은 자리에 없는 것은 뺀다.
  * state는 바꾸지 않고 { windows(새 목록), added, removed }를 돌려준다.
@@ -704,6 +722,62 @@ async function autoWindows() {
   const add = found.filter((f) => !keep.some((w) => near(f, w)))
     .map((g) => ({ id: uid('n'), ...g, ...windowDefaults(G.dist(g.a, g.b)), auto: true }));
   return { windows: keep.concat(add), added: add.length, removed: plan.windows.length - keep.length };
+}
+
+let tourStarting = false;
+async function startTour() {
+  if (view.tour || tourStarting) return;
+  if (!state.plan.walls.length) { status('벽이 있어야 둘러볼 수 있습니다. ① 도면에서 벽을 먼저 세워 주세요.'); return; }
+  if (!state.plan.entrance) { pickEntrance(); return; }
+  // 창 자리(도면 이미지에서 벽 위의 연한 구간, 바깥벽의 틈)에 창을 낸다 (되돌리기로 뺄 수 있다)
+  const plan = state.plan;
+  tourStarting = true;
+  let win;
+  try { win = await autoWindows(); } finally { tourStarting = false; }
+  // 현관 신발장, 욕실·주방 이름이 붙은 방의 변기·세면대·욕조·싱크대가 없으면 놓는다. 창 자리는 벽으로 친다
+  const fixtures = autoFixtures({ ...plan, walls: plan.walls.concat(win.windows) }, state.furniture, uid);
+  if (win.added || win.removed || fixtures.length) {
+    checkpoint();
+    plan.windows = win.windows;
+    state.furniture.push(...fixtures);
+    emit('plan', 'furniture');
+  }
+  viewBeforeTour = currentViewMode();
+  setViewMode('3d');
+  editor.setTool('select');
+  const names = [...new Set(fixtures.map((f) => f.name)), ...(win.added ? [`창 ${win.added}개`] : [])].join('·');
+  const hint = hasFixtureRooms(state.plan) ? '' : " 방 영역에 '욕실'·'주방' 이름을 붙이면 변기·세면대·욕조·싱크대도 자동으로 놓입니다.";
+  status((names
+    ? `${names}을(를) 자동으로 놓았습니다 (옮기거나 지울 수 있고, 되돌리기도 됩니다). Esc로 나갑니다.`
+    : `둘러보기 중 (${plan.floor}층) — Esc로 나갑니다.`) + (win.removed ? ` 잘못 잡혔던 창 ${win.removed}개를 뺐습니다.` : '') + hint);
+  view.startTour({
+    onExit: () => {
+      if (viewBeforeTour) setViewMode(viewBeforeTour);
+      viewBeforeTour = null;
+      status('둘러보기를 마쳤습니다.');
+    },
+    onRepick: () => pickEntrance(),
+  });
+}
+
+/** 2D 도면에서 현관문 자리를 고르게 한다 */
+function pickEntrance() {
+  if (currentViewMode() === '3d') setViewMode('split');
+  editor.setTool('entrance');
+}
+
+function setEntrance(p) {
+  const gap = G.findDoorGap(p, state.plan.walls);
+  if (!gap) {
+    status('근처에서 문 틈을 찾지 못했습니다. 벽이 끊긴 현관문 자리를 눌러 주세요. (벽 인식이 문 자리까지 막았다면 🧽 지우기로 틈을 내 주세요)');
+    return;
+  }
+  checkpoint();
+  state.plan.entrance = gap;
+  emit('plan');
+  editor.setTool('select');
+  status(`현관문을 정했습니다 (폭 ${fmtMM(G.dist(gap.a, gap.b))}mm). 둘러보기를 시작합니다.`);
+  startTour();
 }
 
 /* ---------- 상단 버튼 ---------- */
@@ -726,6 +800,7 @@ $('file-project').addEventListener('change', async (e) => {
   try {
     loadProject(JSON.parse(await file.text()));
     $('wall-height').value = state.plan.wallHeight;
+    $('floor-num').value = state.plan.floor;
     editor.fit();
     view.resetCamera('persp');
     status('프로젝트를 불러왔습니다.');
@@ -744,7 +819,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 
 /* ---------- 단축키 ---------- */
 window.addEventListener('keydown', (e) => {
-  if (isTyping() || $('photo-dialog').open) return;
+  if (view.tour || isTyping() || $('photo-dialog').open) return;   // 둘러보기 중 키는 tour.js가 받는다
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
@@ -778,7 +853,13 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 연결 ---------- */
-on('plan', () => { renderScaleInfo(); renderPlanInfo(); renderPlaced(); refreshOrRender(); });
+on('plan', () => {
+  renderScaleInfo(); renderPlanInfo(); renderPlaced(); refreshOrRender();
+  // 되돌리기·새 도면·불러오기 뒤에도 입력칸이 상태를 따라가게 (입력 중인 칸은 건드리지 않는다)
+  for (const [id, v] of [['wall-height', state.plan.wallHeight], ['floor-num', state.plan.floor]]) {
+    if ($(id) !== document.activeElement) $(id).value = v;
+  }
+});
 on('furniture', () => { renderPlaced(); refreshOrRender(); });
 on('selection', () => {
   renderPlaced();
