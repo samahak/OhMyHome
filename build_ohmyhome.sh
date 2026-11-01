@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# OhMyHome 배포 파일 만들기 — dist/OhMyHome-<날짜>.zip
+# 정해 둔 파일만 담는다: 화면(index.html·css·js), 실행 스크립트, sample 폴더의 json 전부, 사용 가이드 PDF, LICENSE.
+# README(개발용 설명)와 sample의 png는 넣지 않는다. 가이드 PDF는 docs/guide/make_pdf.sh로 미리 만들어 둔다.
+# 사용자가 작업한 도면·가구는 브라우저 localStorage에만 있으므로 담기지 않는다.
+set -euo pipefail
+cd "$(dirname "$0")"
+GUIDE=docs/OhMyHome_Guide.pdf
+[ -f "$GUIDE" ] || { echo "$GUIDE 이 없습니다. docs/guide/make_pdf.sh 로 먼저 만들어 주세요." >&2; exit 1; }
+
+NAME="OhMyHome-$(date +%Y%m%d)"
+OUT="dist/$NAME.zip"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+DEST="$STAGE/OhMyHome"
+mkdir -p "$DEST/sample"
+
+cp index.html serve.py run_ohmyhome.sh run_ohmyhome.bat LICENSE "$GUIDE" "$DEST/"
+cp -R css js "$DEST/"
+cp sample/*.json "$DEST/sample/"
+chmod +x "$DEST/run_ohmyhome.sh"
+find "$DEST" -name '.DS_Store' -delete
+
+mkdir -p dist
+rm -f "$OUT"
+(cd "$STAGE" && zip -qr -X - OhMyHome) > "$OUT"
+echo "만들었습니다: $OUT ($(du -h "$OUT" | cut -f1))"
+unzip -Z1 "$OUT" | grep -v '/$' | sed 's/^/  /'
