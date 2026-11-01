@@ -100,6 +100,39 @@ export function polygonCentroid(pts) {
   return { x: cx / (3 * a), y: cy / (3 * a) };
 }
 
+/** 가구의 로컬 사각형 [x0,x1]×[y0,y1] (가운데 원점, 앞면 +y)을 도면 좌표 꼭짓점으로 */
+function localRect(f, x0, y0, x1, y1) {
+  const r = f.rot * DEG;
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => {
+    const p = rotatePt(x, y, r);
+    return { x: f.x + p.x, y: f.y + p.y };
+  });
+}
+
+// 의자를 밀어 넣을 수 있는(다리 사이가 비어 있는) 가구 → 상판 높이
+// 화장대는 높이(H)에 거울이 들어가므로 상판은 models3d.vanity와 같은 750mm로 본다
+const KNEE_SPACE = {
+  desk: (f) => f.h,
+  table: (f) => f.h,
+  vanity: (f) => Math.min(f.h, 750),
+};
+const DESK_TOP_MM = 40;     // 상판 두께 — 의자가 들어갈 수 있는 높이는 책상 높이에서 이만큼 뺀다
+const CHAIR_BACK_MM = 60;   // 등받이 두께 (models3d.chair와 맞춘다)
+
+/**
+ * 책상·식탁과 의자는 앉는 부분이 책상 밑으로 들어가도 된다.
+ * 책상보다 높이 올라오는 등받이가 책상과 겹칠 때만 겹침이다.
+ * 의자 앉는 높이가 상판 밑으로 들어가지 못하면(낮은 테이블) 평소처럼 바닥 사각형으로 판정한다.
+ */
+function chairUnderDesk(chair, desk) {
+  const under = desk.elev + KNEE_SPACE[desk.type](desk) - DESK_TOP_MM;   // 상판 아랫면 높이
+  const seat = chair.elev + Math.min(460, chair.h * 0.55);  // 앉는 면 높이
+  if (seat + 20 > under) return null;                       // 들어갈 수 없다 → 일반 판정
+  if (chair.elev + chair.h <= under) return false;          // 의자 전체가 들어간다
+  const back = localRect(chair, -chair.w / 2 + 1, -chair.d / 2 + 1, chair.w / 2 - 1, -chair.d / 2 + CHAIR_BACK_MM);
+  return convexOverlap(back, furnitureCorners(desk, 2));
+}
+
 /** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
 export function findCollisions(furniture, walls) {
   const bad = new Set();
@@ -112,7 +145,12 @@ export function findCollisions(furniture, walls) {
     for (let j = i + 1; j < furniture.length; j++) {
       const g = furniture[j];
       const vertical = f.elev < g.elev + g.h && g.elev < f.elev + f.h;
-      if (vertical && convexOverlap(fc[i], fc[j])) { bad.add(f.id); bad.add(g.id); }
+      if (!vertical || !convexOverlap(fc[i], fc[j])) continue;
+      let hit = null;
+      if (f.type === 'chair' && g.type in KNEE_SPACE) hit = chairUnderDesk(f, g);
+      else if (g.type === 'chair' && f.type in KNEE_SPACE) hit = chairUnderDesk(g, f);
+      if (hit === false) continue;
+      bad.add(f.id); bad.add(g.id);
     }
   });
   return bad;
