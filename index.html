@@ -112,6 +112,7 @@
           </div>
           <label class="row">새 벽 두께 <input id="wall-thick" type="number" value="150" min="30" step="10"> mm</label>
           <label class="row">벽 높이(천장) <input id="wall-height" type="number" value="2300" min="500" step="50"> mm</label>
+          <label class="row">층수 <input id="floor-num" type="number" value="10" min="1" max="80" step="1"> 층 <span class="hint" style="margin:0">(둘러보기 창밖 높이)</span></label>
           <label class="row check"><input id="show-dims" type="checkbox" checked> 벽 길이 표시</label>
         </div>
 
@@ -150,6 +151,7 @@
           <button data-view="split" class="active">나란히</button>
           <button data-view="3d">3D</button>
         </div>
+        <button id="btn-tour" class="primary-soft" title="현관에서 문을 열고 들어가 집 안을 둘러봅니다">🚶 둘러보기</button>
         <div class="stage-3d-tools">
           <button id="cam-top">위에서</button>
           <button id="cam-persp">비스듬히</button>

@@ -14,10 +14,12 @@ export function freshState() {
       mmPerPx: 10,          // 이미지 1px이 몇 mm인지
       scaleSet: false,      // 사용자가 축척을 직접 맞췄는지
       scaleRef: null,       // 축척을 맞춘 기준 치수 { a, b, mm } — a·b는 도면 좌표(mm)
+      entrance: null,       // 현관문 틈 { a, b, t, out:{x,y} } — 둘러보기의 출발점, out은 바깥 방향 단위벡터
       walls: [],            // { id, a:{x,y}, b:{x,y}, t, cap, auto }  (mm)
-      rooms: [],            // { id, name, pts:[{x,y}] }               (mm)
+      rooms: [],            // { id, name, pts:[{x,y}], hidden? }      (mm) hidden: 이미지에 이미 그려진 방이라 색·이름표를 생략
       windows: [],          // { id, a, b, t, sill, h }  (mm) a–b: 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이
       wallHeight: 2300,
+      floor: 10,            // 몇 층인지 — 둘러보기에서 창밖 땅 높이
     },
     furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto }
     library: [],            // { id, type, name, w, d, h, color, image(dataURL), usePhoto }
@@ -125,6 +127,7 @@ export function setScale(mmPerPx) {
   p.rooms = p.rooms.map((r) => ({ ...r, pts: r.pts.map(sc) }));
   p.windows = p.windows.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b) }));
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
+  if (p.entrance) p.entrance = { ...p.entrance, a: sc(p.entrance.a), b: sc(p.entrance.b), t: p.entrance.t * k };
   state.furniture.forEach((f) => { f.x *= k; f.y *= k; });
   emit('plan', 'furniture');
 }

@@ -18,6 +18,7 @@ const HINTS = {
   erase: '지울 가구·창·벽·방을 누르세요.',
   window: '창을 낼 벽을 누르면 그 자리에 1.2m 창이 생기고, 벽이 끊긴 틈을 누르면 틈 전체가 창이 됩니다.',
   pick: '도면에서 벽 부분을 누르면 그 색과 비슷한 곳을 벽으로 찾습니다.',
+  entrance: '현관문 자리(벽이 끊긴 곳)를 누르세요. 그곳에서 문을 열고 들어가며 둘러보기를 시작합니다.',
 };
 
 export class PlanEditor {
@@ -263,6 +264,9 @@ export class PlanEditor {
       case 'pick':
         this.hooks.pickColor?.(p);
         break;
+      case 'entrance':
+        this.hooks.pickEntrance?.(p);
+        break;
       case 'window':
         this.addWindow(p);
         break;
@@ -403,6 +407,10 @@ export class PlanEditor {
     plan.rooms.forEach((r, i) => {
       const color = ROOM_COLORS[i % ROOM_COLORS.length];
       this.poly(r.pts);
+      if (r.hidden) {   // 도면 이미지에 이미 그려진 방: 고를 때만 테두리를 보인다
+        if (sel?.id === r.id) { c.lineWidth = 2.5; c.strokeStyle = '#2f6fed'; c.stroke(); }
+        return;
+      }
       c.fillStyle = hexA(color, 0.35);
       c.fill();
       c.lineWidth = sel?.id === r.id ? 2.5 : 1;
@@ -438,6 +446,7 @@ export class PlanEditor {
 
     for (const w of plan.windows) this.drawWindow(w, sel?.id === w.id);
     this.drawScaleRef();
+    this.drawEntrance();
 
     // 가구
     this.collisions = G.findCollisions(state.furniture, plan.walls);
@@ -518,6 +527,26 @@ export class PlanEditor {
       c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
     }
     c.stroke();
+  }
+
+  /** 현관문: 초록 선 + 안쪽을 가리키는 화살표 */
+  drawEntrance() {
+    const e = state.plan.entrance;
+    if (!e) return;
+    const c = this.ctx, a = this.toScr(e.a), b = this.toScr(e.b);
+    c.strokeStyle = '#16a34a';
+    c.lineWidth = 5;
+    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const ix = -e.out.x, iy = -e.out.y, L = 26;
+    const tip = { x: m.x + ix * L, y: m.y + iy * L };
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(m.x - ix * 10, m.y - iy * 10); c.lineTo(tip.x, tip.y);
+    c.moveTo(tip.x, tip.y); c.lineTo(tip.x - ix * 9 - iy * 7, tip.y - iy * 9 + ix * 7);
+    c.moveTo(tip.x, tip.y); c.lineTo(tip.x - ix * 9 + iy * 7, tip.y - iy * 9 - ix * 7);
+    c.stroke();
+    this.tag('현관문', m.x + e.out.x * 18, m.y + e.out.y * 18, 0, '#16a34a');
   }
 
   /** 축척을 맞춘 기준 치수선 */

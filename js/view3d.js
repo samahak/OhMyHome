@@ -6,6 +6,7 @@ import { state, ui, on, checkpoint, select, updateFurniture } from './store.js';
 import { buildFurniture, buildWindow, disposeObject } from './models3d.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
+import { Tour } from './tour.js';
 
 const M = 0.001;
 const LOW_WALL_MM = 1000;
@@ -16,6 +17,9 @@ export class View3D {
     this.wallOpacity = 1;
     this.floorImage = true;
     this.lowWalls = false;
+    this.tourMode = false;     // 둘러보기 중: 나무 바닥, 천장 높이 벽, 이름표 숨김
+    this.tour = null;
+    this.clock = new THREE.Clock();
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -82,13 +86,16 @@ export class View3D {
     this.labels.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    // 사용자가 아직 카메라를 돌리지 않았으면 새 화면 비율에 맞춰 다시 잡는다
-    if (!this.userMoved) this.resetCamera(this.camMode);
+    // 사용자가 아직 카메라를 돌리지 않았으면 새 화면 비율에 맞춰 다시 잡는다 (둘러보기 중에는 카메라를 tour.js가 쥐고 있다 —
+    // 여기서 다시 잡으면 먼 풍경용 far가 500m로 돌아가 하늘·산이 잘린다)
+    if (!this.userMoved && !this.tour) this.resetCamera(this.camMode);
   }
 
   tick() {
+    const dt = this.clock.getDelta();
     if (!this.el.clientWidth) return;
-    this.controls.update();
+    if (this.tour) this.tour.update(dt);
+    else this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   }
@@ -159,6 +166,25 @@ export class View3D {
     this.buildPlan();
   }
 
+  /** 둘러보기를 시작한다. 현관(state.plan.entrance)이 정해져 있어야 한다. */
+  startTour(hooks) {
+    if (this.tour) return;
+    select(null);
+    this.tour = new Tour(this, {
+      ...hooks,
+      onExit: () => { this.tour = null; hooks.onExit?.(); },
+    });
+    this.tour.start();
+  }
+
+  setTourMode(v) {
+    this.tourMode = v;
+    this.scene.background = new THREE.Color(v ? '#cfe2f3' : '#e9edf2');   // 둘러보기: 창밖 하늘
+    this.labels.domElement.style.display = v ? 'none' : '';
+    this.buildPlan();
+    this.syncFurniture(true);
+  }
+
   setFloorImage(v) {
     this.floorImage = v;
     this.buildPlan();
@@ -173,9 +199,15 @@ export class View3D {
     this.floorTex = null;
 
     // 바닥
-    const floorMat = new THREE.MeshStandardMaterial({ color: '#f4f1ec', roughness: 0.95 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: this.tourMode ? '#cdb08a' : '#f4f1ec', roughness: this.tourMode ? 0.7 : 0.95 });
     let fw = size * 3, fd = size * 3, fx = cx, fz = cz;
-    if (p.image && this.floorImage) {
+    const wb = this.tourMode && p.walls.length && G.boundsOf(p.walls.flatMap((w) => [w.a, w.b]));
+    if (wb) {
+      // 둘러보기: 나무 바닥은 집 안에만 깐다. 창밖 땅·건물은 tour.js가 층수에 맞춰 놓는다(scenery.js)
+      fw = wb.w * M + 0.4; fd = wb.h * M + 0.4;
+      fx = (wb.minX + wb.w / 2) * M; fz = (wb.minY + wb.h / 2) * M;
+    }
+    if (p.image && this.floorImage && !this.tourMode) {
       fw = p.image.width * p.mmPerPx * M;
       fd = p.image.height * p.mmPerPx * M;
       fx = fw / 2; fz = fd / 2;
@@ -197,7 +229,7 @@ export class View3D {
     floor.position.set(fx, 0, fz);
     floor.receiveShadow = true;
     this.planGroup.add(floor);
-    if (!p.image || !this.floorImage) {
+    if ((!p.image || !this.floorImage) && !this.tourMode) {
       const grid = new THREE.GridHelper(Math.ceil(size * 3), Math.ceil(size * 3), '#c9d0d8', '#dde2e8');
       grid.position.set(Math.round(cx), 0.001, Math.round(cz));
       this.planGroup.add(grid);
@@ -205,7 +237,7 @@ export class View3D {
 
     // 방 바닥 + 이름
     p.rooms.forEach((r, i) => {
-      if (r.pts.length < 3) return;
+      if (r.pts.length < 3 || r.hidden) return;
       const shape = new THREE.Shape(r.pts.map((q) => new THREE.Vector2(q.x * M, -q.y * M)));
       const mesh = new THREE.Mesh(
         new THREE.ShapeGeometry(shape),
@@ -226,7 +258,7 @@ export class View3D {
 
     // 벽
     // '벽 낮게'는 안이 잘 보이도록 벽을 허리 높이로 잘라 보여 준다 (단면도처럼)
-    const Hmm = this.lowWalls ? Math.min(p.wallHeight, LOW_WALL_MM) : p.wallHeight;
+    const Hmm = this.lowWalls && !this.tourMode ? Math.min(p.wallHeight, LOW_WALL_MM) : p.wallHeight;
     const wins = p.windows || [];
     // 벽은 창 자리만큼 잘라 여러 토막으로 세운다 (창 아래·위 벽은 창 쪽에서 채운다)
     for (const w of p.walls) {
@@ -258,7 +290,7 @@ export class View3D {
       g.rotation.y = -Math.atan2(u.y, u.x);
       this.planGroup.add(g);
     }
-    this.setWallOpacity(this.wallOpacity);
+    this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity);
 
     // 그림자 범위를 도면에 맞춘다
     const half = size * 0.75;
@@ -292,7 +324,7 @@ export class View3D {
         if (e) { this.furnGroup.remove(e.obj); disposeObject(e.obj); }
         const obj = buildFurniture(f, this.textureFor(f));
         obj.traverse((o) => { o.userData.fid = f.id; });
-        if (f.id === selId || bad.has(f.id)) {
+        if (!this.tourMode && (f.id === selId || bad.has(f.id))) {
           const outline = new THREE.LineSegments(
             new THREE.EdgesGeometry(new THREE.BoxGeometry(f.w * M + 0.02, f.h * M + 0.02, f.d * M + 0.02)),
             new THREE.LineBasicMaterial({ color: bad.has(f.id) ? '#e03b30' : '#2f6fed', depthTest: false, transparent: true }),
@@ -312,7 +344,7 @@ export class View3D {
       if (!alive.has(id)) { this.furnGroup.remove(e.obj); disposeObject(e.obj); this.fmap.delete(id); }
     }
 
-    const sel = state.furniture.find((f) => f.id === selId);
+    const sel = !this.tourMode && state.furniture.find((f) => f.id === selId);
     this.label.visible = !!sel;
     if (sel) {
       this.label.element.className = `label3d${bad.has(sel.id) ? ' bad' : ''}`;
@@ -341,7 +373,7 @@ export class View3D {
   }
 
   onDown(e) {
-    if (e.button !== 0) return;
+    if (this.tour || e.button !== 0) return;
     this.down = { x: e.clientX, y: e.clientY };
     const fid = this.pickFurniture(e);
     if (!fid) return;
@@ -356,6 +388,7 @@ export class View3D {
   }
 
   onMove(e) {
+    if (this.tour) return;
     if (this.drag) {
       const p = this.floorPoint(e);
       if (!p) return;
@@ -370,6 +403,7 @@ export class View3D {
   }
 
   onUp(e) {
+    if (this.tour) return;
     if (this.drag) {
       this.drag = null;
       this.controls.enabled = true;

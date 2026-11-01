@@ -151,6 +151,19 @@ button.primary-soft.active { border-color: #e8590c; background: #ffe8d9; color: 
   background: var(--panel); border-top: 1px solid var(--line); color: var(--muted);
 }
 
+.tour-hud {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100% - 24px);
+  padding: 10px 14px; border-radius: 12px; background: rgba(20, 26, 36, .8); color: #fff;
+}
+.tour-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 14px; }
+.tour-count { background: rgba(255, 255, 255, .18); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+.tour-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.tour-btns button { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .25); }
+.tour-btns button:hover { background: rgba(255, 255, 255, .22); }
+.tour-btns button.primary { background: var(--accent); border-color: var(--accent); }
+.tour-help { font-size: 11.5px; opacity: .75; text-align: center; }
+
 .label3d {
   background: rgba(20, 28, 40, .85); color: #fff; padding: 3px 8px; border-radius: 6px;
   font-size: 12px; white-space: nowrap; pointer-events: none; text-align: center; line-height: 1.35;
