@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { state, ui, on, checkpoint, select, updateFurniture } from './store.js';
-import { buildFurniture, disposeObject } from './models3d.js';
+import { buildFurniture, buildWindow, disposeObject } from './models3d.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
 
@@ -140,6 +140,20 @@ export class View3D {
     });
   }
 
+  /** 벽 토막 하나: o에서 u 방향으로 s0~s1(mm), 높이 y0~y1(mm), 두께 t(mm) */
+  wallPiece(o, u, s0, s1, y0, y1, t, mat) {
+    const len = (s1 - s0) * M, h = (y1 - y0) * M, sm = (s0 + s1) / 2;
+    if (len <= 0 || h <= 0) return;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, h, t * M), mat);
+    mesh.position.set((o.x + u.x * sm) * M, y0 * M + h / 2, (o.y + u.y * sm) * M);
+    mesh.rotation.y = -Math.atan2(u.y, u.x);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.userData.isWall = true;
+    // 모서리를 진하게 보여 줘서 위에서 볼 때 벽 두께가 읽히게 한다
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: '#9aa3ad' })));
+    this.planGroup.add(mesh);
+  }
+
   setLowWalls(v) {
     this.lowWalls = v;
     this.buildPlan();
@@ -212,20 +226,37 @@ export class View3D {
 
     // 벽
     // '벽 낮게'는 안이 잘 보이도록 벽을 허리 높이로 잘라 보여 준다 (단면도처럼)
-    const H = (this.lowWalls ? Math.min(p.wallHeight, LOW_WALL_MM) : p.wallHeight) * M;
+    const Hmm = this.lowWalls ? Math.min(p.wallHeight, LOW_WALL_MM) : p.wallHeight;
+    const wins = p.windows || [];
+    // 벽은 창 자리만큼 잘라 여러 토막으로 세운다 (창 아래·위 벽은 창 쪽에서 채운다)
     for (const w of p.walls) {
-      const len = G.wallLength(w) * M;
-      if (len <= 0) continue;
+      const len = G.wallLength(w), d = G.dist(w.a, w.b);
+      if (len <= 0 || !d) continue;
       const mat = new THREE.MeshStandardMaterial({ color: w.auto ? '#f2efe9' : '#f5f2ec', roughness: 0.9 });
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, H, w.t * M), mat);
-      mesh.position.set(((w.a.x + w.b.x) / 2) * M, H / 2, ((w.a.y + w.b.y) / 2) * M);
-      mesh.rotation.y = -Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x);
-      mesh.castShadow = mesh.receiveShadow = true;
-      mesh.userData.isWall = true;
-      // 윗면 모서리를 진하게 보여 줘서 위에서 볼 때 벽 두께가 읽히게 한다
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: '#9aa3ad' }));
-      mesh.add(edges);
-      this.planGroup.add(mesh);
+      const u = { x: (w.b.x - w.a.x) / d, y: (w.b.y - w.a.y) / d }, ext = w.cap ? w.t / 2 : 0;
+      const o = { x: w.a.x - u.x * ext, y: w.a.y - u.y * ext };
+      const cuts = wins.map((win) => G.windowSpanOnWall(win, w)).filter(Boolean).sort((a, b) => a[0] - b[0]);
+      let at = 0;
+      for (const [c0, c1] of cuts) {
+        if (c0 > at) this.wallPiece(o, u, at, c0, 0, Hmm, w.t, mat);
+        at = Math.max(at, c1);
+      }
+      if (len > at) this.wallPiece(o, u, at, len, 0, Hmm, w.t, mat);
+    }
+    // 창: 창 아래 벽 + 창틀·유리 + 창 위 벽 ('벽 낮게'에서는 잘린 높이까지만)
+    for (const win of wins) {
+      const len = G.dist(win.a, win.b);
+      if (!len) continue;
+      const u = { x: (win.b.x - win.a.x) / len, y: (win.b.y - win.a.y) / len };
+      const mat = new THREE.MeshStandardMaterial({ color: '#f2efe9', roughness: 0.9 });
+      const sill = Math.min(win.sill, Hmm), top = Math.min(win.sill + win.h, Hmm);
+      if (sill > 0) this.wallPiece(win.a, u, 0, len, 0, sill, win.t, mat);
+      if (top < Hmm) this.wallPiece(win.a, u, 0, len, top, Hmm, win.t, mat);
+      if (top - sill < 50) continue;
+      const g = buildWindow(len * M, (top - sill) * M, win.t * M, sill * M);
+      g.position.set(((win.a.x + win.b.x) / 2) * M, sill * M, ((win.a.y + win.b.y) / 2) * M);
+      g.rotation.y = -Math.atan2(u.y, u.x);
+      this.planGroup.add(g);
     }
     this.setWallOpacity(this.wallOpacity);
 

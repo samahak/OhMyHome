@@ -4,12 +4,13 @@ import {
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, iconFor } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, iconFor, windowDefaults } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
+import { findWindows } from './windows.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -117,7 +118,7 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.mmPerPx = mmPerPx;
   p.scaleSet = scaleSet;
   p.scaleRef = null;
-  if (clear) { p.walls = []; p.rooms = []; }
+  if (clear) { p.walls = []; p.rooms = []; p.windows = []; }
   ui.selection = null;
   emit('plan', 'selection');
   editor.fit();
@@ -338,6 +339,7 @@ async function runDetect() {
   });
   checkpoint();
   p.walls = p.walls.filter((w) => !w.auto).concat(rects.map((r) => ({ id: uid('w'), ...rectToWall(r, mmPerPx), cap: false, auto: true })));
+  p.windows = (await autoWindows()).windows;   // 바뀐 벽에 맞춰 창 자리도 다시 찾는다
   emit('plan');
   status(rects.length
     ? `벽 ${rects.length}개를 찾았습니다.${p.scaleSet ? '' : ' (축척을 맞추지 않아 크기는 어림값입니다)'} 잘못 잡힌 것은 🧽 지우기로, 빠진 벽은 🧱 벽 그리기로 고치세요.`
@@ -516,6 +518,15 @@ function renderProps() {
       <p class="hint">${state.plan.image
         ? '길이를 실제 치수로 고치면 이 벽을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.'
         : '길이를 고치면 시작점은 그대로 두고 끝점을 옮깁니다.'}</p>`;
+  } else if (sel.kind === 'window') {
+    el.innerHTML = `
+      <h3><span>🪟 창</span><button data-act="close" class="icon">✕</button></h3>
+      <label class="field"><span>창 폭 (mm)</span><input type="text" data-f="wlen"></label>
+      <label class="field"><span>바닥~창 아래 (mm)</span><input type="number" min="0" step="50" data-f="sill"></label>
+      <label class="field"><span>창 높이 (mm)</span><input type="number" min="100" step="50" data-f="h"></label>
+      <div class="btns"><button data-preset-win="900">허리창</button><button data-preset-win="0">바닥까지 큰 창</button></div>
+      <div class="btns"><button data-act="del" class="danger">창 삭제</button></div>
+      <p class="hint">폭을 고치면 가운데를 두고 양쪽으로 늘어납니다. 3D에서는 창 자리의 벽을 비우고 창틀·유리를 넣습니다.</p>`;
   } else {
     el.innerHTML = `
       <h3><span>⬛ 방</span><button data-act="close" class="icon">✕</button></h3>
@@ -530,6 +541,14 @@ function renderProps() {
   el.querySelectorAll('[data-f]').forEach((inp) => inp.addEventListener('change', () => applyProp(inp)));
   el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => propAction(b.dataset.act)));
   el.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => applyPreset(findSelected(), +b.dataset.preset)));
+  el.querySelectorAll('[data-preset-win]').forEach((b) => b.addEventListener('click', () => {
+    const w = findSelected();
+    if (!w) return;
+    checkpoint();
+    const sill = +b.dataset.presetWin;
+    Object.assign(w, { sill, h: Math.max(300, (sill ? 2100 : Math.min(2100, state.plan.wallHeight - 100)) - sill) });
+    emit('plan');
+  }));
   refreshProps();
 }
 
@@ -541,6 +560,7 @@ function refreshProps() {
   const el = $('props');
   const val = (k) => {
     if (sel.kind === 'wall' && k === 'len') return fmtMM(G.wallLength(obj));
+    if (k === 'wlen') return fmtMM(G.dist(obj.a, obj.b));
     if (k === 'rw' || k === 'rh') { const b = G.boundsOf(obj.pts); return fmtMM(k === 'rw' ? b.w : b.h); }
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
@@ -599,6 +619,16 @@ function applyProp(inp) {
     }
     if (sel.kind === 'room') { refreshProps(); return; } // 도면 없이 그린 방은 기준이 없다
   }
+  if (k === 'wlen') {
+    const mm = G.parseLengthMM(v), cur = G.dist(obj.a, obj.b) || 1;
+    if (!(mm >= 100)) { status(`‘${v}’를 창 폭으로 읽지 못했습니다.`); refreshProps(); return; }
+    checkpoint();
+    const c = { x: (obj.a.x + obj.b.x) / 2, y: (obj.a.y + obj.b.y) / 2 }, ux = (obj.b.x - obj.a.x) / cur, uy = (obj.b.y - obj.a.y) / cur;
+    obj.a = { x: c.x - ux * mm / 2, y: c.y - uy * mm / 2 };
+    obj.b = { x: c.x + ux * mm / 2, y: c.y + uy * mm / 2 };
+    emit('plan');
+    return;
+  }
   checkpoint();
   if (sel.kind === 'wall' && k === 'len') {
     const cur = G.dist(obj.a, obj.b) || 1;
@@ -607,7 +637,7 @@ function applyProp(inp) {
   } else {
     if (k === 'rot') v = G.normDeg(v);
     if (['w', 'd', 'h', 't'].includes(k)) v = Math.max(10, v);
-    if (k === 'elev') v = Math.max(0, v);
+    if (k === 'elev' || k === 'sill') v = Math.max(0, v);
     obj[k] = v;
     // 크기를 직접 고치면 인치·인원은 지우고, 화면에는 크기로 짐작한 값을 보여 준다
     if (preset?.affects.includes(k)) delete obj[preset.key];
@@ -660,6 +690,20 @@ function duplicateSelected() {
   state.furniture.push(c);
   emit('furniture');
   select({ kind: 'furniture', id: c.id });
+}
+
+/**
+ * 자동 창을 다시 찾는다. 직접 낸 창(auto: false)은 그대로 두고, 예전 자동 창 가운데 지금 찾은 자리에 없는 것은 뺀다.
+ * state는 바꾸지 않고 { windows(새 목록), added, removed }를 돌려준다.
+ */
+async function autoWindows() {
+  const plan = state.plan;
+  const found = findWindows(plan, plan.image ? await planImageData() : null);
+  const near = (c, w) => G.distToSegment({ x: (c.a.x + c.b.x) / 2, y: (c.a.y + c.b.y) / 2 }, w.a, w.b).dist < 150;
+  const keep = plan.windows.filter((w) => w.auto === false || found.some((f) => near(f, w)));
+  const add = found.filter((f) => !keep.some((w) => near(f, w)))
+    .map((g) => ({ id: uid('n'), ...g, ...windowDefaults(G.dist(g.a, g.b)), auto: true }));
+  return { windows: keep.concat(add), added: add.length, removed: plan.windows.length - keep.length };
 }
 
 /* ---------- 상단 버튼 ---------- */
@@ -728,7 +772,7 @@ window.addEventListener('keydown', (e) => {
       return;
     }
   }
-  const tools = { v: 'select', w: 'wall', a: 'room', m: 'measure', x: 'erase' };
+  const tools = { v: 'select', w: 'wall', a: 'room', m: 'measure', n: 'window', x: 'erase' };
   if (tools[key]) { editor.setTool(tools[key]); return; }
   if (key === 'f') editor.fit();
 });

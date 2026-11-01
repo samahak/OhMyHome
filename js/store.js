@@ -16,6 +16,7 @@ export function freshState() {
       scaleRef: null,       // 축척을 맞춘 기준 치수 { a, b, mm } — a·b는 도면 좌표(mm)
       walls: [],            // { id, a:{x,y}, b:{x,y}, t, cap, auto }  (mm)
       rooms: [],            // { id, name, pts:[{x,y}] }               (mm)
+      windows: [],          // { id, a, b, t, sill, h }  (mm) a–b: 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이
       wallHeight: 2300,
     },
     furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto }
@@ -24,7 +25,7 @@ export function freshState() {
 }
 
 export const state = freshState();
-export const ui = { selection: null }; // { kind: 'furniture'|'wall'|'room', id }
+export const ui = { selection: null }; // { kind: 'furniture'|'wall'|'room'|'window', id }
 
 const listeners = new Map();
 export function on(type, fn) {
@@ -88,6 +89,7 @@ export function findSelected() {
   if (s.kind === 'furniture') return state.furniture.find((f) => f.id === s.id) || null;
   if (s.kind === 'wall') return state.plan.walls.find((w) => w.id === s.id) || null;
   if (s.kind === 'room') return state.plan.rooms.find((r) => r.id === s.id) || null;
+  if (s.kind === 'window') return state.plan.windows.find((w) => w.id === s.id) || null;
   return null;
 }
 
@@ -103,6 +105,7 @@ export function removeItem(kind, id) {
   if (kind === 'furniture') state.furniture = state.furniture.filter((f) => f.id !== id);
   if (kind === 'wall') state.plan.walls = state.plan.walls.filter((w) => w.id !== id);
   if (kind === 'room') state.plan.rooms = state.plan.rooms.filter((r) => r.id !== id);
+  if (kind === 'window') state.plan.windows = state.plan.windows.filter((w) => w.id !== id);
   if (ui.selection?.id === id) ui.selection = null;
   emit(kind === 'furniture' ? 'furniture' : 'plan', 'selection');
 }
@@ -120,6 +123,7 @@ export function setScale(mmPerPx) {
   const sc = (pt) => ({ x: pt.x * k, y: pt.y * k });
   p.walls = p.walls.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b), t: w.auto ? w.t * k : w.t }));
   p.rooms = p.rooms.map((r) => ({ ...r, pts: r.pts.map(sc) }));
+  p.windows = p.windows.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b) }));
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
   state.furniture.forEach((f) => { f.x *= k; f.y *= k; });
   emit('plan', 'furniture');

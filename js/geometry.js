@@ -189,7 +189,7 @@ export function parseLengthMM(text) {
 }
 
 /** p에서 방향 (dx,dy)로 쏜 반직선이 다각형 변과 처음 만나는 거리 (없으면 Infinity) */
-function rayHit(p, dx, dy, poly) {
+export function rayHit(p, dx, dy, poly) {
   let best = Infinity;
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
@@ -218,6 +218,133 @@ export function spanAt(p, walls) {
   };
   const h = axis(1, 0), v = axis(0, 1);
   return h || v ? { h, v } : null;
+}
+
+/**
+ * 점 p 근처의 문 틈(벽이 끊긴 곳)을 찾는다. 벽 끝에서 벽 방향으로 반직선을 쏘아
+ * min~max mm 안에서 다른 벽을 만나면 그 사이를 틈으로 본다. 바깥 방향(out)은 벽 전체의 중심에서 먼 쪽이다.
+ * 반환: { a, b, t, out:{x,y} } | null
+ */
+export function findDoorGap(p, walls, { min = 550, max = 1800, near = 1500 } = {}) {
+  const polys = walls.map((w) => wallCorners(w));
+  let best = null;
+  walls.forEach((w, i) => {
+    const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
+    if (!len) return;
+    const ux = (w.b.x - w.a.x) / len, uy = (w.b.y - w.a.y) / len, ext = w.cap ? w.t / 2 : 0;
+    for (const [end, dx, dy] of [[w.b, ux, uy], [w.a, -ux, -uy]]) {
+      const e = { x: end.x + dx * ext, y: end.y + dy * ext };
+      const from = { x: e.x + dx, y: e.y + dy };
+      let d = Infinity;
+      polys.forEach((poly, j) => { if (j !== i) d = Math.min(d, rayHit(from, dx, dy, poly)); });
+      d += 1;
+      if (!(d >= min && d <= max)) continue;
+      const b = { x: e.x + dx * d, y: e.y + dy * d };
+      const gap = Math.hypot((e.x + b.x) / 2 - p.x, (e.y + b.y) / 2 - p.y);
+      if (gap > near || (best && gap >= best.gap)) continue;
+      best = { a: e, b, t: w.t, gap };
+    }
+  });
+  if (!best) return null;
+  const n = walls.length * 2;
+  const c = walls.reduce((s, w) => ({ x: s.x + (w.a.x + w.b.x) / n, y: s.y + (w.a.y + w.b.y) / n }), { x: 0, y: 0 });
+  const gx = best.b.x - best.a.x, gy = best.b.y - best.a.y, gl = Math.hypot(gx, gy);
+  let out = { x: -gy / gl, y: gx / gl };
+  const mid = { x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2 };
+  const far = (k) => Math.hypot(mid.x + out.x * k - c.x, mid.y + out.y * k - c.y);
+  if (far(800) < far(-800)) out = { x: -out.x, y: -out.y };
+  return { a: best.a, b: best.b, t: best.t, out };
+}
+
+/**
+ * 창이 벽 위에 걸친 구간 [s0, s1] (mm, 벽 상자의 시작 끝에서 잰 거리). 창이 그 벽 위에 없으면 null.
+ * 3D에서 벽 상자를 창 자리만큼 잘라 내는 데 쓴다.
+ */
+export function windowSpanOnWall(win, w) {
+  const d = dist(w.a, w.b);
+  if (!d) return null;
+  const ux = (w.b.x - w.a.x) / d, uy = (w.b.y - w.a.y) / d, ext = w.cap ? w.t / 2 : 0;
+  const o = { x: w.a.x - ux * ext, y: w.a.y - uy * ext };
+  const proj = (p) => ({ s: (p.x - o.x) * ux + (p.y - o.y) * uy, off: -(p.x - o.x) * uy + (p.y - o.y) * ux });
+  const pa = proj(win.a), pb = proj(win.b), tol = w.t / 2 + 20;
+  if (Math.abs(pa.off) > tol || Math.abs(pb.off) > tol) return null;
+  const s0 = Math.max(0, Math.min(pa.s, pb.s)), s1 = Math.min(wallLength(w), Math.max(pa.s, pb.s));
+  return s1 - s0 > 1 ? [s0, s1] : null;
+}
+
+/**
+ * 바깥벽의 틈(= 창 자리) 찾기. 도면 이미지에서 인식한 벽은 창 자리가 얇은 선이라 지워져 틈으로 남는다.
+ * 벽 끝에서 벽 방향으로 쏜 반직선이 **같은 줄의 나란한 벽**에 min~max 안에서 닿으면 틈이다.
+ * 틈을 모두 막은 칸 지도에서 도면 바깥 테두리부터 채워 나가 '집 바깥'을 구하고, 틈 한쪽이 바깥에 닿으면 창 자리로 본다.
+ * (반직선 한 줄로 바깥을 재면 다른 문·창 틈으로 새어 나가 안쪽 문을 창으로 잘못 본다.)
+ * skip 점(현관문 가운데)에서 300mm 안을 지나는 틈은 뺀다. outsideOnly: false면 바깥 판정 없이 같은 줄의 틈을 모두 돌려준다.
+ * @returns [{ a, b, t }]
+ */
+export function findWindowGaps(walls, { min = 400, max = 6000, skip = [], cell = 40, outsideOnly = true } = {}) {
+  const polys = walls.map((w) => wallCorners(w));
+  const gaps = [];
+  walls.forEach((w, i) => {
+    const len = dist(w.a, w.b);
+    if (!len) return;
+    const ux = (w.b.x - w.a.x) / len, uy = (w.b.y - w.a.y) / len, ext = w.cap ? w.t / 2 : 0;
+    for (const [end, dx, dy] of [[w.b, ux, uy], [w.a, -ux, -uy]]) {
+      const e = { x: end.x + dx * ext, y: end.y + dy * ext };
+      const from = { x: e.x + dx, y: e.y + dy };
+      let d = Infinity, j = -1;
+      polys.forEach((poly, k) => { if (k === i) return; const h = rayHit(from, dx, dy, poly); if (h < d) { d = h; j = k; } });
+      d += 1;
+      if (!(d >= min && d <= max)) continue;
+      const o = walls[j], ol = dist(o.a, o.b) || 1;
+      if (Math.abs(ux * (o.b.y - o.a.y) / ol - uy * (o.b.x - o.a.x) / ol) > 0.05) continue;              // 나란한 벽
+      if (Math.abs(-(o.a.x - e.x) * uy + (o.a.y - e.y) * ux) > Math.max(w.t, o.t) / 2 + 30) continue;     // 같은 줄
+      const b = { x: e.x + dx * d, y: e.y + dy * d }, mid = { x: (e.x + b.x) / 2, y: (e.y + b.y) / 2 };
+      if (gaps.some((g) => dist(g.mid, mid) < 100)) continue;
+      gaps.push({ a: e, b, t: w.t, mid, n: { x: -uy, y: ux } });
+    }
+  });
+  if (!gaps.length) return [];
+  if (!outsideOnly) return gaps.filter((g) => !skip.some((s) => distToSegment(s, g.a, g.b).dist < 300)).map(({ a, b, t }) => ({ a, b, t }));
+
+  // 벽 + 모든 틈을 막은 칸 지도 → 테두리부터 채운 칸이 집 바깥
+  const isOutside = outsideTester(polys.concat(gaps.map((g) => wallCorners({ a: g.a, b: g.b, t: g.t + 20, cap: false }))), cell);
+  return gaps
+    .filter((g) => !skip.some((s) => distToSegment(s, g.a, g.b).dist < 300))
+    .filter((g) => [1, -1].some((k) => isOutside({ x: g.mid.x + g.n.x * k * (g.t / 2 + 90), y: g.mid.y + g.n.y * k * (g.t / 2 + 90) })))
+    .map(({ a, b, t }) => ({ a, b, t }));
+}
+
+/**
+ * 막힌 다각형들(벽·막은 틈) 바깥 테두리부터 칸을 채워 '집 바깥'을 구하고, 점이 바깥인지 알려 주는 함수를 돌려준다.
+ * cell(mm)은 가장 얇은 벽(60mm)보다 작아야 벽 사이로 새지 않는다.
+ */
+export function outsideTester(polys, cell = 40) {
+  if (!polys.length) return () => true;
+  const bb = boundsOf(polys.flat()), pad = 3 * cell;
+  const x0 = bb.minX - pad, y0 = bb.minY - pad, W = Math.ceil((bb.w + 2 * pad) / cell), H = Math.ceil((bb.h + 2 * pad) / cell);
+  const blocked = new Uint8Array(W * H), outside = new Uint8Array(W * H);
+  for (const poly of polys) {
+    const pb = boundsOf(poly);
+    for (let cy = Math.max(0, Math.floor((pb.minY - y0) / cell)); cy <= Math.min(H - 1, Math.ceil((pb.maxY - y0) / cell)); cy++) {
+      for (let cx = Math.max(0, Math.floor((pb.minX - x0) / cell)); cx <= Math.min(W - 1, Math.ceil((pb.maxX - x0) / cell)); cx++) {
+        if (!blocked[cy * W + cx] && pointInPoly({ x: x0 + (cx + 0.5) * cell, y: y0 + (cy + 0.5) * cell }, poly)) blocked[cy * W + cx] = 1;
+      }
+    }
+  }
+  const queue = [];
+  const push = (i) => { if (!blocked[i] && !outside[i]) { outside[i] = 1; queue.push(i); } };
+  for (let cx = 0; cx < W; cx++) { push(cx); push((H - 1) * W + cx); }
+  for (let cy = 0; cy < H; cy++) { push(cy * W); push(cy * W + W - 1); }
+  while (queue.length) {
+    const i = queue.pop(), cx = i % W;
+    if (cx > 0) push(i - 1);
+    if (cx < W - 1) push(i + 1);
+    if (i >= W) push(i - W);
+    if (i < W * (H - 1)) push(i + W);
+  }
+  return (p) => {
+    const cx = Math.floor((p.x - x0) / cell), cy = Math.floor((p.y - y0) / cell);
+    return cx < 0 || cy < 0 || cx >= W || cy >= H || outside[cy * W + cx] === 1;
+  };
 }
 
 export function boundsOf(points) {

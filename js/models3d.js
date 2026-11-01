@@ -404,6 +404,39 @@ function plain(g, W, D, H, c) {
   box(g, W, H, D, 0, H / 2, 0, mat(c));
 }
 
+/**
+ * 창틀 + 유리 (m). 원점은 창 가운데 아래(창 아래 높이), x = 창 폭 방향, y = 위, z = 벽 두께 방향.
+ * 폭이 0.9m를 넘으면 미닫이 두 짝(앞뒤로 겹친 유리)으로 그린다. 바닥까지 내려오는 창이 아니면 안쪽에 창턱을 단다.
+ */
+export function buildWindow(W, H, T, sill) {
+  const g = new THREE.Group();
+  const frame = mat('#eef0f2', { roughness: 0.5 }), fw = 0.05, fd = Math.min(T * 0.6, 0.12);
+  const glass = new THREE.MeshStandardMaterial({ color: '#cfe6f5', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.22, depthWrite: false });
+  box(g, W, fw, fd, 0, fw / 2, 0, frame);                 // 아래
+  box(g, W, fw, fd, 0, H - fw / 2, 0, frame);             // 위
+  box(g, fw, H, fd, -W / 2 + fw / 2, H / 2, 0, frame);    // 왼쪽
+  box(g, fw, H, fd, W / 2 - fw / 2, H / 2, 0, frame);     // 오른쪽
+  const n = W > 0.9 ? 2 : 1, pw = (W - 2 * fw) / n + (n > 1 ? 0.04 : 0), gh = H - 2 * fw;
+  for (let i = 0; i < n; i++) {
+    const x = n > 1 ? (i === 0 ? -1 : 1) * (W - 2 * fw - pw) / 2 : 0, z = n > 1 ? (i === 0 ? -1 : 1) * fd * 0.2 : 0;
+    const sash = mat('#f6f7f8', { roughness: 0.45 }), sw = 0.035;
+    box(g, pw, sw, 0.03, x, fw + sw / 2, z, sash);
+    box(g, pw, sw, 0.03, x, H - fw - sw / 2, z, sash);
+    box(g, sw, gh, 0.03, x - pw / 2 + sw / 2, H / 2, z, sash);
+    box(g, sw, gh, 0.03, x + pw / 2 - sw / 2, H / 2, z, sash);
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(pw - 2 * sw, gh - 2 * sw), glass);
+    pane.position.set(x, H / 2, z);
+    g.add(pane);
+    const back = pane.clone();
+    back.rotation.y = Math.PI;
+    g.add(back);
+  }
+  if (sill > 0.05) {
+    for (const zs of [1, -1]) box(g, W + 0.06, 0.025, (T - fd) / 2 + 0.04, 0, 0.0125 - 0.005, zs * (fd / 2 + ((T - fd) / 2 + 0.04) / 2 - 0.01), mat('#e7e1d6', { roughness: 0.4 }));
+  }
+  return g;
+}
+
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),

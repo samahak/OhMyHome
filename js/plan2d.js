@@ -2,6 +2,7 @@
 // 좌표: 도면 mm. 화면 px = mm * view.s + view.o
 import { state, ui, on, checkpoint, select, uid, removeItem, emit, updateFurniture } from './store.js';
 import * as G from './geometry.js';
+import { windowDefaults } from './catalog.js';
 
 export const ROOM_COLORS = ['#f6c48b', '#9fd3c7', '#b5c7f2', '#f2a9b5', '#c9e29b', '#d7b8f0', '#f5dd8b'];
 const SNAP_PX = 12;
@@ -14,7 +15,8 @@ const HINTS = {
   room: '방 꼭짓점을 차례로 찍으세요. 첫 점을 다시 누르거나 더블클릭하면 방이 완성됩니다.',
   scale: '방 안을 한 번 누르면 벽 사이 가로·세로가 지금 몇 mm로 보이는지 나옵니다. 도면 치수로 고치면 전체 크기가 바뀝니다. (Shift+클릭: 두 점으로 재기)',
   measure: '두 점을 찍어 길이를 잽니다. Shift를 누르면 자유 각도.',
-  erase: '지울 가구·벽·방을 누르세요.',
+  erase: '지울 가구·창·벽·방을 누르세요.',
+  window: '창을 낼 벽을 누르면 그 자리에 1.2m 창이 생기고, 벽이 끊긴 틈을 누르면 틈 전체가 창이 됩니다.',
   pick: '도면에서 벽 부분을 누르면 그 색과 비슷한 곳을 벽으로 찾습니다.',
 };
 
@@ -167,6 +169,14 @@ export class PlanEditor {
     }
     return null;
   }
+  hitWindow(p) {
+    const tol = 4 / this.view.s;
+    for (let i = state.plan.windows.length - 1; i >= 0; i--) {
+      const w = state.plan.windows[i];
+      if (G.pointInPoly(p, G.wallCorners({ ...w, cap: false }, -tol))) return w;
+    }
+    return null;
+  }
   hitRoom(p) {
     for (let i = state.plan.rooms.length - 1; i >= 0; i--) {
       if (G.pointInPoly(p, state.plan.rooms[i].pts)) return state.plan.rooms[i];
@@ -176,6 +186,8 @@ export class PlanEditor {
   hitAny(p) {
     const f = this.hitFurniture(p);
     if (f) return { kind: 'furniture', id: f.id, obj: f };
+    const win = this.hitWindow(p);   // 창은 벽 위에 있으니 벽보다 먼저 본다
+    if (win) return { kind: 'window', id: win.id, obj: win };
     const w = this.hitWall(p);
     if (w) return { kind: 'wall', id: w.id, obj: w };
     const r = this.hitRoom(p);
@@ -250,6 +262,9 @@ export class PlanEditor {
       }
       case 'pick':
         this.hooks.pickColor?.(p);
+        break;
+      case 'window':
+        this.addWindow(p);
         break;
     }
     this.draw();
@@ -421,6 +436,7 @@ export class PlanEditor {
       if (w) this.wallLabel(w);
     }
 
+    for (const w of plan.windows) this.drawWindow(w, sel?.id === w.id);
     this.drawScaleRef();
 
     // 가구
@@ -461,6 +477,47 @@ export class PlanEditor {
     };
     lines(100, '#f0f2f5');
     lines(1000, '#dfe4ea');
+  }
+
+  /**
+   * 창 내기: 벽 위를 누르면 그 벽 방향으로 1,200mm(벽이 짧으면 벽 길이) 창을, 벽이 끊긴 틈을 누르면 틈 전체를 창으로.
+   */
+  addWindow(p) {
+    let win = null;
+    const w = this.hitWall(p);
+    if (w) {
+      const d = G.dist(w.a, w.b), ux = (w.b.x - w.a.x) / d, uy = (w.b.y - w.a.y) / d;
+      const t = Math.max(0, Math.min(d, (p.x - w.a.x) * ux + (p.y - w.a.y) * uy)), half = Math.min(600, d / 2);
+      const c = Math.max(half, Math.min(d - half, t));
+      win = { a: { x: w.a.x + ux * (c - half), y: w.a.y + uy * (c - half) }, b: { x: w.a.x + ux * (c + half), y: w.a.y + uy * (c + half) }, t: w.t };
+    } else {
+      const g = G.findDoorGap(p, state.plan.walls, { min: 300, max: 6000, near: 800 });
+      if (g) win = { a: g.a, b: g.b, t: g.t };
+    }
+    if (!win) { this.hooks.status?.('벽 위나 벽이 끊긴 틈을 눌러 주세요.'); return; }
+    checkpoint();
+    const obj = { id: uid('n'), ...win, ...windowDefaults(G.dist(win.a, win.b)), auto: false };
+    state.plan.windows.push(obj);
+    emit('plan');
+    select({ kind: 'window', id: obj.id });
+  }
+
+  /** 창: 벽 자리를 하얗게 비우고 가는 선 세 줄 (도면 기호) */
+  drawWindow(w, selected) {
+    const c = this.ctx;
+    this.poly(G.wallCorners({ ...w, cap: false }));
+    c.fillStyle = '#ffffff';
+    c.fill();
+    c.lineWidth = selected ? 2.5 : 1;
+    c.strokeStyle = selected ? '#2f6fed' : '#4a90c2';
+    c.stroke();
+    const len = G.dist(w.a, w.b) || 1, nx = -(w.b.y - w.a.y) / len, ny = (w.b.x - w.a.x) / len;
+    c.beginPath();
+    for (const k of [-0.25, 0, 0.25]) {
+      const a = this.toScr({ x: w.a.x + nx * w.t * k, y: w.a.y + ny * w.t * k }), b = this.toScr({ x: w.b.x + nx * w.t * k, y: w.b.y + ny * w.t * k });
+      c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+    }
+    c.stroke();
   }
 
   /** 축척을 맞춘 기준 치수선 */
