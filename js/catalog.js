@@ -32,6 +32,56 @@ export const SHAPES = {
   box: { label: '상자(기본)', photoFront: true },
 };
 
+/** TV 화면 크기(인치, 16:9 대각선) → 겉 크기(mm). 베젤은 가로 12mm · 세로 22mm로 어림한다. */
+export const TV_INCHES = [43, 50, 55, 65, 75, 85];
+const TV_DIAG = Math.hypot(16, 9);
+export function tvSizeFromInch(inch) {
+  const diag = inch * 25.4;
+  return { w: Math.round((diag * 16) / TV_DIAG + 12), h: Math.round((diag * 9) / TV_DIAG + 22) };
+}
+/** 가로 크기로 거꾸로 짐작한 인치 (크기를 직접 고쳤을 때 보여 주는 값) */
+export function inchFromTvWidth(w) {
+  return Math.round((((w - 12) * TV_DIAG) / 16 / 25.4) * 10) / 10;
+}
+
+/** 소파 인원 → 가로(mm). 한 자리 580mm + 양쪽 팔걸이 180mm씩 (3인 2,100mm) */
+const SOFA_SEAT_MM = 580, SOFA_ARMS_MM = 360;
+export function sofaWidthFromSeats(n) { return SOFA_ARMS_MM + SOFA_SEAT_MM * n; }
+export function seatsFromSofaWidth(w) { return Math.max(1, Math.round((w - SOFA_ARMS_MM) / SOFA_SEAT_MM)); }
+
+/** 식탁 인원 → 크기(mm). 긴 변 한 자리 600mm + 여유 200mm, 인원이 많을수록 조금 깊게 (4인 1,400×800) */
+export function tableSizeFromPeople(n) {
+  return { w: Math.max(800, Math.ceil(n / 2) * 600 + 200), d: n <= 2 ? 750 : n <= 4 ? 800 : n <= 6 ? 900 : 1000 };
+}
+export function peopleFromTableWidth(w) { return Math.max(2, Math.round((w - 200) / 600) * 2); }
+
+/**
+ * 숫자 하나로 크기를 정하는 가구 (TV 인치, 소파 인원).
+ * 속성 패널은 이 표를 보고 입력칸과 빠른 선택 버튼을 그린다. 가구 항목에는 f[key]로 남는다.
+ *   size(v)  → 바꿀 크기 { w, h, ... }      guess(f) → key가 없을 때(크기를 직접 고친 뒤) 짐작한 값
+ *   affects  → 이 칸을 직접 고치면 f[key]를 지운다
+ */
+export const SIZE_PRESETS = {
+  tv: {
+    key: 'inch', label: '화면 크기 (인치)', unit: '"', unitText: '인치', card: 'TV', pick: '인치 선택',
+    options: TV_INCHES, min: 10, max: 150,
+    size: tvSizeFromInch, guess: (f) => inchFromTvWidth(f.w), affects: ['w', 'h'],
+    name: (v) => `${v}인치 TV`, namePattern: /^\d+(\.\d+)?인치 TV$/, note: '16:9 화면 + 베젤 어림값',
+  },
+  sofa: {
+    key: 'seats', label: '인원 (인용)', unit: '인', unitText: '인', card: '소파', pick: '인원 선택',
+    options: [2, 3, 4, 5, 6], min: 1, max: 8,
+    size: (n) => ({ w: sofaWidthFromSeats(n) }), guess: (f) => seatsFromSofaWidth(f.w), affects: ['w'],
+    name: (v) => `${v}인 소파`, namePattern: /^\d+인 소파$/, note: '한 자리 580mm + 팔걸이',
+  },
+  table: {
+    key: 'people', label: '인원 (인용)', unit: '인', unitText: '인', card: '식탁', pick: '인원 선택',
+    options: [2, 4, 6, 8], min: 1, max: 12,
+    size: tableSizeFromPeople, guess: (f) => peopleFromTableWidth(f.w), affects: ['w', 'd'],
+    name: (v) => `${v}인 식탁`, namePattern: /^\d+인 식탁$/, note: '긴 변 한 자리 600mm',
+  },
+};
+
 export const CATALOG = [
   { type: 'fridge_side', name: '양문형 냉장고', icon: '🧊', w: 912, d: 928, h: 1793, color: '#c9ced6' },
   { type: 'fridge_top', name: '일반 냉장고', icon: '🧊', w: 700, d: 700, h: 1800, color: '#e8eaee' },
@@ -48,12 +98,12 @@ export const CATALOG = [
   { type: 'bed', name: '슈퍼싱글 침대', icon: '🛏️', w: 1150, d: 2050, h: 900, color: '#b89a7a' },
   { type: 'bed', name: '퀸 침대', icon: '🛏️', w: 1550, d: 2100, h: 1000, color: '#9c7b5b' },
   { type: 'bed', name: '킹 침대', icon: '🛏️', w: 1700, d: 2100, h: 1000, color: '#9c7b5b' },
-  { type: 'sofa', name: '3인 소파', icon: '🛋️', w: 2100, d: 900, h: 850, color: '#8a9bb0' },
-  { type: 'table', name: '4인 식탁', icon: '🍽️', w: 1400, d: 800, h: 750, color: '#a7825c' },
+  { type: 'sofa', name: '3인 소파', icon: '🛋️', seats: 3, w: sofaWidthFromSeats(3), d: 900, h: 850, color: '#8a9bb0' },
+  { type: 'table', name: '4인 식탁', icon: '🍽️', people: 4, ...tableSizeFromPeople(4), h: 750, color: '#a7825c' },
   { type: 'desk', name: '책상', icon: '🖥️', w: 1200, d: 600, h: 740, color: '#d8c7b0' },
   { type: 'chair', name: '의자', icon: '🪑', w: 450, d: 500, h: 850, color: '#6f7d8c' },
   { type: 'tvstand', name: '거실장', icon: '🗄️', w: 1800, d: 400, h: 450, color: '#f0ece6' },
-  { type: 'tv', name: '65인치 TV', icon: '📺', w: 1450, d: 60, h: 840, color: '#1d2025', elev: 500 },
+  { type: 'tv', name: '65인치 TV', icon: '📺', inch: 65, ...tvSizeFromInch(65), d: 60, color: '#1d2025', elev: 500 },
   { type: 'shelf', name: '책장', icon: '📚', w: 800, d: 300, h: 1800, color: '#e3d3bd' },
   { type: 'drawer', name: '서랍장', icon: '🗃️', w: 800, d: 450, h: 900, color: '#efe6da' },
   { type: 'vanity', name: '화장대', icon: '🪞', w: 800, d: 400, h: 1450, color: '#efe6da' },

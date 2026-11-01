@@ -4,7 +4,7 @@ import {
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, iconFor } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, iconFor } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
@@ -395,6 +395,8 @@ function addFurniture(def, extra = {}) {
     id: uid('f'), type: def.type, name: def.name, w: def.w, d: def.d, h: def.h,
     x, y, rot: 0, elev: def.elev || 0, color: def.color, libId: null, usePhoto: false, ...extra,
   };
+  const preset = SIZE_PRESETS[def.type];
+  if (preset && def[preset.key]) f[preset.key] = def[preset.key];
   state.furniture.push(f);
   emit('furniture');
   select({ kind: 'furniture', id: f.id });
@@ -403,11 +405,15 @@ function addFurniture(def, extra = {}) {
 }
 
 function renderCatalog() {
-  $('catalog').innerHTML = CATALOG.map((c, i) => `
+  $('catalog').innerHTML = CATALOG.map((c, i) => {
+    const p = SIZE_PRESETS[c.type];
+    const v = p && c[p.key];
+    return `
     <button class="cat-item" data-i="${i}" title="${esc(c.name)} ${c.w}×${c.d}×${c.h}mm">
-      <span class="ico">${c.icon}</span><span class="nm">${esc(c.name)}</span>
-      <span class="sz">${c.w}×${c.d}</span>
-    </button>`).join('');
+      <span class="ico">${c.icon}</span><span class="nm">${v ? p.card : esc(c.name)}</span>
+      <span class="sz">${v ? `${v}${p.unitText} · ${p.pick}` : `${c.w}×${c.d}`}</span>
+    </button>`;
+  }).join('');
   $('catalog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => addFurniture(CATALOG[+b.dataset.i])));
 }
 
@@ -474,12 +480,16 @@ function renderProps() {
 
   if (sel.kind === 'furniture') {
     const lib = obj.libId && state.library.find((l) => l.id === obj.libId);
+    const preset = SIZE_PRESETS[obj.type];
     el.innerHTML = `
       <h3><span>${iconFor(obj.type)} 가구</span><button data-act="close" class="icon">✕</button></h3>
       ${lib?.image ? `<img class="thumb" src="${lib.image}" alt="">` : ''}
       <div class="warn" data-warn hidden>⚠ 벽이나 다른 가구와 겹칩니다.</div>
       <label class="field"><span>이름</span><input type="text" data-f="name"></label>
       <label class="field"><span>샘플 모양</span><select data-f="type">${Object.entries(SHAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      ${preset ? `
+      <label class="field"><span>${preset.label}</span><input type="number" min="${preset.min}" max="${preset.max}" step="1" data-f="${preset.key}"></label>
+      <div class="btns preset-btns">${preset.options.map((n) => `<button data-preset="${n}">${n}${preset.unit}</button>`).join('')}</div>` : ''}
       <label class="field"><span>가로 W (mm)</span><input type="number" min="10" step="10" data-f="w"></label>
       <label class="field"><span>깊이 D (mm)</span><input type="number" min="10" step="10" data-f="d"></label>
       <label class="field"><span>높이 H (mm)</span><input type="number" min="10" step="10" data-f="h"></label>
@@ -519,6 +529,7 @@ function renderProps() {
   }
   el.querySelectorAll('[data-f]').forEach((inp) => inp.addEventListener('change', () => applyProp(inp)));
   el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => propAction(b.dataset.act)));
+  el.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => applyPreset(findSelected(), +b.dataset.preset)));
   refreshProps();
 }
 
@@ -533,6 +544,8 @@ function refreshProps() {
     if (k === 'rw' || k === 'rh') { const b = G.boundsOf(obj.pts); return fmtMM(k === 'rw' ? b.w : b.h); }
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
+    const p = SIZE_PRESETS[obj.type];
+    if (p && k === p.key) return obj[k] ?? p.guess(obj);
     return obj[k];
   };
   el.querySelectorAll('[data-f]').forEach((inp) => {
@@ -542,6 +555,9 @@ function refreshProps() {
   });
   if (sel.kind === 'furniture') {
     el.querySelector('[data-warn]').hidden = !G.findCollisions(state.furniture, state.plan.walls).has(obj.id);
+    const p = SIZE_PRESETS[obj.type];
+    const cur = p && (obj[p.key] ?? p.guess(obj));
+    el.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', +b.dataset.preset === cur));
   }
   if (sel.kind === 'room') {
     const a = G.polygonArea(obj.pts) / 1e6, b = G.boundsOf(obj.pts);
@@ -558,6 +574,8 @@ function applyProp(inp) {
   const k = inp.dataset.f;
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
+  const preset = sel.kind === 'furniture' && SIZE_PRESETS[obj.type];
+  if (preset && k === preset.key) { applyPreset(obj, v); return; }
   // 길이로 도면 전체 크기를 맞추는 칸들
   if ((sel.kind === 'wall' && k === 'len') || k === 'rw' || k === 'rh') {
     const mm = G.parseLengthMM(v);
@@ -591,8 +609,22 @@ function applyProp(inp) {
     if (['w', 'd', 'h', 't'].includes(k)) v = Math.max(10, v);
     if (k === 'elev') v = Math.max(0, v);
     obj[k] = v;
+    // 크기를 직접 고치면 인치·인원은 지우고, 화면에는 크기로 짐작한 값을 보여 준다
+    if (preset?.affects.includes(k)) delete obj[preset.key];
   }
   emit(sel.kind === 'furniture' ? 'furniture' : 'plan');
+}
+
+/** TV 인치·소파 인원처럼 숫자 하나로 크기를 정한다 (catalog.SIZE_PRESETS) */
+function applyPreset(obj, v) {
+  const p = obj && SIZE_PRESETS[obj.type];
+  if (!p) return;
+  if (!(v >= p.min && v <= p.max)) { status(`${p.label}는 ${p.min}~${p.max} 사이로 넣어 주세요.`); refreshProps(); return; }
+  checkpoint();
+  Object.assign(obj, { [p.key]: v, ...p.size(v) });
+  if (p.namePattern.test(obj.name)) obj.name = p.name(v);
+  emit('furniture');
+  status(`${p.name(v)}: ${fmtMM(obj.w)} × ${fmtMM(obj.d)} × ${fmtMM(obj.h)} mm (${p.note})`);
 }
 
 function propAction(act) {

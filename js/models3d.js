@@ -288,10 +288,10 @@ function bed(g, W, D, H, c) {
   box(g, W - 0.02, 0.05, blanket, 0, mattTop + 0.02, D / 2 - blanket / 2 - 0.02, mat('#9db7d6', { roughness: 1 }));
 }
 
-function sofa(g, W, D, H, c) {
+function sofa(g, W, D, H, c, f) {
   const m = mat(c, { roughness: 0.9 }), seatH = 0.42, arm = Math.min(0.2, W * 0.12), backT = Math.min(0.22, D * 0.25);
   box(g, W, seatH * 0.65, D, 0, seatH * 0.325, 0, m);
-  const n = W > 1.6 ? 3 : W > 1.1 ? 2 : 1, cw = (W - 2 * arm) / n;
+  const n = f?.seats || (W > 1.6 ? 3 : W > 1.1 ? 2 : 1), cw = (W - 2 * arm) / n;
   const cm = mat(shade(c, 1.08), { roughness: 0.95 });
   for (let i = 0; i < n; i++) box(g, cw - 0.015, 0.15, D - backT - 0.03, -W / 2 + arm + cw * i + cw / 2, seatH * 0.65 + 0.075, backT / 2, cm);
   box(g, W, H, backT, 0, H / 2, -D / 2 + backT / 2, m);
@@ -418,7 +418,7 @@ const BUILDERS = {
 export function buildFurniture(f, photo) {
   const g = new THREE.Group();
   const W = f.w / 1000, D = f.d / 1000, H = f.h / 1000;
-  (BUILDERS[f.type] || plain)(g, W, D, H, f.color || '#cccccc');
+  (BUILDERS[f.type] || plain)(g, W, D, H, f.color || '#cccccc', f);
   if (photo) {
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(W, H),
