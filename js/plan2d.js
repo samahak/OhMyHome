@@ -124,7 +124,7 @@ export class PlanEditor {
     this.hooks.closeMeasure?.();
     this.cv.style.cursor = tool === 'select' ? 'default' : 'crosshair';
     this.hooks.toolChanged?.(tool);
-    this.hooks.status?.(HINTS[tool] || '');
+    this.hooks.status?.((HINTS[tool] || '') + (tool === 'select' ? '' : ' · 도구 끄기: Esc(그리는 중이면 두 번) 또는 도구 버튼 한 번 더'));
     this.draw();
   }
 
