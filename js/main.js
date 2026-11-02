@@ -5,7 +5,7 @@ import {
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, iconFor, windowDefaults } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
@@ -419,6 +419,7 @@ function addFurniture(def, extra = {}) {
   };
   const preset = SIZE_PRESETS[def.type];
   if (preset && def[preset.key]) f[preset.key] = def[preset.key];
+  if (def.plant) f.plant = def.plant;
   state.furniture.push(f);
   emit('furniture');
   select({ kind: 'furniture', id: f.id });
@@ -430,10 +431,11 @@ function renderCatalog() {
   $('catalog').innerHTML = CATALOG.map((c, i) => {
     const p = SIZE_PRESETS[c.type];
     const v = p && c[p.key];
+    const plant = c.type === 'plant';   // 식물은 놓은 뒤 종류를 고른다
     return `
     <button class="cat-item" data-i="${i}" title="${esc(c.name)} ${c.w}×${c.d}×${c.h}mm">
-      <span class="ico">${c.icon}</span><span class="nm">${v ? p.card : esc(c.name)}</span>
-      <span class="sz">${v ? `${v}${p.unitText} · ${p.pick}` : `${c.w}×${c.d}`}</span>
+      <span class="ico">${c.icon}</span><span class="nm">${v ? p.card : plant ? '식물' : esc(c.name)}</span>
+      <span class="sz">${v ? `${v}${p.unitText} · ${p.pick}` : plant ? `${esc(c.name)} · 종류 선택` : `${c.w}×${c.d}`}</span>
     </button>`;
   }).join('');
   $('catalog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => addFurniture(CATALOG[+b.dataset.i])));
@@ -569,6 +571,9 @@ function renderProps() {
       <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: LG 오브제 M873"></label>
       <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,290,000 · 129만"></label>
       <label class="field"><span>샘플 모양</span><select data-f="type">${Object.entries(SHAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      ${obj.type === 'plant' ? `
+      <label class="field"><span>식물 종류</span><select data-f="plant">${Object.entries(PLANTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      <div class="btns preset-btns">${Object.entries(PLANTS).map(([k, v]) => `<button data-plant="${k}">${v.label}</button>`).join('')}</div>` : ''}
       ${preset ? `
       <label class="field"><span>${preset.label}</span><input type="number" min="${preset.min}" max="${preset.max}" step="1" data-f="${preset.key}"></label>
       <div class="btns preset-btns">${preset.options.map((n) => `<button data-preset="${n}">${n}${preset.unit}</button>`).join('')}</div>` : ''}
@@ -633,6 +638,7 @@ function renderProps() {
   el.querySelectorAll('[data-f]').forEach((inp) => inp.addEventListener('change', () => applyProp(inp)));
   el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => propAction(b.dataset.act)));
   el.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => applyPreset(findSelected(), +b.dataset.preset)));
+  el.querySelectorAll('[data-plant]').forEach((b) => b.addEventListener('click', () => applyPlant(findSelected(), b.dataset.plant)));
   el.querySelectorAll('[data-preset-win]').forEach((b) => b.addEventListener('click', () => {
     const w = findSelected();
     if (!w) return;
@@ -662,6 +668,7 @@ function refreshProps() {
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
     if (k === 'counterD') return lCounterDepth(obj);
+    if (k === 'plant') return plantOf(obj);
     if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
     const p = SIZE_PRESETS[obj.type];
     if (p && k === p.key) return obj[k] ?? p.guess(obj);
@@ -677,6 +684,7 @@ function refreshProps() {
     const p = SIZE_PRESETS[obj.type];
     const cur = p && (obj[p.key] ?? p.guess(obj));
     el.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', +b.dataset.preset === cur));
+    el.querySelectorAll('[data-plant]').forEach((b) => b.classList.toggle('active', b.dataset.plant === plantOf(obj)));
     const lside = el.querySelector('[data-v=lside]');
     if (lside) lside.textContent = obj.mirror ? '왼쪽 (앞에서 볼 때)' : '오른쪽 (앞에서 볼 때)';
   }
@@ -695,6 +703,7 @@ function applyProp(inp) {
   const k = inp.dataset.f;
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
+  if (k === 'plant') { applyPlant(obj, v); return; }
   if (k === 'price') {
     const won = parseWon(v);
     if (Number.isNaN(won)) { status(`‘${v}’를 가격으로 읽지 못했습니다. 예: 1,290,000 · 1290000원 · 129만`); refreshProps(); return; }
@@ -773,6 +782,21 @@ function clampKitchenL(obj, k, v) {
     return Math.max(min, v);
   }
   return v;
+}
+
+/**
+ * 식물 종류를 바꾼다: 크기를 그 종류의 기본값으로 맞추고, 이름이 종류 이름(또는 '식물')이었으면 이름도 바꾼다.
+ * 자리·화분 색·모델명·가격은 그대로 둔다.
+ */
+function applyPlant(obj, key) {
+  const p = PLANTS[key];
+  if (!obj || obj.type !== 'plant' || !p) return;
+  checkpoint();
+  const named = obj.name === '식물' || Object.values(PLANTS).some((x) => x.label === obj.name);
+  Object.assign(obj, { plant: key, w: p.w, d: p.d, h: p.h });
+  if (named) obj.name = p.label;
+  emit('furniture');
+  status(`${p.label}(으)로 바꿨습니다: ${fmtMM(p.w)} × ${fmtMM(p.d)} × ${fmtMM(p.h)} mm. 크기는 속성에서 고칠 수 있고, 색상은 화분 색입니다.`);
 }
 
 /** TV 인치·소파 인원처럼 숫자 하나로 크기를 정한다 (catalog.SIZE_PRESETS) */

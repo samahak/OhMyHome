@@ -340,7 +340,7 @@ export class View3D {
     for (const f of state.furniture) {
       alive.add(f.id);
       const picked = selIds.has(f.id);
-      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.mirror, f.counterD, f.color, f.libId, f.usePhoto, picked, bad.has(f.id)].join('|');
+      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.mirror, f.counterD, f.plant, f.type === 'plant' && f.elev, f.color, f.libId, f.usePhoto, picked, bad.has(f.id)].join('|');
       let e = this.fmap.get(f.id);
       if (!e || e.key !== key || force) {
         if (e) { this.furnGroup.remove(e.obj); disposeObject(e.obj); }
