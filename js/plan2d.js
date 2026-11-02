@@ -161,7 +161,7 @@ export class PlanEditor {
   hitFurniture(p) {
     for (let i = state.furniture.length - 1; i >= 0; i--) {
       const f = state.furniture[i];
-      if (G.pointInPoly(p, G.furnitureCorners(f))) return f;
+      if (G.furnitureParts(f).some((poly) => G.pointInPoly(p, poly))) return f;
     }
     return null;
   }
@@ -640,8 +640,7 @@ export class PlanEditor {
 
   drawFurniture(f, selected, bad) {
     const c = this.ctx;
-    const pts = G.furnitureCorners(f);
-    this.poly(pts);
+    this.poly(G.furnitureOutline(f));
     c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.color || '#cccccc', f.elev > 0 ? 0.55 : 0.85);
     c.fill();
     c.lineWidth = selected ? 2.5 : 1.2;
@@ -649,14 +648,18 @@ export class PlanEditor {
     c.setLineDash(f.elev > 0 ? [5, 3] : []);
     c.stroke();
     c.setLineDash([]);
-    // 앞면 표시 (로컬 +y 변)
-    const a = this.toScr(pts[2]), b = this.toScr(pts[3]);
+    // 앞면 표시 (로컬 +y 변, ㄱ자는 안쪽으로 꺾인 두 변)
     c.strokeStyle = selected ? '#2f6fed' : '#1f2833';
     c.lineWidth = 3;
-    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+    c.beginPath();
+    G.furnitureFront(f).forEach((q, i) => { const s = this.toScr(q); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
+    c.stroke();
 
-    const ct = this.toScr(f);
-    const minSide = Math.min(f.w, f.d) * this.view.s;
+    // 이름은 첫 조각 가운데에 쓴다 (보통 가구는 전체, ㄱ자는 뒤쪽 가로 — 전체 가운데는 비어 있는 안쪽 모서리다)
+    const [x0, y0, x1, y1] = G.furnitureRects(f)[0];
+    const lp = G.rotatePt((x0 + x1) / 2, (y0 + y1) / 2, f.rot * G.DEG);
+    const ct = this.toScr({ x: f.x + lp.x, y: f.y + lp.y });
+    const minSide = Math.min(x1 - x0, y1 - y0) * this.view.s;
     if (minSide > 18) {
       c.fillStyle = '#1f2833';
       c.font = `600 ${Math.min(13, Math.max(10, minSide / 4))}px sans-serif`;

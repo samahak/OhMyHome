@@ -1,6 +1,7 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
+import { lCounterDepth } from './catalog.js';
 
 const geoCache = new Map();
 function boxGeo() {
@@ -368,6 +369,14 @@ function bathtub(g, W, D, H, c) {
 
 /** 주방 싱크대: 하부장 + 상판(개수대·쿡탑) + H가 1.4m를 넘으면 상부장 */
 function kitchenCounter(g, W, D, H, c) {
+  counterRun(g, W, D, H, c);
+}
+
+/**
+ * 싱크대 한 줄: 하부장 + 상판 + (개수대) + (인덕션) + 상부장(+ 후드). 가운데 원점, 앞면 +z.
+ * sink/cook: 놓을지 (cook 기본은 1.2m 넘을 때), flip: 개수대는 왼쪽·인덕션은 오른쪽인 것을 좌우로 바꾼다.
+ */
+function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false } = {}) {
   const cab = mat(c), baseH = 0.85, top = 0.04, plinth = 0.1;
   box(g, W, plinth, D * 0.9, 0, plinth / 2, -D * 0.05, mat(shade(c, 0.6)));
   box(g, W, baseH - top - plinth, D * 0.96, 0, plinth + (baseH - top - plinth) / 2, -D * 0.02, cab);
@@ -375,11 +384,14 @@ function kitchenCounter(g, W, D, H, c) {
   const n = Math.max(1, Math.round(W / 0.6)), dw = W / n, groove = GROOVE();
   for (let i = 1; i < n; i++) box(g, 0.005, baseH - top - plinth - 0.02, 0.004, -W / 2 + dw * i, plinth + (baseH - top - plinth) / 2, D * 0.46 + 0.002, groove);
   const metal = METAL();
-  const sinkX = -W / 2 + Math.min(W * 0.3, 0.75), cookX = W / 2 - Math.min(W * 0.28, 0.6);
-  box(g, Math.min(0.8, W * 0.3), 0.006, D * 0.7, sinkX, baseH + 0.001, 0.02, mat('#9ea6ae', { metalness: 0.8, roughness: 0.25 }));
-  box(g, 0.03, 0.25, 0.03, sinkX, baseH + 0.125, -D / 2 + 0.08, metal);
-  box(g, 0.025, 0.025, 0.18, sinkX, baseH + 0.24, -D / 2 + 0.16, metal);
-  if (W > 1.2) {
+  const k = flip ? -1 : 1;
+  const sinkX = k * (-W / 2 + Math.min(W * 0.3, 0.75)), cookX = sink ? k * (W / 2 - Math.min(W * 0.28, 0.6)) : 0;
+  if (sink) {
+    box(g, Math.min(0.8, W * 0.3), 0.006, D * 0.7, sinkX, baseH + 0.001, 0.02, mat('#9ea6ae', { metalness: 0.8, roughness: 0.25 }));
+    box(g, 0.03, 0.25, 0.03, sinkX, baseH + 0.125, -D / 2 + 0.08, metal);
+    box(g, 0.025, 0.025, 0.18, sinkX, baseH + 0.24, -D / 2 + 0.16, metal);
+  }
+  if (cook) {
     // 인덕션 3구: 검은 유리판 + 화구 테두리(가는 회색 원) + 앞쪽 터치 조작부
     const iw = 0.59, id = Math.min(0.52, D * 0.86), topY = baseH + 0.004;
     box(g, iw, 0.008, id, cookX, topY, 0, mat('#121417', { roughness: 0.08, metalness: 0.4 }));
@@ -396,8 +408,28 @@ function kitchenCounter(g, W, D, H, c) {
     const y0 = Math.max(1.4, baseH + 0.6), uD = Math.min(0.35, D * 0.6);
     box(g, W, H - y0, uD, 0, (y0 + H) / 2, -D / 2 + uD / 2, cab);
     for (let i = 1; i < n; i++) box(g, 0.005, H - y0 - 0.02, 0.004, -W / 2 + dw * i, (y0 + H) / 2, -D / 2 + uD + 0.002, groove);
-    if (W > 1.2) box(g, 0.6, 0.12, uD + 0.05, cookX, y0 - 0.06, -D / 2 + (uD + 0.05) / 2, mat('#b9bec4', { metalness: 0.6, roughness: 0.35 })); // 후드
+    if (cook) box(g, 0.6, 0.12, uD + 0.05, cookX, y0 - 0.06, -D / 2 + (uD + 0.05) / 2, mat('#b9bec4', { metalness: 0.6, roughness: 0.35 })); // 후드
   }
+}
+
+/**
+ * ㄱ자 주방 싱크대: 뒤쪽 가로(W, 개수대) + 옆쪽 꺾인 세로(D, 인덕션·후드). 상판 깊이 T는 f.counterD.
+ * 꺾인 쪽은 앞에서 볼 때 오른쪽(+x), f.mirror면 왼쪽. 꺾인 쪽이 짧아 인덕션이 안 들어가면 가로 쪽에 함께 놓는다.
+ * 바닥 모양은 geometry.furnitureRects와 같다.
+ */
+function kitchenL(g, W, D, H, c, f) {
+  const T = Math.min(lCounterDepth(f) * 0.001, W, D), side = f?.mirror ? -1 : 1, legL = D - T;
+  const legCook = legL >= 0.8;
+  const long = new THREE.Group();
+  counterRun(long, W, T, H, c, { cook: !legCook && W > 1.2, flip: f?.mirror });   // 개수대는 꺾인 쪽에서 먼 끝
+  long.position.z = -D / 2 + T / 2;
+  g.add(long);
+  if (legL <= 0.01) return;
+  const leg = new THREE.Group();
+  counterRun(leg, legL, T, H, c, { sink: false, cook: legCook });
+  leg.rotation.y = -side * Math.PI / 2;   // 앞면(+z)이 안쪽을 보게
+  leg.position.set(side * (W / 2 - T / 2), 0, T / 2);
+  g.add(leg);
 }
 
 function plain(g, W, D, H, c) {
@@ -441,7 +473,7 @@ const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
   kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, tvstand, tv, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
-  bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, box: plain,
+  bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
 /**

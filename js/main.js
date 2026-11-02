@@ -5,7 +5,7 @@ import {
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, iconFor, windowDefaults } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, iconFor, windowDefaults } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
@@ -532,6 +532,8 @@ function renderProps() {
   } else if (sel.kind === 'furniture') {
     const lib = obj.libId && state.library.find((l) => l.id === obj.libId);
     const preset = SIZE_PRESETS[obj.type];
+    const dims = { w: '가로 W', d: '깊이 D', ...SHAPES[obj.type]?.dims };
+    const isL = obj.type === 'kitchen_l';
     el.innerHTML = `
       <h3><span>${iconFor(obj.type)} 가구</span><button data-act="close" class="icon">✕</button></h3>
       ${lib?.image ? `<img class="thumb" src="${lib.image}" alt="">` : ''}
@@ -541,8 +543,12 @@ function renderProps() {
       ${preset ? `
       <label class="field"><span>${preset.label}</span><input type="number" min="${preset.min}" max="${preset.max}" step="1" data-f="${preset.key}"></label>
       <div class="btns preset-btns">${preset.options.map((n) => `<button data-preset="${n}">${n}${preset.unit}</button>`).join('')}</div>` : ''}
-      <label class="field"><span>가로 W (mm)</span><input type="number" min="10" step="10" data-f="w"></label>
-      <label class="field"><span>깊이 D (mm)</span><input type="number" min="10" step="10" data-f="d"></label>
+      <label class="field"><span>${dims.w} (mm)</span><input type="number" min="10" step="10" data-f="w"></label>
+      <label class="field"><span>${dims.d} (mm)</span><input type="number" min="10" step="10" data-f="d"></label>
+      ${isL ? `
+      <label class="field"><span>상판 깊이 (mm)</span><input type="number" min="${L_COUNTER.minDepth}" max="${L_COUNTER.maxDepth}" step="10" data-f="counterD"></label>
+      <div class="field"><span>꺾인 쪽</span><b data-v="lside"></b></div>
+      <div class="btns"><button data-act="mirror">⇋ 좌우 반전</button></div>` : ''}
       <label class="field"><span>높이 H (mm)</span><input type="number" min="10" step="10" data-f="h"></label>
       <label class="field"><span>회전 (°)</span><input type="number" step="15" data-f="rot"></label>
       <div class="btns"><button data-act="rot-90">⟲ 90°</button><button data-act="rot90">⟳ 90°</button></div>
@@ -618,6 +624,7 @@ function refreshProps() {
     if (k === 'rw' || k === 'rh') { const b = G.boundsOf(obj.pts); return fmtMM(k === 'rw' ? b.w : b.h); }
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
+    if (k === 'counterD') return lCounterDepth(obj);
     const p = SIZE_PRESETS[obj.type];
     if (p && k === p.key) return obj[k] ?? p.guess(obj);
     return obj[k];
@@ -632,6 +639,8 @@ function refreshProps() {
     const p = SIZE_PRESETS[obj.type];
     const cur = p && (obj[p.key] ?? p.guess(obj));
     el.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', +b.dataset.preset === cur));
+    const lside = el.querySelector('[data-v=lside]');
+    if (lside) lside.textContent = obj.mirror ? '왼쪽 (앞에서 볼 때)' : '오른쪽 (앞에서 볼 때)';
   }
   if (sel.kind === 'room') {
     const a = G.polygonArea(obj.pts) / 1e6, b = G.boundsOf(obj.pts);
@@ -692,11 +701,25 @@ function applyProp(inp) {
     if (k === 'rot') v = G.normDeg(v);
     if (['w', 'd', 'h', 't'].includes(k)) v = Math.max(10, v);
     if (k === 'elev' || k === 'sill') v = Math.max(0, v);
+    if (obj.type === 'kitchen_l') v = clampKitchenL(obj, k, v);
     obj[k] = v;
     // 크기를 직접 고치면 인치·인원은 지우고, 화면에는 크기로 짐작한 값을 보여 준다
     if (preset?.affects.includes(k)) delete obj[preset.key];
   }
   emit(sel.kind === 'furniture' ? 'furniture' : 'plan');
+  if (k === 'type') renderProps();   // 모양마다 칸 이름·칸이 다르다 (ㄱ자 싱크대)
+}
+
+/** ㄱ자 싱크대: 상판 깊이는 정해진 범위에서, 가로·세로는 상판 깊이 + 최소 팔 길이보다 길게 (세로가 가로보다 길어도 된다) */
+function clampKitchenL(obj, k, v) {
+  const L = L_COUNTER;
+  if (k === 'counterD') return Math.max(L.minDepth, Math.min(L.maxDepth, obj.w - L.minArm, obj.d - L.minArm, v));
+  if (k === 'w' || k === 'd') {
+    const min = lCounterDepth(obj) + L.minArm;
+    if (v < min) status(`${k === 'w' ? '가로' : '세로'} 길이는 상판 깊이 + ${L.minArm}mm(${fmtMM(min)}mm) 이상이어야 합니다.`);
+    return Math.max(min, v);
+  }
+  return v;
 }
 
 /** TV 인치·소파 인원처럼 숫자 하나로 크기를 정한다 (catalog.SIZE_PRESETS) */
@@ -719,6 +742,12 @@ function propAction(act) {
   if (act === 'del') { deleteSelected(); return; }
   if (act === 'rot90' || act === 'rot-90') rotateSelected(act === 'rot90' ? 90 : -90);
   if (act === 'dup') duplicateSelected();
+  if (act === 'mirror') {
+    checkpoint();
+    obj.mirror = !obj.mirror;
+    emit('furniture');
+    status(`꺾인 쪽을 ${obj.mirror ? '왼쪽' : '오른쪽'}으로 바꿨습니다.`);
+  }
   if (act === 'snap') {
     const r = G.snapToWall(obj, state.plan.walls);
     if (!r) { status('붙일 벽이 없습니다.'); return; }
