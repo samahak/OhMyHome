@@ -13,6 +13,12 @@ import { ROOM_COLORS, fmtMM } from './plan2d.js';
 import { Tour } from './tour.js';
 
 const M = 0.001;
+/** 3D 캡처 묶음: 위에서 · 앞 왼쪽 비스듬히 · 앞 오른쪽 비스듬히 (dir: 집에서 카메라 쪽 방향, +z가 도면 아래쪽 = 앞) */
+export const SHOTS = [
+  { name: '위', dir: [0, 1, 0] },
+  { name: '왼쪽', dir: [-0.6, 0.75, 0.62] },
+  { name: '오른쪽', dir: [0.6, 0.75, 0.62] },
+];
 const LOW_WALL_MM = 1000;
 
 export class View3D {
@@ -436,24 +442,58 @@ export class View3D {
   }
 
   /**
-   * 3D 화면을 가로 그림(W×H px)으로. 화면 칸이 세로로 길어도 가로로 찍는다.
-   * 카메라를 아직 돌리지 않았으면 가로 화면에 맞춰 도면 전체가 들어오게 잡았다가 되돌린다. 화면 크기·카메라는 그대로 돌려 놓는다.
+   * 캡처용 카메라 자리: dir 쪽에서 집(벽·가구 범위)이 가로 화면에 꽉 차게. 위에서(dir가 거의 위)는 바닥 사각형을,
+   * 비스듬히는 집을 감싸는 공을 화면 짧은 쪽에 맞춘다.
    */
+  shotCamera(dir, aspect) {
+    const p = state.plan, pts = p.walls.flatMap((w) => [w.a, w.b]).concat(state.furniture);
+    const b = pts.length ? G.boundsOf(pts) : this.bounds().b;
+    const w = Math.max(b.w, 1000) * M, d = Math.max(b.h, 1000) * M, Hm = p.wallHeight * M;
+    const c = new THREE.Vector3((b.minX + b.w / 2) * M, 0, (b.minY + b.h / 2) * M);
+    const half = Math.tan((this.camera.fov * G.DEG) / 2), halfW = half * aspect;
+    const v = new THREE.Vector3(...dir).normalize();
+    if (v.y > 0.99) {
+      const dist = Math.max(d / 2 / half, w / 2 / halfW) * 1.15 + Hm;
+      return { pos: new THREE.Vector3(c.x, dist, c.z + 0.001), target: c, dist };
+    }
+    const target = c.clone().setY(Hm * 0.3), dist = ((0.5 * Math.hypot(w, d, Hm)) / Math.min(half, halfW)) * 1.05;
+    return { pos: target.clone().addScaledVector(v, dist), target, dist };
+  }
+
+  /** 지금 3D 화면 한 장 (가로). 둘러보기 중에는 1인칭 화면 그대로 */
   capture(W = 1920, H = 1080) {
+    return this.captureShots([{ name: '' }], W, H)[0].url;
+  }
+
+  /**
+   * 3D를 가로 그림(W×H px) 여러 장으로. 화면 칸이 세로로 길어도 가로로 찍는다.
+   * shot.dir가 있으면 그 방향에서 집이 꽉 차게 잡아 찍고(shotCamera), 없으면 지금 카메라로 찍는다
+   * (아직 돌리지 않았으면 가로에 맞춰 다시 잡고 조금 다가간다). 화면 크기·카메라는 그대로 돌려 놓는다.
+   * @returns [{ name, url }]
+   */
+  captureShots(shots, W = 1920, H = 1080) {
     const r = this.renderer, cam = this.camera;
     const size = r.getSize(new THREE.Vector2()), ratio = r.getPixelRatio();
     const saved = { aspect: cam.aspect, pos: cam.position.clone(), target: this.controls.target.clone(), far: cam.far, mode: this.camMode, moved: this.userMoved };
     r.setPixelRatio(1);
     r.setSize(W, H, false);   // false: 화면의 캔버스 CSS 크기는 건드리지 않는다
     cam.aspect = W / H;
-    if (!this.userMoved && !this.tour) {
-      this.resetCamera(this.camMode);
-      // 화면용 맞춤은 여유가 넉넉해서 그림에서는 집이 작다 → 조금 다가가 찍는다
-      cam.position.lerp(this.controls.target, 0.2);
-    }
-    cam.updateProjectionMatrix();
-    r.render(this.scene, cam);
-    const url = r.domElement.toDataURL('image/png');
+    const out = shots.map((shot) => {
+      if (shot.dir && !this.tour) {
+        const s = this.shotCamera(shot.dir, cam.aspect);
+        cam.position.copy(s.pos);
+        cam.far = Math.max(500, s.dist * 6);
+        cam.lookAt(s.target);
+      } else if (!this.userMoved && !this.tour) {
+        this.resetCamera(this.camMode);
+        // 화면용 맞춤은 여유가 넉넉해서 그림에서는 집이 작다 → 조금 다가가 찍는다
+        cam.position.lerp(this.controls.target, 0.2);
+        cam.lookAt(this.controls.target);
+      }
+      cam.updateProjectionMatrix();
+      r.render(this.scene, cam);
+      return { name: shot.name, url: r.domElement.toDataURL('image/png') };
+    });
     r.setPixelRatio(ratio);
     r.setSize(size.x, size.y, false);
     cam.aspect = saved.aspect;
@@ -465,7 +505,7 @@ export class View3D {
     this.camMode = saved.mode;
     this.userMoved = saved.moved;
     r.render(this.scene, cam);
-    return url;
+    return out;
   }
 }
 

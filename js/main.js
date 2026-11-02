@@ -7,7 +7,7 @@ import {
 import * as G from './geometry.js';
 import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
-import { View3D } from './view3d.js';
+import { View3D, SHOTS } from './view3d.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
@@ -1051,7 +1051,12 @@ $('file-project').addEventListener('change', async (e) => {
     alert(`불러오지 못했습니다: ${err.message}`);
   }
 });
-$('btn-capture').addEventListener('click', () => download(view.capture(), `ohmyhome-3d-${today()}.png`));
+$('btn-capture').addEventListener('click', () => {
+  if (view.tour) { download(view.capture(), `ohmyhome-3d-${today()}.png`); return; }   // 둘러보기 중: 1인칭 화면 그대로
+  // 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히 세 장 (파일을 하나씩 내려받게 조금씩 띄운다)
+  view.captureShots(SHOTS).forEach((s, i) => setTimeout(() => download(s.url, `ohmyhome-3d-${s.name}-${today()}.png`), i * 400));
+  status('3D 그림 세 장(위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히)을 저장합니다. 브라우저가 여러 파일 받기를 물으면 허용해 주세요.');
+});
 $('btn-capture-2d').addEventListener('click', () => download(editor.capture(), `ohmyhome-2d-${today()}.png`));
 
 function download(url, name) {
