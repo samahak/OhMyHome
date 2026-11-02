@@ -1,13 +1,15 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
-import { lCounterDepth } from './catalog.js';
+import { lCounterDepth, plantOf } from './catalog.js';
 
+// 같은 지오메트리를 여러 메시가 scale만 바꿔 함께 쓴다 (disposeObject가 버리지 않는다)
 const geoCache = new Map();
-function boxGeo() {
-  if (!geoCache.has('box')) geoCache.set('box', new THREE.BoxGeometry(1, 1, 1));
-  return geoCache.get('box');
+function sharedGeo(key, make) {
+  if (!geoCache.has(key)) geoCache.set(key, make());
+  return geoCache.get(key);
 }
+function boxGeo() { return sharedGeo('box', () => new THREE.BoxGeometry(1, 1, 1)); }
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05, ...opts });
@@ -209,6 +211,183 @@ function vanity(g, W, D, H, c) {
 }
 
 /** 욕실 철제 선반: 네 기둥 + 단마다 테두리 · 가는 철망 (선반 수는 높이 35cm마다 하나) */
+/** 나무 선반: 네 귀퉁이 다리 + 칸마다 원목 판(뒤판 없음) + 뒤쪽 가로대. 칸은 약 35cm마다 */
+function woodShelf(g, W, D, H, c) {
+  const wood = mat(c, { roughness: 0.7 }), board = mat(shade(c, 1.06), { roughness: 0.65 }), leg = 0.04, t = 0.025;
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(g, leg, H, leg, x * (W / 2 - leg / 2), H / 2, z * (D / 2 - leg / 2), wood);
+  const n = Math.max(2, Math.round(H / 0.35)), y0 = 0.08, gap = (H - y0 - t) / (n - 1);
+  for (let i = 0; i < n; i++) {
+    const y = y0 + gap * i;
+    box(g, W, t, D, 0, y + t / 2, 0, board);
+    if (i < n - 1) box(g, W - 2 * leg, 0.03, 0.015, 0, y + gap * 0.55, -D / 2 + 0.0075, wood);   // 뒤 가로대 (물건이 뒤로 안 빠지게)
+  }
+}
+
+/* ---------- 식물 ---------- */
+
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+/** 잎 하나: base에서 방향(yaw: 수평 각, pitch: 위로 든 각)으로 길이 L·폭 wd인 납작한 타원. 잎 끝 점을 돌려준다 */
+function leaf(g, base, yaw, pitch, L, wd, material, thick = 0.006) {
+  const dir = V3(Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch), Math.cos(pitch) * Math.sin(yaw));
+  const m = new THREE.Mesh(sharedGeo('sphere', () => new THREE.SphereGeometry(1, 12, 8)), material);
+  m.scale.set(L / 2, thick, wd / 2);
+  m.quaternion.setFromUnitVectors(V3(1, 0, 0), dir);
+  m.position.copy(base).addScaledVector(dir, L / 2);
+  m.castShadow = true;
+  g.add(m);
+  return base.clone().addScaledVector(dir, L);
+}
+
+/** 줄기·가지: a에서 b까지 반지름 r 막대 */
+function rod(g, a, b, r, material) {
+  const d = b.clone().sub(a), len = d.length();
+  if (len < 1e-4) return;
+  const m = new THREE.Mesh(sharedGeo('cyl', () => new THREE.CylinderGeometry(1, 1, 1, 8)), material);
+  m.scale.set(r, len, r);
+  m.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize());
+  m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.castShadow = true;
+  g.add(m);
+}
+
+/** 고정 씨앗 난수 — 같은 종류는 늘 같은 모양 (다시 그려도 잎이 바뀌지 않게) */
+function seeded(seed) {
+  return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+}
+
+const GOLD = 2.39996;   // 잎을 고르게 돌려 놓는 황금각 (rad)
+
+/**
+ * 종류별 잎·줄기. p = { R: 잎이 퍼지는 반지름, H: 전체 높이, top: 흙 가운데 점, potR, potH, drop: 화분 아래로 늘어질 수 있는 길이, rnd }
+ */
+const PLANT_SHAPES = {
+  /** 몬스테라: 줄기마다 크고 넓은 하트 모양 잎이 바깥으로 처진다 */
+  monstera(g, { R, H, top, potH, rnd }) {
+    const lf = mat('#2e6b3c', { roughness: 0.5 }), st = mat('#557d3c');
+    const L = Math.min(R * 0.75, (H - potH) * 0.45);
+    for (let i = 0; i < 9; i++) {
+      const a = i * GOLD + rnd() * 0.4, dist = R * (0.2 + 0.4 * rnd());
+      const p = V3(Math.cos(a) * dist, Math.min(H - L * 0.3, potH + (H - potH) * (0.45 + 0.45 * rnd())), Math.sin(a) * dist);
+      rod(g, top, p, 0.008, st);
+      leaf(g, p, a, -0.2 - 0.35 * rnd(), L * (0.8 + 0.3 * rnd()), L * 0.85, lf);
+    }
+  },
+  /** 여인초: 곧게 선 줄기 끝에 길쭉한 노 모양 잎이 위로 부채처럼 퍼진다 */
+  strelitzia(g, { R, H, top, potH, rnd }) {
+    const lf = mat('#3b7a44', { roughness: 0.5 }), st = mat('#6c8a48');
+    for (let i = 0; i < 8; i++) {
+      const a = i * GOLD, dist = R * 0.3 * rnd();
+      const p = V3(Math.cos(a) * dist, potH + (H - potH) * (0.35 + 0.2 * rnd()), Math.sin(a) * dist);
+      rod(g, top, p, 0.01, st);
+      const pitch = 1.0 + 0.3 * rnd(), L = Math.max(0.1, (H - p.y - 0.02) / Math.sin(pitch));
+      leaf(g, p, a, pitch, L, L * 0.32, lf);
+    }
+  },
+  /** 올리브나무: 가는 줄기 + 가지 몇 개 + 은빛 작은 잎이 둥글게 모인 수관 */
+  olive(g, { R, H, top, rnd }) {
+    const bark = mat('#6e5640', { roughness: 0.9 }), lf = mat('#7d9168', { roughness: 0.7 });
+    const trunkTop = V3(0, H * 0.55, 0);
+    rod(g, top, trunkTop, 0.02, bark);
+    const cy = H * 0.78, ry = Math.min(0.3, H * 0.18), rx = R * 0.85;
+    for (let i = 0; i < 4; i++) {
+      const a = i * GOLD;
+      rod(g, trunkTop, V3(Math.cos(a) * rx * 0.5, cy, Math.sin(a) * rx * 0.5), 0.01, bark);
+    }
+    for (let i = 0; i < 160; i++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()), h = (rnd() * 2 - 1) * ry;
+      const b = V3(Math.cos(a) * rx * r, cy + h, Math.sin(a) * rx * r);
+      leaf(g, b, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.2, 0.1, 0.028, lf, 0.005);
+    }
+  },
+  /** 고무나무: 곧은 줄기에 두껍고 윤기 나는 짙은 타원 잎이 어긋나게 달린다 */
+  rubber(g, { H, top, potH }) {
+    const lf = mat('#1f3d27', { roughness: 0.3 }), st = mat('#5a4a3a');
+    rod(g, top, V3(0, H - 0.05, 0), 0.012, st);
+    let k = 0;
+    for (let y = potH + 0.15; y < H - 0.08; y += 0.11, k++) leaf(g, V3(0, y, 0), k * 2.3, 0.15 + 0.1 * (k % 2), 0.24, 0.12, lf, 0.008);
+    leaf(g, V3(0, H - 0.08, 0), 0, 1.35, 0.1, 0.035, mat('#8a3b3b', { roughness: 0.4 }));   // 끝의 새순
+  },
+  /** 아레카야자: 휘어진 잎줄기 여러 개, 잎줄기마다 가는 작은 잎이 양쪽으로 줄지어 난다 */
+  areca(g, { R, H, top, potH, rnd }) {
+    const st = mat('#7a9440'), lf = mat('#5c9a45', { roughness: 0.55 });
+    for (let i = 0; i < 9; i++) {
+      const a = i * GOLD + rnd() * 0.3, reach = R * (0.75 + 0.25 * rnd()), hi = H * (0.8 + 0.18 * rnd());
+      const c = V3(Math.cos(a) * reach * 0.3, hi, Math.sin(a) * reach * 0.3);
+      const e = V3(Math.cos(a) * reach, Math.max(potH + 0.2, hi - (H - potH) * 0.3), Math.sin(a) * reach);
+      const at = (t) => top.clone().multiplyScalar((1 - t) ** 2).addScaledVector(c, 2 * (1 - t) * t).addScaledVector(e, t * t);
+      let prev = top;
+      for (let s = 1; s <= 10; s++) {
+        const t = s / 10, p = at(t);
+        rod(g, prev, p, 0.005, st);
+        if (t > 0.25) for (const side of [1, -1]) leaf(g, p, a + side * 1.25, -0.35, 0.2 * (1.1 - t * 0.5), 0.022, lf, 0.003);
+        prev = p;
+      }
+    }
+  },
+  /** 산세베리아: 흙에서 바로 곧게 솟은 길고 뾰족한 칼 모양 잎 */
+  sansevieria(g, { H, top, potR, potH, rnd }) {
+    const lfs = [mat('#355e33', { roughness: 0.5 }), mat('#4c7a3e', { roughness: 0.5 })];
+    for (let i = 0; i < 11; i++) {
+      const a = i * GOLD, dist = potR * 0.5 * rnd(), pitch = 1.32 + 0.18 * rnd();
+      const b = V3(top.x + Math.cos(a) * dist, top.y, top.z + Math.sin(a) * dist);
+      leaf(g, b, a, pitch, ((H - potH) * (0.6 + 0.38 * rnd())) / Math.sin(pitch), 0.055, lfs[i % 2], 0.009);
+    }
+  },
+  /** 금전수: 흙에서 굵은 줄기 여러 개가 위로 휘어 오르고, 줄기 양쪽에 윤기 나는 짙은 타원 잎이 마주 달린다 */
+  zamioculcas(g, { R, H, top, potR, potH, rnd }) {
+    const st = mat('#4f6b33', { roughness: 0.5 }), lf = mat('#24502c', { roughness: 0.25 });
+    for (let i = 0; i < 9; i++) {
+      const a = i * GOLD + rnd() * 0.3, base = V3(Math.cos(a) * potR * 0.3 * rnd(), top.y, Math.sin(a) * potR * 0.3 * rnd());
+      const reach = R * (0.55 + 0.4 * rnd()), hi = potH + (H - potH) * (0.6 + 0.38 * rnd());
+      const c = V3(base.x + Math.cos(a) * reach * 0.35, potH + (hi - potH) * 0.75, base.z + Math.sin(a) * reach * 0.35);
+      const e = V3(Math.cos(a) * reach, hi, Math.sin(a) * reach);
+      const at = (t) => base.clone().multiplyScalar((1 - t) ** 2).addScaledVector(c, 2 * (1 - t) * t).addScaledVector(e, t * t);
+      let prev = base;
+      for (let s = 1; s <= 8; s++) {
+        const t = s / 8, p = at(t);
+        rod(g, prev, p, 0.009 * (1.2 - t * 0.6), st);
+        if (t > 0.2) for (const side of [1, -1]) leaf(g, p, a + side * 1.1, 0.2 - t * 0.5, 0.085, 0.04, lf, 0.006);
+        prev = p;
+      }
+      leaf(g, prev, a, 0.1, 0.08, 0.038, lf, 0.006);   // 끝 잎
+    }
+  },
+  /** 스킨답서스: 화분 위 작은 하트 잎 덩어리 + 화분 가장자리 너머로 늘어지는 덩굴 (선반 위에 두면 아래로 길게 처진다) */
+  pothos(g, { top, potR, potH, drop, rnd }) {
+    const lfs = [mat('#4f8f3a', { roughness: 0.45 }), mat('#9fb54a', { roughness: 0.45 })], st = mat('#5f8a3a');
+    for (let i = 0; i < 12; i++) leaf(g, V3(Math.cos(i * GOLD) * potR * 0.4, potH, Math.sin(i * GOLD) * potR * 0.4), i * GOLD, 0.3 + 0.5 * rnd(), 0.09, 0.075, lfs[i % 3 === 0 ? 1 : 0]);
+    for (let i = 0; i < 7; i++) {
+      const a = i * 0.9 + rnd() * 0.3, len = Math.min(drop, 0.15 + 0.5 * rnd());
+      const rim = V3(Math.cos(a) * potR * 0.85, potH + 0.02, Math.sin(a) * potR * 0.85);
+      const out = V3(Math.cos(a) * (potR + 0.05), potH + 0.03, Math.sin(a) * (potR + 0.05));
+      const end = V3(Math.cos(a) * (potR + 0.09), potH - len, Math.sin(a) * (potR + 0.09));
+      rod(g, top, rim, 0.003, st); rod(g, rim, out, 0.003, st); rod(g, out, end, 0.003, st);
+      for (let s = 0.08; s < len; s += 0.07) {
+        const p = out.clone().lerp(end, s / len);
+        leaf(g, p, a + (s * 10 % 2 < 1 ? 0.6 : -0.6), -0.5, 0.07, 0.06, lfs[Math.floor(s * 100) % 3 === 0 ? 1 : 0]);
+      }
+    }
+  },
+};
+
+/** 식물: 아래로 좁아지는 화분(색상 = 화분 색) + 흙 + 종류별 잎. 종류는 f.plant (catalog.PLANTS) */
+function plant(g, W, D, H, c, f) {
+  const kind = plantOf(f), R = Math.min(W, D) / 2;
+  const potR = Math.min(0.2, R * 0.55), potH = Math.min(0.38, Math.max(0.15, H * 0.24));
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(potR, potR * 0.78, potH, 28), mat(c, { roughness: 0.8 }));
+  pot.position.y = potH / 2;
+  pot.castShadow = pot.receiveShadow = true;
+  g.add(pot);
+  const soil = new THREE.Mesh(new THREE.CylinderGeometry(potR * 0.93, potR * 0.93, 0.01, 28), mat('#4a3626', { roughness: 1 }));
+  soil.position.y = potH - 0.025;
+  g.add(soil);
+  const seed = Object.keys(PLANT_SHAPES).indexOf(kind) * 97 + 13;
+  // 늘어지는 덩굴은 바닥을 뚫지 않게: 화분 바닥 + 띄운 높이까지만
+  const drop = Math.max(0.05, potH + (f?.elev || 0) / 1000 - 0.03);
+  PLANT_SHAPES[kind](g, { R, H, top: V3(0, potH - 0.02, 0), potR, potH, drop, rnd: seeded(seed) });
+}
+
 function bathShelf(g, W, D, H, c) {
   const steel = mat(c, { metalness: 0.3, roughness: 0.3 }), r = 0.008;   // 금속성이 높으면 비출 환경이 없어 검게 보인다
   for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(g, 2 * r, H, 2 * r, x * (W / 2 - r), H / 2, z * (D / 2 - r), steel);
@@ -498,7 +677,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, tvstand, tv, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
@@ -523,7 +702,7 @@ export function buildFurniture(f, photo) {
 
 export function disposeObject(obj) {
   obj.traverse((o) => {
-    if (o.geometry && o.geometry !== boxGeo()) o.geometry.dispose();
+    if (o.geometry && ![...geoCache.values()].includes(o.geometry)) o.geometry.dispose();
     if (o.material) {
       for (const m of [].concat(o.material)) m.dispose();
     }

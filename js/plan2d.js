@@ -700,20 +700,27 @@ export class PlanEditor {
 
   drawFurniture(f, selected, bad) {
     const c = this.ctx;
-    this.poly(G.furnitureOutline(f));
-    c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.color || '#cccccc', f.elev > 0 ? 0.55 : 0.85);
+    if (f.type === 'plant') {   // 식물은 둥글게 그린다 (겹침 판정은 다른 가구처럼 사각형)
+      const ct = this.toScr(f);
+      c.beginPath();
+      c.ellipse(ct.x, ct.y, (f.w / 2) * this.view.s, (f.d / 2) * this.view.s, f.rot * G.DEG, 0, Math.PI * 2);
+    } else this.poly(G.furnitureOutline(f));
+    // 식물의 색상은 화분 색이라 2D는 잎 색으로 칠한다
+    c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.type === 'plant' ? '#7fb27a' : f.color || '#cccccc', f.elev > 0 ? 0.55 : 0.85);
     c.fill();
     c.lineWidth = selected ? 2.5 : 1.2;
     c.strokeStyle = selected ? '#2f6fed' : bad ? '#d9443b' : 'rgba(30,40,50,.75)';
     c.setLineDash(f.elev > 0 ? [5, 3] : []);
     c.stroke();
     c.setLineDash([]);
-    // 앞면 표시 (로컬 +y 변, ㄱ자는 안쪽으로 꺾인 두 변)
-    c.strokeStyle = selected ? '#2f6fed' : '#1f2833';
-    c.lineWidth = 3;
-    c.beginPath();
-    G.furnitureFront(f).forEach((q, i) => { const s = this.toScr(q); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
-    c.stroke();
+    // 앞면 표시 (로컬 +y 변, ㄱ자는 안쪽으로 꺾인 두 변). 식물은 앞뒤가 없다
+    if (f.type !== 'plant') {
+      c.strokeStyle = selected ? '#2f6fed' : '#1f2833';
+      c.lineWidth = 3;
+      c.beginPath();
+      G.furnitureFront(f).forEach((q, i) => { const s = this.toScr(q); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
+      c.stroke();
+    }
 
     // 이름은 첫 조각 가운데에 쓴다 (보통 가구는 전체, ㄱ자는 뒤쪽 가로 — 전체 가운데는 비어 있는 안쪽 모서리다)
     const [x0, y0, x1, y1] = G.furnitureRects(f)[0];

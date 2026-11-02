@@ -15,6 +15,8 @@ export const SHAPES = {
   drawer: { label: '서랍장', photoFront: true },
   vanity: { label: '화장대', photoFront: false },
   shelf: { label: '책장', photoFront: true },
+  wood_shelf: { label: '나무 선반', photoFront: false },
+  plant: { label: '식물', photoFront: false },
   tvstand: { label: '거실장', photoFront: true },
   tv: { label: 'TV', photoFront: true },
   aircon: { label: '스탠드 에어컨', photoFront: true },
@@ -90,6 +92,22 @@ export const SIZE_PRESETS = {
 export const L_COUNTER = { depth: 600, minDepth: 400, maxDepth: 900, minArm: 300 };
 export function lCounterDepth(f) { return f.counterD || L_COUNTER.depth; }
 
+/**
+ * 식물 종류 — 놓은 뒤 속성 패널에서 바꾼다. 가구 항목에는 f.plant(키)로 남고, 크기는 화분 포함 겉 크기(mm).
+ * 색상(f.color)은 화분 색이다. 3D 모양은 models3d.js의 PLANT_SHAPES.
+ */
+export const PLANTS = {
+  monstera: { label: '몬스테라', w: 750, d: 750, h: 1100 },
+  strelitzia: { label: '여인초', w: 650, d: 650, h: 1700 },
+  olive: { label: '올리브나무', w: 550, d: 550, h: 1500 },
+  rubber: { label: '고무나무', w: 500, d: 500, h: 1300 },
+  areca: { label: '아레카야자', w: 850, d: 850, h: 1500 },
+  sansevieria: { label: '산세베리아', w: 350, d: 350, h: 800 },
+  zamioculcas: { label: '금전수', w: 550, d: 550, h: 800 },
+  pothos: { label: '스킨답서스', w: 400, d: 400, h: 350 },
+};
+export function plantOf(f) { return PLANTS[f?.plant] ? f.plant : 'monstera'; }
+
 /** 문 높이(mm) — 3D에서 문 위로는 천장까지 벽을 채운다 */
 export const DOOR = { h: 2100 };
 
@@ -121,6 +139,8 @@ export const CATALOG = [
   { type: 'tvstand', name: '거실장', icon: '🗄️', w: 1800, d: 400, h: 450, color: '#f0ece6' },
   { type: 'tv', name: '65인치 TV', icon: '📺', inch: 65, ...tvSizeFromInch(65), d: 60, color: '#1d2025', elev: 500 },
   { type: 'shelf', name: '책장', icon: '📚', w: 800, d: 300, h: 1800, color: '#e3d3bd' },
+  { type: 'wood_shelf', name: '나무 선반', icon: '🪵', w: 800, d: 350, h: 1500, color: '#c49a6c' },
+  { type: 'plant', name: PLANTS.monstera.label, icon: '🪴', plant: 'monstera', w: PLANTS.monstera.w, d: PLANTS.monstera.d, h: PLANTS.monstera.h, color: '#e3dbd0' },
   { type: 'drawer', name: '서랍장', icon: '🗃️', w: 800, d: 450, h: 900, color: '#efe6da' },
   { type: 'vanity', name: '화장대', icon: '🪞', w: 800, d: 400, h: 1450, color: '#efe6da' },
   { type: 'aircon', name: '스탠드 에어컨', icon: '❄️', w: 400, d: 400, h: 1850, color: '#f6f7f9' },
