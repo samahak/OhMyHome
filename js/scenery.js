@@ -1,4 +1,4 @@
-// 둘러보기 창밖 풍경 — 우리 동(아래층 외벽·옆집), 앞 도로·인도·가로수·차, 길 건너 빌라, 사방 아파트 동,
+// 둘러보기 창밖 풍경 — 우리 동(아래층 외벽·옆집), 앞 도로·인도·가로수·차, 길 건너 빌라, 사방 아파트 동, 시가지 숲·공원, 산비탈 숲,
 // 멀리 산 능선 세 겹, 하늘. 단위 m, 3D 좌표(x = 도면 x, z = 도면 y). 도면 아래쪽(+z)을 앞(거실 창 쪽)으로 본다.
 // 우리 층 바닥이 y = 0이고, 땅은 (층 - 1) × 층 높이 + 1m(1층 바닥 높이) 아래다.
 import * as THREE from 'three';
@@ -70,8 +70,10 @@ export function buildScenery({ minX, maxX, minZ, maxZ, floor = 10 }) {
   const apt = [keep(facadeTexture('#eeeae3', rand)), keep(facadeTexture('#e4e8ec', rand)), keep(facadeTexture('#efe6d8', rand))];
   const villa = ['#b26a52', '#d8c9b0', '#c4c6c3', '#a5806a'].map((c) => keep(facadeTexture(c, rand, 0.06)));
 
+  const taken = [];   // 건물 바닥 사각형 [x, z, w, d] — 나무를 이 자리에는 심지 않는다
   /** 창 텍스처를 입힌 건물 상자. y0: 바닥 높이, vShift: 창 줄을 층에 맞추려 아래로 민 높이(m) */
   const block = (x, z, w, d, h, tex, { y0 = groundY, roof = '#8b9096', vShift = 0, top = true } = {}) => {
+    taken.push([x, z, w, d]);
     const face = (len) => {
       const t = keep(tex.clone());
       t.repeat.set(len / TILE_W, h / TILE_H);
@@ -161,28 +163,6 @@ export function buildScenery({ minX, maxX, minZ, maxZ, floor = 10 }) {
     block(cx + Math.cos(a) * r, (minZ + maxZ) / 2 + Math.sin(a) * r, w, d, floors * FLOOR_H, apt[i % 3]);
   }
 
-  // 가로수 · 단지 나무 (한 번에 그리는 InstancedMesh)
-  const spots = [];
-  for (let x = cx - 300; x < cx + 300; x += 9) for (const z of [roadZ - 10, roadZ + 10]) spots.push([x + rand() * 2, z]);
-  for (let i = 0; i < 70; i++) {
-    const x = cx + (rand() - 0.5) * 220;
-    const z = rand() < 0.5 ? zF + 3 + rand() * 9 : minZ - 8 - rand() * 18;
-    if (Math.abs(x - cx) < W / 2 + unitW + 2 && z > minZ - 3 && z < zF + 3) continue;
-    spots.push([x, z]);
-  }
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 2.6, 6), lambert({ color: '#6b4f3a' }), spots.length);
-  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.9, 0), lambert({ color: '#5d8a4c' }), spots.length);
-  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-  spots.forEach(([x, z], i) => {
-    const s = 0.8 + rand() * 0.6;
-    mtx.compose(new THREE.Vector3(x, groundY + 1.3 * s, z), q.identity(), new THREE.Vector3(s, s, s));
-    trunk.setMatrixAt(i, mtx);
-    e.set(0, rand() * Math.PI, 0);
-    mtx.compose(new THREE.Vector3(x, groundY + 3.4 * s, z), q.setFromEuler(e), new THREE.Vector3(s, s * 1.15, s));
-    crown.setMatrixAt(i, mtx);
-  });
-  group.add(trunk, crown);
-
   // 산 능선 세 겹 — 가까운 것은 짙은 초록, 먼 것은 푸르스름하게 (안개가 더 흐리게 만든다)
   const ridge = (R, hMin, hMax, color, seed) => {
     const r2 = rng(seed), N = 240, pos = [];
@@ -202,10 +182,73 @@ export function buildScenery({ minX, maxX, minZ, maxZ, floor = 10 }) {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
     group.add(m);
+    return { R, height };
   };
-  ridge(1500, 60, 260, '#5f7a5a', 11);
-  ridge(2300, 120, 420, '#748f86', 23);
+  const near = ridge(1500, 60, 260, '#5f7a5a', 11);
+  const mid = ridge(2300, 120, 420, '#748f86', 23);
   ridge(3200, 200, 620, '#93a9b3', 37);
+
+  // ---------- 나무 ----------
+  // 둥근 활엽수(가로수·단지·공원)와 뾰족한 침엽수(먼 숲·산비탈). 수만 그루라 종류마다 InstancedMesh 하나로 그린다.
+  // 건물 바닥·도로에는 심지 않고, 나무마다 초록을 조금씩 달리한다. 멀수록 크게 키워 점으로라도 보이게 한다.
+  const ccz = (minZ + maxZ) / 2;
+  const round = [], cone = [];   // [x, y, z, 크기]
+  const free = (x, z, pad = 2) => !(Math.abs(z - roadZ) < 8.5 + pad && Math.abs(x - cx) < L / 2)
+    && !taken.some(([bx, bz, bw, bd]) => Math.abs(x - bx) < bw / 2 + pad && Math.abs(z - bz) < bd / 2 + pad);
+  const plantAt = (list, x, z, sc, y = groundY) => { if (free(x, z)) list.push([x, y, z, sc]); };
+  // 가로수: 도로 양쪽 인도, 도로 끝까지
+  for (let x = cx - L / 2 + 30; x < cx + L / 2 - 30; x += 9) for (const z of [roadZ - 10, roadZ + 10]) round.push([x + rand() * 2, groundY, z, 0.8 + rand() * 0.6]);
+  // 우리 단지 안 (반지름 230m)
+  for (let i = 0; i < 320; i++) {
+    const a = rand() * Math.PI * 2, r = W / 2 + 12 + rand() * 220;
+    plantAt(round, cx + Math.cos(a) * r, ccz + Math.sin(a) * r, 0.8 + rand() * 0.7);
+  }
+  // 시가지의 작은 숲·공원 (반지름 150~1,250m) + 사이사이 흩어진 나무
+  for (let gi = 0; gi < 110; gi++) {
+    const a = rand() * Math.PI * 2, r = 150 + rand() * 1100, gx = cx + Math.cos(a) * r, gz = ccz + Math.sin(a) * r;
+    const n = 30 + Math.floor(rand() * 60), spread = 20 + rand() * 50, k = 1 + r / 900;
+    for (let i = 0; i < n; i++) {
+      const b = rand() * Math.PI * 2, d = Math.sqrt(rand()) * spread;
+      plantAt(rand() < 0.7 ? round : cone, gx + Math.cos(b) * d, gz + Math.sin(b) * d, (1 + rand() * 0.8) * k);
+    }
+  }
+  for (let i = 0; i < 1800; i++) {
+    const a = rand() * Math.PI * 2, r = 250 + rand() * 1050;
+    plantAt(round, cx + Math.cos(a) * r, ccz + Math.sin(a) * r, (1 + rand() * 0.6) * (1 + r / 900));
+  }
+  // 산 앞자락 숲 띠 (1,250~1,500m)
+  for (let i = 0; i < 3500; i++) {
+    const a = rand() * Math.PI * 2, r = 1250 + rand() * 250;
+    plantAt(rand() < 0.65 ? cone : round, cx + Math.cos(a) * r, ccz + Math.sin(a) * r, 2.2 + rand() * 1.6);
+  }
+  // 산비탈 (가까운 산 두 겹): 비탈 높이를 따라 꼭대기 아래까지 빽빽하게
+  for (const [rd, count, s0] of [[near, 6000, 3.5], [mid, 5000, 6]]) {
+    for (let i = 0; i < count; i++) {
+      const a = rand() * Math.PI * 2, t = 0.04 + rand() * 0.86;
+      const r = rd.R + t * 250, y = groundY - 5 + t * (rd.height(a) + 5);
+      cone.push([cx + Math.cos(a) * r, y, ccz + Math.sin(a) * r, s0 * (0.8 + rand() * 0.5)]);
+    }
+  }
+  const trees = (list, geo, colors, lift) => {
+    const m = new THREE.InstancedMesh(geo, lambert({ color: '#ffffff' }), list.length);
+    const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
+    list.forEach(([x, y, z, sc], i) => {
+      e.set(0, rand() * Math.PI, 0);
+      mtx.compose(new THREE.Vector3(x, y + lift * sc, z), q.setFromEuler(e), new THREE.Vector3(sc, sc * (0.95 + rand() * 0.35), sc));
+      m.setMatrixAt(i, mtx);
+      m.setColorAt(i, col.set(colors[Math.floor(rand() * colors.length)]));
+    });
+    group.add(m);
+    return m;
+  };
+  trees(round, new THREE.IcosahedronGeometry(1.9, 0), ['#5d8a4c', '#4f7d43', '#6b9a52', '#7aa35a', '#55803f', '#648f48'], 3.4);
+  trees(cone, new THREE.ConeGeometry(1.7, 5, 7), ['#3f6b3f', '#355f3a', '#4a7445', '#2f5535', '#456d3c'], 3.2);
+  // 줄기는 가까운 나무(600m 안)만 — 먼 나무는 줄기가 보이지 않는다
+  const trunks = round.concat(cone).filter(([x, , z]) => Math.hypot(x - cx, z - ccz) < 600);
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 2.6, 6), lambert({ color: '#6b4f3a' }), trunks.length);
+  const tm = new THREE.Matrix4(), tq = new THREE.Quaternion();
+  trunks.forEach(([x, y, z, sc], i) => { tm.compose(new THREE.Vector3(x, y + 1.3 * sc, z), tq, new THREE.Vector3(sc, sc, sc)); trunk.setMatrixAt(i, tm); });
+  group.add(trunk);
 
   // 하늘: 지평선은 옅고 위로 갈수록 파란 둥근 지붕
   const sky = new THREE.SphereGeometry(4600, 32, 16);
