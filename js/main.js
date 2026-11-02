@@ -40,9 +40,14 @@ const editor = new PlanEditor($('plan-canvas'), {
 });
 const view = new View3D($('view3d'));
 
+/** 2D 그리기 도구를 끈다 — 가구를 누르면 (이미 골라 둔 가구라 선택이 안 바뀌어도) 다음 2D 클릭에 벽 등이 그려지지 않게 */
+function endDrawTool() { if (editor.tool !== 'select') editor.setTool('select'); }
+view.renderer.domElement.addEventListener('pointerdown', (e) => { if (e.button === 0 && view.pickFurniture(e)) endDrawTool(); });
+
 document.querySelectorAll('.tool-btn').forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.tool === 'pick' && !state.plan.image) { status('먼저 도면 이미지를 여세요.'); return; }
-  editor.setTool(b.dataset.tool);
+  // 켜진 도구 버튼을 다시 누르면 끄고 선택 도구로 돌아간다
+  editor.setTool(b.dataset.tool === editor.tool ? 'select' : b.dataset.tool);
 }));
 
 /* ---------- 탭 · 보기 방식 ---------- */
@@ -483,6 +488,7 @@ function renderPlaced() {
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
   // Shift·Ctrl(⌘)+클릭: 선택에 더하거나 빼기
   $('placed-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', (e) => {
+    endDrawTool();
     if (e.shiftKey || e.ctrlKey || e.metaKey) toggleFurnitureSelection(b.dataset.id);
     else select({ kind: 'furniture', id: b.dataset.id });
   }));
@@ -894,7 +900,10 @@ window.addEventListener('keydown', (e) => {
   if (mod) return;
   const sel = ui.selection;
   if (e.key === 'Escape') {
-    if (!editor.cancel()) { if (sel) select(null); else editor.setTool('select'); }
+    // 그리던 것 취소 → 그리기 도구 끄기 → 선택 해제 순서
+    if (editor.cancel()) return;
+    if (editor.tool !== 'select') editor.setTool('select');
+    else if (sel) select(null);
     return;
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); deleteSelected(); return; }
@@ -927,7 +936,10 @@ on('furniture', () => { renderPlaced(); refreshOrRender(); });
 on('selection', () => {
   renderPlaced();
   renderProps();
-  if (ui.selection?.kind === 'furniture') showTab('furniture');
+  if (ui.selection?.kind === 'furniture') {
+    showTab('furniture');
+    endDrawTool();   // 목록·3D·샘플 가구·Ctrl+A로 가구를 골랐을 때
+  }
 });
 on('library', renderLibrary);
 
