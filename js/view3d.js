@@ -435,9 +435,37 @@ export class View3D {
     this.down = null;
   }
 
-  capture() {
-    this.renderer.render(this.scene, this.camera);
-    return this.renderer.domElement.toDataURL('image/png');
+  /**
+   * 3D 화면을 가로 그림(W×H px)으로. 화면 칸이 세로로 길어도 가로로 찍는다.
+   * 카메라를 아직 돌리지 않았으면 가로 화면에 맞춰 도면 전체가 들어오게 잡았다가 되돌린다. 화면 크기·카메라는 그대로 돌려 놓는다.
+   */
+  capture(W = 1920, H = 1080) {
+    const r = this.renderer, cam = this.camera;
+    const size = r.getSize(new THREE.Vector2()), ratio = r.getPixelRatio();
+    const saved = { aspect: cam.aspect, pos: cam.position.clone(), target: this.controls.target.clone(), far: cam.far, mode: this.camMode, moved: this.userMoved };
+    r.setPixelRatio(1);
+    r.setSize(W, H, false);   // false: 화면의 캔버스 CSS 크기는 건드리지 않는다
+    cam.aspect = W / H;
+    if (!this.userMoved && !this.tour) {
+      this.resetCamera(this.camMode);
+      // 화면용 맞춤은 여유가 넉넉해서 그림에서는 집이 작다 → 조금 다가가 찍는다
+      cam.position.lerp(this.controls.target, 0.2);
+    }
+    cam.updateProjectionMatrix();
+    r.render(this.scene, cam);
+    const url = r.domElement.toDataURL('image/png');
+    r.setPixelRatio(ratio);
+    r.setSize(size.x, size.y, false);
+    cam.aspect = saved.aspect;
+    cam.position.copy(saved.pos);
+    this.controls.target.copy(saved.target);
+    cam.far = saved.far;
+    cam.updateProjectionMatrix();
+    if (!this.tour) this.controls.update();
+    this.camMode = saved.mode;
+    this.userMoved = saved.moved;
+    r.render(this.scene, cam);
+    return url;
   }
 }
 

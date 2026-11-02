@@ -82,6 +82,25 @@ export class PlanEditor {
     this.draw();
   }
 
+  /**
+   * 2D 도면을 가로 그림(W×H, scale배 해상도)으로. 도면 전체가 들어오게 맞춰 그린다.
+   * 화면의 확대·위치, 그리던 선, 마우스 표시는 건드리지 않는다.
+   */
+  capture(W = 1920, H = 1080, scale = 2) {
+    const keep = { ctx: this.ctx, w: this.w, h: this.h, dpr: this.dpr, view: this.view, mouse: this.mouse, snapMark: this.snapMark, temp: this.temp };
+    const cv = document.createElement('canvas');
+    cv.width = W * scale; cv.height = H * scale;
+    Object.assign(this, { ctx: cv.getContext('2d'), w: W, h: H, dpr: scale, view: { ...this.view }, mouse: null, snapMark: null, temp: null });
+    try {
+      this.fit();
+      this.render();
+      return cv.toDataURL('image/png');
+    } finally {
+      Object.assign(this, keep);
+      this.draw();
+    }
+  }
+
   /** 도면 전체가 보이게 맞춘다 */
   fit() {
     if (!this.w) return;
