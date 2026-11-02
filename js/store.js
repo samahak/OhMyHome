@@ -18,6 +18,8 @@ export function freshState() {
       walls: [],            // { id, a:{x,y}, b:{x,y}, t, cap, auto }  (mm)
       rooms: [],            // { id, name, pts:[{x,y}], hidden? }      (mm) hidden: 이미지에 이미 그려진 방이라 색·이름표를 생략
       windows: [],          // { id, a, b, t, sill, h }  (mm) a–b: 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이
+      doors: [],            // { id, a, b, t, swing, auto }  (mm) a: 경첩 끝, b: 반대 끝, swing: 문짝이 a→b 왼쪽 법선 쪽(1)/반대(-1) (doors.js)
+      doorsRemoved: [],     // [{x,y}] 사용자가 지운 자동 문의 가운데 — 문 기호를 다시 찾아도 이 자리에는 달지 않는다
       wallHeight: 2300,
       floor: 10,            // 몇 층인지 — 둘러보기에서 창밖 땅 높이
     },
@@ -27,7 +29,7 @@ export function freshState() {
 }
 
 export const state = freshState();
-// { kind: 'furniture'|'wall'|'room'|'window', id, ids? } — ids: 가구를 여러 개 고른 경우의 id 목록(2개 이상, id는 마지막에 고른 것)
+// { kind: 'furniture'|'wall'|'room'|'window'|'door', id, ids? } — ids: 가구를 여러 개 고른 경우의 id 목록(2개 이상, id는 마지막에 고른 것)
 export const ui = { selection: null };
 
 const listeners = new Map();
@@ -140,6 +142,7 @@ export function findSelected() {
   if (s.kind === 'wall') return state.plan.walls.find((w) => w.id === s.id) || null;
   if (s.kind === 'room') return state.plan.rooms.find((r) => r.id === s.id) || null;
   if (s.kind === 'window') return state.plan.windows.find((w) => w.id === s.id) || null;
+  if (s.kind === 'door') return state.plan.doors.find((d) => d.id === s.id) || null;
   return null;
 }
 
@@ -156,6 +159,11 @@ export function removeItem(kind, id) {
   if (kind === 'wall') state.plan.walls = state.plan.walls.filter((w) => w.id !== id);
   if (kind === 'room') state.plan.rooms = state.plan.rooms.filter((r) => r.id !== id);
   if (kind === 'window') state.plan.windows = state.plan.windows.filter((w) => w.id !== id);
+  if (kind === 'door') {
+    const d = state.plan.doors.find((x) => x.id === id);
+    if (d && d.auto !== false) state.plan.doorsRemoved.push({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 });
+    state.plan.doors = state.plan.doors.filter((x) => x.id !== id);
+  }
   if (ui.selection?.ids) ui.selection = furnitureSelection(ui.selection.ids);
   else if (ui.selection?.id === id) ui.selection = null;
   emit(kind === 'furniture' ? 'furniture' : 'plan', 'selection');
@@ -182,6 +190,8 @@ export function setScale(mmPerPx) {
   p.walls = p.walls.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b), t: w.auto ? w.t * k : w.t }));
   p.rooms = p.rooms.map((r) => ({ ...r, pts: r.pts.map(sc) }));
   p.windows = p.windows.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b) }));
+  p.doors = p.doors.map((d) => ({ ...d, a: sc(d.a), b: sc(d.b), t: d.auto ? d.t * k : d.t }));
+  p.doorsRemoved = p.doorsRemoved.map(sc);
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
   if (p.entrance) p.entrance = { ...p.entrance, a: sc(p.entrance.a), b: sc(p.entrance.b), t: p.entrance.t * k };
   state.furniture.forEach((f) => { f.x *= k; f.y *= k; });
@@ -239,7 +249,7 @@ export function loadSaved() {
     Object.assign(state.plan, base.plan, data.plan);
     state.furniture = data.furniture || [];
     state.library = data.library || [];
-    return true;
+    return data;   // 불러온 원본 — 문 목록이 없던 예전 저장본인지 main.js가 본다
   } catch {
     return false;
   }

@@ -5,7 +5,9 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import {
   state, on, select, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
 } from './store.js';
-import { buildFurniture, buildWindow, disposeObject } from './models3d.js';
+import { buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, disposeObject } from './models3d.js';
+import { DOOR } from './catalog.js';
+import { doorGeometry } from './doors.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
 import { Tour } from './tour.js';
@@ -291,6 +293,23 @@ export class View3D {
       g.position.set(((win.a.x + win.b.x) / 2) * M, sill * M, ((win.a.y + win.b.y) / 2) * M);
       g.rotation.y = -Math.atan2(u.y, u.x);
       this.planGroup.add(g);
+    }
+    // 문: 문 위 벽(문 높이 ~ 천장) + 문틀 + 도면 기호대로 90° 열린 문짝. 둘러보기 중 현관문은 tour.js가 따로 여닫는다
+    const e = p.entrance;
+    for (const d of p.doors || []) {
+      const g = doorGeometry(d), mid = { x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 };
+      if (this.tourMode && e && G.distToSegment(mid, e.a, e.b).dist < 200) continue;
+      const doorH = Math.min(DOOR.h, Hmm);
+      if (Hmm > DOOR.h) this.wallPiece(d.a, g.u, 0, g.len, DOOR.h, Hmm, d.t, new THREE.MeshStandardMaterial({ color: '#f2efe9', roughness: 0.9 }));
+      const frame = buildDoorFrame(g.len * M, doorH * M, d.t * M);
+      frame.position.set(mid.x * M, 0, mid.y * M);
+      frame.rotation.y = -Math.atan2(g.u.y, g.u.x);
+      this.planGroup.add(frame);
+      // 문짝: 로컬 +x → 도면 n(문짝이 뻗는 쪽). 로컬 +z는 도면 (-n.y, n.x) = -swing·u 이므로 두께는 틈 안쪽(+u)으로 둔다
+      const leaf = buildDoorLeaf(g.len * M, doorH * M, -d.swing);
+      leaf.position.set((g.hinge.x + g.u.x * 40) * M, 0, (g.hinge.y + g.u.y * 40) * M);
+      leaf.rotation.y = -Math.atan2(g.n.y, g.n.x);
+      this.planGroup.add(leaf);
     }
     this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity);
 
