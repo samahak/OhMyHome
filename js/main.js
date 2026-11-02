@@ -471,8 +471,29 @@ const TYPE_ORDER = new Map(Object.keys(SHAPES).map((k, i) => [k, i]));
 const typeRank = (t) => TYPE_ORDER.get(t) ?? TYPE_ORDER.size;
 const byTypeThenName = (a, b) => typeRank(a.type) - typeRank(b.type) || byName(a.name, b.name);
 
-/** 배치된 가구: 종류별로 묶고(제목 + 개수), 같은 종류 안에서는 이름순 */
+/** 가격 입력 읽기: '1,290,000' · '1290000원' · '129만' · '129만 9천' · '12.9만' → 원. 빈칸은 null, 못 읽으면 NaN */
+function parseWon(text) {
+  const s = String(text).replace(/[\s,원₩]/g, '');
+  if (!s) return null;
+  const m = s.match(/^(?:(\d+(?:\.\d+)?)만)?(?:(\d+(?:\.\d+)?)천)?(\d+)?$/);
+  if (!m || (!m[1] && !m[2] && !m[3])) return NaN;
+  return Math.round((+m[1] || 0) * 10000 + (+m[2] || 0) * 1000 + (+m[3] || 0));
+}
+const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
+const sumPrice = (fs) => fs.reduce((s, f) => s + (f.price || 0), 0);
+
+/** 배치된 가구 합계: 개수 · 가격 합계 (가격을 안 넣은 가구 수도 알린다) */
+function renderPlacedTotal() {
+  const fs = state.furniture, priced = fs.filter((f) => f.price != null);
+  $('placed-total').hidden = !fs.length;
+  $('placed-total').innerHTML = priced.length
+    ? `가구 ${fs.length}개 · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priced.length < fs.length ? `<small>가격을 넣지 않은 가구 ${fs.length - priced.length}개는 빼고 더했습니다</small>` : ''}`
+    : `가구 ${fs.length}개<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
+}
+
+/** 배치된 가구: 종류별로 묶고(제목 + 개수 + 소계), 같은 종류 안에서는 이름순 */
 function renderPlaced() {
+  renderPlacedTotal();
   const bad = G.findCollisions(state.furniture, state.plan.walls);
   const groups = new Map();
   for (const f of [...state.furniture].sort(byTypeThenName)) {
@@ -481,11 +502,11 @@ function renderPlaced() {
   }
   $('placed-list').innerHTML = state.furniture.length
     ? [...groups].map(([type, fs]) => `
-      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span></div>
+      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span>${fs.some((f) => f.price != null) ? `<span class="sub">${fmtWon(sumPrice(fs))}</span>` : ''}</div>
       ${fs.map((f) => `
       <button data-id="${f.id}" class="${isFurnitureSelected(f.id) ? 'sel' : ''}">
-        <span>${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}</span>
-        <span class="sz">${f.w}×${f.d}×${f.h}</span>
+        <span>${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}${f.model ? `<span class="model">${esc(f.model)}</span>` : ''}</span>
+        ${f.price != null ? `<span class="price">${fmtWon(f.price)}</span>` : `<span class="sz">${f.w}×${f.d}×${f.h}</span>`}
       </button>`).join('')}`).join('')
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
   // Shift·Ctrl(⌘)+클릭: 선택에 더하거나 빼기
@@ -523,7 +544,11 @@ function renderProps() {
       <h3><span>🗂️ 가구 ${sel.ids.length}개</span><button data-act="close" class="icon">✕</button></h3>
       <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽이나 다른 가구와 겹치는 것이 있습니다.</div>
       <ul class="multi-list">${sel.ids.map((id) => state.furniture.find((f) => f.id === id))
-        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}</li>`).join('')}</ul>
+        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}${f.price != null ? ` · ${fmtWon(f.price)}` : ''}</li>`).join('')}</ul>
+      ${(() => {
+        const fs = sel.ids.map((id) => state.furniture.find((f) => f.id === id)), n = fs.filter((f) => f.price != null).length;
+        return n ? `<div class="field"><span>고른 가구 가격 합계</span><b>${fmtWon(sumPrice(fs))}</b></div>${n < fs.length ? `<p class="hint">가격 없는 ${fs.length - n}개는 빼고 더했습니다.</p>` : ''}` : '';
+      })()}
       <div class="btns"><button data-act="rot-90">⟲ 90°</button><button data-act="rot90">⟳ 90°</button></div>
       <div class="btns">
         <button data-act="dup">함께 복제</button>
@@ -541,6 +566,8 @@ function renderProps() {
       ${lib?.image ? `<img class="thumb" src="${lib.image}" alt="">` : ''}
       <div class="warn" data-warn hidden>⚠ 벽이나 다른 가구와 겹칩니다.</div>
       <label class="field"><span>이름</span><input type="text" data-f="name"></label>
+      <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: LG 오브제 M873"></label>
+      <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,290,000 · 129만"></label>
       <label class="field"><span>샘플 모양</span><select data-f="type">${Object.entries(SHAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${preset ? `
       <label class="field"><span>${preset.label}</span><input type="number" min="${preset.min}" max="${preset.max}" step="1" data-f="${preset.key}"></label>
@@ -635,6 +662,7 @@ function refreshProps() {
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
     if (k === 'counterD') return lCounterDepth(obj);
+    if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
     const p = SIZE_PRESETS[obj.type];
     if (p && k === p.key) return obj[k] ?? p.guess(obj);
     return obj[k];
@@ -667,6 +695,21 @@ function applyProp(inp) {
   const k = inp.dataset.f;
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
+  if (k === 'price') {
+    const won = parseWon(v);
+    if (Number.isNaN(won)) { status(`‘${v}’를 가격으로 읽지 못했습니다. 예: 1,290,000 · 1290000원 · 129만`); refreshProps(); return; }
+    checkpoint();
+    if (won === null) delete obj.price; else obj.price = won;
+    emit('furniture');
+    return;
+  }
+  if (k === 'model') {
+    checkpoint();
+    const m = String(v).trim();
+    if (m) obj.model = m; else delete obj.model;
+    emit('furniture');
+    return;
+  }
   const preset = sel.kind === 'furniture' && SIZE_PRESETS[obj.type];
   if (preset && k === preset.key) { applyPreset(obj, v); return; }
   // 길이로 도면 전체 크기를 맞추는 칸들
