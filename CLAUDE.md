@@ -59,7 +59,8 @@ js/tour.js             둘러보기 — 현관문 열기 · 1인칭 카메라 ·
 js/walkGrid.js         둘러보기용 걸을 수 있는 칸 지도 · A* 길 찾기 · 들를 곳 고르기             (DOM 없음)
 js/fixtures.js         현관·욕실·주방 설비 자동 배치 (신발장·변기·세면대·욕조·주방 싱크대)          (DOM 없음)
 js/windows.js          창 자동 찾기 — 도면 이미지에서 벽 위의 연한 구간 + 바깥벽 틈                 (DOM 없음)
-js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 먼 산, 하늘
+js/doors.js            문 자동 찾기 — 벽 틈 중 도면 이미지에 여닫이 문 기호(문짝 선 + 호)가 있는 곳   (DOM 없음)
+js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 숲, 먼 산, 하늘
 js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
 sample/                실제 세대 예시 — 55㎡ A-2형 · A-1형(좌우 반전)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
@@ -77,14 +78,17 @@ sample/                실제 세대 예시 — 55㎡ A-2형 · A-1형(좌우 �
 ### 상태 (`store.js`)
 
 ```
-state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], wallHeight, floor }
+state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], wallHeight, floor }
   scaleRef      { a, b, mm } | null — 축척을 맞춘 기준 치수선 (2D에 주황 점선으로 그린다)
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
   room          { id, name, pts:[{x,y}], hidden? }
   window        { id, a, b, t, sill, h, auto } — a–b는 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이 (mm)
-state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto }
+  door          { id, a, b, t, swing, auto } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
+state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
+  model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
 state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
-ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저장하지 않는다)
+ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   (저장하지 않는다)
+  ids           가구를 2개 이상 골랐을 때만 있다. id는 마지막에 고른 가구
 ```
 
 - 화면들은 `on('plan' | 'furniture' | 'library' | 'selection')`을 듣고 다시 그린다. 상태를 바꾼 쪽이 `emit()`한다.
@@ -179,6 +183,21 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저�
 - `view3d.setTourMode(true)`는 나무 바닥·천장 높이 벽·이름표 숨김으로 다시 그린다. 문짝·문 위 벽·천장·실내등은
   `Tour.group`에 따로 두고 나갈 때 치운다. 둘러보기 중 키 입력은 `tour.js`가 capture 단계에서 받고, `main.js` 단축키는 쉰다.
 
+### 문 (`doors.js`)
+
+- 후보 틈은 `doorGaps()`: 벽 끝에서 벽 방향으로 쏜 반직선이 **어느 벽이든** 500~1,300mm 안에서 닿는 곳(같은 줄 벽만 보는
+  `findWindowGaps`로는 복도에서 방으로 꺾이는 문을 놓친다). 창 자리 틈은 뺀다.
+- 틈마다 경첩(양 끝) × 여는 쪽(양쪽) 네 가지 기호를 가정해 이미지와 맞춰 본다. 경첩은 **벽 면 위**(중심선에서 t/2), 문짝은 문 폭 길이로
+  벽에 수직, 호는 반대 끝까지. 호 10~80° 표본의 60%, 문짝 선 표본의 50% 이상이 어두우면(< 180, 법선 방향 ±25mm) 문이다.
+  미닫이(평행한 두 선)는 찾지 않는다 — 🚪 문 도구로 직접 단다.
+- 자동 문은 벽 인식·'문 기호 찾아 문 달기'·둘러보기 시작 때 다시 찾는다(`autoDoors`, 창과 같은 방식: `auto: false`는 그대로).
+  문 목록이 없는 예전 프로젝트·저장본을 열면 한 번 찾아 단다(`doorsForOldProject`, 그래서 `loadSaved()`는 불러온 원본을 돌려준다).
+- 자동 문을 지우면 그 가운데를 `plan.doorsRemoved`에 남기고(`store.removeItem`), 다시 찾을 때 300mm 안의 문은 달지 않는다.
+  🚪 문 도구로 그 자리에 직접 달면 목록에서 빠진다. 새 도면 이미지를 열면 비운다. `setScale()`도 함께 옮긴다.
+- 경첩·여는 쪽을 손으로 바꾸면 `auto: false`가 된다. 경첩을 반대로 하면 a↔b를 바꾸고 swing도 뒤집는다(법선이 뒤집히므로).
+- 3D: 문 위 벽(`catalog.DOOR.h` ~ 천장, `wallPiece`) + 문틀 + 90° 열린 문짝(`models3d.buildDoorFrame/buildDoorLeaf`).
+  둘러보기 중 현관 자리의 문은 그리지 않는다(`tour.js`가 여닫는 현관문을 따로 만든다). 문짝은 길 찾기 장애물에 넣지 않는다.
+
 ### 창 (`windows.js`, `G.findWindowGaps`)
 
 - 창은 벽과 따로 `plan.windows`에 둔다. 3D는 벽 상자를 창 자리만큼 잘라(`G.windowSpanOnWall`) 토막으로 세우고,
@@ -199,6 +218,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저�
 - 둘러보기 창밖은 `scenery.buildScenery()`가 만든다(`Tour.group`에 넣어 나갈 때 함께 치운다). 우리 층 바닥이 y=0이고 땅은
   `(plan.floor - 1) × 2.8m + 1m` 아래. 도면 아래쪽(+z)을 앞으로 보고 앞 30m에 4차로 도로, 길 건너 빌라, 사방에 아파트 동,
   반지름 320~900m 시가지, 1.5·2.3·3.2km에 산 능선 세 겹, 하늘 둥근 지붕을 놓는다. 고정 씨앗 난수라 늘 같은 풍경이다.
+  나무는 약 2만 6천 그루: 가로수(도로 끝까지)·단지(230m)·시가지 숲 110곳과 흩어진 나무(~1.3km)·산 앞자락 숲 띠(1.25~1.5km)·
+  가까운 산 두 겹의 비탈(능선 `height(a)`를 따라). 둥근 활엽수·뾰족한 침엽수 InstancedMesh 둘(+ 600m 안 줄기)로 그리고
+  `setColorAt`으로 초록을 섞는다. `block()`이 남긴 건물 바닥(`taken`)과 도로에는 심지 않는다. 멀수록 크게 키운다(점으로라도 보이게).
   창 텍스처는 캔버스 한 장(8층 × 8칸)을 건물마다 `clone()`해 repeat만 바꾼다(같은 source라 GPU에는 한 번만 올라간다).
 - 둘러보기 중에는 `camera.far = 6000`, `scene.fog`(500~4200m)를 쓰고 나갈 때 되돌린다. **`view3d`의 화면 크기 변경 처리는
   둘러보기 중 `resetCamera()`를 부르지 않는다** — 부르면 far가 500m로 돌아가 하늘·산이 잘리고 엉뚱한 삼각형이 보인다.
@@ -216,9 +238,21 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저�
   이름이 `namePattern`(예: `65인치 TV`, `3인 소파`) 꼴일 때만 이름도 따라 바꾼다. 새 항목은 이 표에만 더하면 된다.
 - 모양 함수는 다섯째 인자로 가구 항목 `f`도 받는다(소파 쿠션 수 = `f.seats`). 모양에 영향을 주는 값을 새로 쓰면
   `view3d.syncFurniture()`의 `key`에도 넣어야 다시 그려진다.
+- **ㄱ자 주방 싱크대(`kitchen_l`)**: `w` = 가로(뒤쪽), `d` = 세로(꺾인 쪽) 길이(세로가 더 길어도 된다), 상판 깊이 `f.counterD`(없으면 `catalog.L_COUNTER.depth`),
+  `f.mirror`면 꺾인 쪽이 왼쪽(기본은 앞에서 볼 때 오른쪽 +x). 바닥 모양은 `G.furnitureRects(f)`(사각형 둘)가 정하고,
+  겹침(`findCollisions`)·클릭·길 찾기는 `G.furnitureParts()`, 2D 그리기는 `furnitureOutline`/`furnitureFront`를 쓴다 —
+  `furnitureCorners()`(바깥 상자)로 재면 안쪽 빈 모서리까지 막힌다. 새로 사각형이 아닌 가구를 넣으면 `furnitureRects`에 더한다.
+  3D는 `counterRun()`(싱크대 한 줄) 둘: 가로 쪽에 개수대, 꺾인 쪽에 인덕션·후드(꺾인 쪽이 800mm 미만이면 가로 쪽에).
+  `SHAPES[type].dims`가 있으면 속성 패널의 가로·깊이 칸 이름을 바꾼다.
+- **식물(`plant`)**: 종류는 `f.plant`(`catalog.PLANTS` 키, 없으면 몬스테라 — `plantOf()`). 종류를 바꾸면(`applyPlant`) 크기를 그 종류
+  기본값으로 맞추고, 이름이 종류 이름이었으면 이름도 바꾼다. `f.color`는 화분 색(2D는 잎 색으로 칠한다). 3D는 `models3d.PLANT_SHAPES`의
+  종류별 함수가 `leaf()`(납작한 타원)·`rod()`(줄기)로 그리고, 고정 씨앗 난수라 다시 그려도 모양이 같다. 스킨답서스 덩굴은 바닥을 뚫지 않게
+  `f.elev`만큼만 늘어지므로 `syncFurniture()` key에 식물의 elev가 들어간다. 잎·줄기 지오메트리는 `sharedGeo()`로 함께 쓴다.
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
-- 박스 지오메트리는 하나를 공유하고 `scale`로 키운다. `disposeObject()`는 그 공유 지오메트리를 버리지 않는다.
+- 박스·구·원기둥 지오메트리는 `sharedGeo()`로 하나씩 공유하고 `scale`로 키운다. `disposeObject()`는 공유 지오메트리를 버리지 않는다.
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.
+- `view.capture()`·`editor.capture()`는 화면 크기와 상관없이 가로 그림(3D 1920×1080, 2D 3840×2160)을 따로 그린 뒤
+  렌더러 크기·카메라(2D는 view·그리던 선)를 되돌린다. 3D는 카메라를 안 돌렸으면 가로에 맞춰 다시 잡고 20% 다가가 찍는다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
 - 방 이름표는 `CSS2DObject`다. 그룹에서 빼면(`clear()`) three.js가 DOM 요소도 함께 지운다.
 
@@ -226,11 +260,21 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id } | null   (저�
 
 - 속성 패널은 선택이 바뀔 때만 통째로 그리고(`renderProps`), 같은 대상이 바뀌면 입력칸 값만 고친다(`refreshProps`).
   이때 **지금 포커스가 있는 칸은 건드리지 않는다.** 통째로 다시 그리면 Tab으로 칸을 옮길 때 포커스가 사라진다.
+- **여러 가구 선택**: 가구만 된다. `selectedFurnitureIds()`·`selectFurniture(ids)`·`toggleFurnitureSelection(id)`로 다루고
+  `ui.selection.ids`를 직접 만들지 않는다(없는 id를 걸러 1개면 `ids`를 뺀다). Shift+클릭으로 더하기·빼기, 2D 빈 곳 Shift+끌기는
+  가운데가 사각형 안에 든 가구를 고른다. 고른 가구를 끌면 함께 움직인다 — 2D·3D 모두 `beginFurnitureDrag`/`dragFurnitureTo`
+  (store) 하나를 쓴다. 하나는 자리를, 여럿은 이동량을 10mm 칸에 맞춘다. 묶음 동작(끌기·방향키·회전·복제·삭제)은 `checkpoint()`를
+  한 번만 불러 Ctrl+Z 한 번에 돌아온다. 묶음 회전은 고른 가구 가운데를 축으로 자리까지 돈다. 속성 패널은 묶음 화면(`sel.ids`)을 따로 그린다.
+- 가격 입력은 `parseWon()`(main.js)으로 읽는다: 쉼표·원·₩·공백을 빼고 `129만`·`129만 9천`·`12.9만`을 받는다. 화면은 `fmtWon()`.
+  목록 위 `#placed-total`에 전체 합계(가격 없는 가구 수도 알림), 종류 제목에 소계, 여러 개 선택 패널에 고른 가구 합계를 보인다.
+- 왼쪽 '배치된 가구' 목록은 `SHAPES` 순서로 종류별로 묶고(제목 + 개수), 같은 종류 안은 이름순(`Intl.Collator('ko', { numeric })`)이다.
 - 새 가구는 `dropPoint()`가 화면 가운데에서 나선형으로 돌며 벽·가구와 겹치지 않는 첫 자리에 놓는다.
 - 겹침 판정은 `G.findCollisions()` 하나다. 맞닿기만 한 것은 겹침이 아니도록 꼭짓점을 1~2mm 안쪽으로 줄여 잰다.
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
+- 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
+  누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 사진 대화상자가 열려 있으면 무시한다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
   먹지 않는다. 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.
