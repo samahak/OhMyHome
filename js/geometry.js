@@ -1,5 +1,6 @@
 // 평면 기하 — 모든 좌표는 mm, y는 아래로 증가한다(도면 이미지와 같은 방향).
 // 가구 회전 rot(도)은 화면에서 시계 방향이다. 가구의 앞면은 로컬 +y(= 3D의 +z)다.
+import { lCounterDepth } from './catalog.js';
 
 export const DEG = Math.PI / 180;
 
@@ -23,6 +24,50 @@ export function furnitureCorners(f, shrink = 0) {
     const p = rotatePt(x, y, r);
     return { x: f.x + p.x, y: f.y + p.y };
   });
+}
+
+/**
+ * 가구 바닥을 이루는 로컬 사각형 목록 [x0, y0, x1, y1] (가운데 원점, 앞면 +y). 보통 가구는 w×d 하나다.
+ * ㄱ자 주방 싱크대(kitchen_l)는 뒤쪽 가로(w × 상판 깊이) + 옆쪽 꺾인 세로(상판 깊이 × 나머지 d) 두 개다.
+ * 꺾인 쪽은 앞에서 볼 때 오른쪽(+x)이고, f.mirror면 왼쪽이다.
+ */
+export function furnitureRects(f) {
+  const hw = f.w / 2, hd = f.d / 2;
+  if (f.type !== 'kitchen_l') return [[-hw, -hd, hw, hd]];
+  const t = Math.min(lCounterDepth(f), f.w, f.d);
+  const [x0, x1] = f.mirror ? [-hw, -hw + t] : [hw - t, hw];
+  return [[-hw, -hd, hw, -hd + t], [x0, -hd + t, x1, hd]];
+}
+
+const toPlan = (f, x, y) => {
+  const p = rotatePt(x, y, f.rot * DEG);
+  return { x: f.x + p.x, y: f.y + p.y };
+};
+
+/** 가구 바닥 조각들의 꼭짓점 (볼록 사각형 목록, shrink만큼 안쪽으로) — 겹침·클릭·길 찾기에 쓴다 */
+export function furnitureParts(f, shrink = 0) {
+  return furnitureRects(f).map(([x0, y0, x1, y1]) => {
+    const s = Math.min(shrink, (x1 - x0) / 2, (y1 - y0) / 2);
+    return [[x0 + s, y0 + s], [x1 - s, y0 + s], [x1 - s, y1 - s], [x0 + s, y1 - s]].map(([x, y]) => toPlan(f, x, y));
+  });
+}
+
+/** 2D에 그릴 가구 바깥 테두리. ㄱ자는 여섯 꼭짓점 */
+export function furnitureOutline(f) {
+  if (f.type !== 'kitchen_l') return furnitureCorners(f);
+  const [[x0, y0, x1, y1], [lx0, , lx1, ly1]] = furnitureRects(f);
+  const pts = f.mirror
+    ? [[x0, y0], [x1, y0], [x1, y1], [lx1, y1], [lx1, ly1], [lx0, ly1]]
+    : [[x0, y0], [x1, y0], [lx1, ly1], [lx0, ly1], [lx0, y1], [x0, y1]];
+  return pts.map(([x, y]) => toPlan(f, x, y));
+}
+
+/** 앞면(사람이 서는 쪽) 선. 보통 가구는 +y 변 하나, ㄱ자는 안쪽으로 꺾인 두 변 */
+export function furnitureFront(f) {
+  if (f.type !== 'kitchen_l') { const c = furnitureCorners(f); return [c[3], c[2]]; }
+  const [[x0, , x1, y1], [lx0, , lx1, ly1]] = furnitureRects(f);
+  const pts = f.mirror ? [[x1, y1], [lx1, y1], [lx1, ly1]] : [[x0, y1], [lx0, y1], [lx0, ly1]];
+  return pts.map(([x, y]) => toPlan(f, x, y));
 }
 
 /** 벽 사각형의 네 꼭짓점. cap이면 양 끝을 두께 절반만큼 늘려 모서리를 메운다. */
@@ -136,16 +181,17 @@ function chairUnderDesk(chair, desk) {
 /** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
 export function findCollisions(furniture, walls) {
   const bad = new Set();
-  const fc = furniture.map((f) => furnitureCorners(f, 2));
+  const fc = furniture.map((f) => furnitureParts(f, 2));
   const wc = walls.map((w) => wallCorners(w, 1));
+  const overlap = (A, B) => A.some((a) => B.some((b) => convexOverlap(a, b)));   // 조각(ㄱ자는 둘) 중 하나라도 겹치면
   furniture.forEach((f, i) => {
     for (const w of wc) {
-      if (convexOverlap(fc[i], w)) { bad.add(f.id); break; }
+      if (overlap(fc[i], [w])) { bad.add(f.id); break; }
     }
     for (let j = i + 1; j < furniture.length; j++) {
       const g = furniture[j];
       const vertical = f.elev < g.elev + g.h && g.elev < f.elev + f.h;
-      if (!vertical || !convexOverlap(fc[i], fc[j])) continue;
+      if (!vertical || !overlap(fc[i], fc[j])) continue;
       let hit = null;
       if (f.type === 'chair' && g.type in KNEE_SPACE) hit = chairUnderDesk(f, g);
       else if (g.type === 'chair' && f.type in KNEE_SPACE) hit = chairUnderDesk(g, f);

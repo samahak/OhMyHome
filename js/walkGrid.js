@@ -1,7 +1,7 @@
 // 둘러보기용 걸을 수 있는 칸 지도 — DOM 없이 돈다.
 // 도면을 cell(mm) 칸으로 나누고, 벽·가구에서 몸 반지름(radius)만큼 떨어지지 않은 칸을 막는다.
 // 벽들의 바깥 사각형 밖은 모두 막는다(창이 벽 틈으로 잡힌 도면에서 밖으로 나가지 않게).
-import { wallCorners, furnitureCorners, pointInPoly, distToSegment, boundsOf } from './geometry.js';
+import { wallCorners, furnitureParts, pointInPoly, distToSegment, boundsOf } from './geometry.js';
 
 export function buildGrid(walls, furniture, { cell = 100, radius = 220, margin = 300 } = {}) {
   const b = boundsOf(walls.flatMap((w) => [w.a, w.b]));
@@ -18,7 +18,7 @@ export function buildGrid(walls, furniture, { cell = 100, radius = 220, margin =
   }
   // 높이 걸린 것(벽걸이 등)은 걸어서 지나갈 수 있다
   const polys = walls.map((w) => wallCorners(w))
-    .concat(furniture.filter((f) => (f.elev || 0) < 1200).map((f) => furnitureCorners(f)));
+    .concat(furniture.filter((f) => (f.elev || 0) < 1200).flatMap((f) => furnitureParts(f)));
   for (const poly of polys) {
     const pb = boundsOf(poly);
     const i0 = Math.max(0, Math.floor((pb.minX - radius - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((pb.maxX + radius - x0) / cell));

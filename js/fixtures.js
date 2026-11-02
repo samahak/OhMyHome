@@ -13,7 +13,7 @@ const BATH = /욕실|화장실|파우더/;
 const NO_TUB = /부부|안방|마스터|파우더/;   // 보통 샤워부스만 두는 욕실
 const KITCHEN = /주방|부엌|키친/;
 const BATH_TYPES = new Set(['toilet', 'basin', 'bathtub']);
-const KITCHEN_TYPES = new Set(['kitchen_counter']);
+const KITCHEN_TYPES = new Set(['kitchen_counter', 'kitchen_l']);
 const SHOE = /신발/;
 
 /** 방 안쪽 상자: 가운데에서 벽까지 잰 칸을 방 경계로 자른다 */
