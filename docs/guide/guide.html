@@ -166,7 +166,7 @@ run_ohmyhome.bat</pre>
     <tr><td>왼쪽 <span class="btn">① 도면</span></td><td>도면 이미지 열기, 기준 치수(축척) 맞추기, 벽 자동 인식, 벽·방·창 그리기 도구, 벽 높이·층수</td></tr>
     <tr><td>왼쪽 <span class="btn">② 가구</span></td><td>샘플 가구 목록, 사진으로 가구 추가, 놓은 가구 목록</td></tr>
     <tr><td>가운데 위 막대</td><td><span class="btn">2D 도면</span> <span class="btn">나란히</span> <span class="btn">3D</span> 보기 전환, <span class="btn">🚶 둘러보기</span>, 3D 시점(위에서·비스듬히), 벽 투명도, 벽 낮게</td></tr>
-    <tr><td>맨 위 오른쪽</td><td>되돌리기·다시 하기, 새 프로젝트, 불러오기, 저장(.json), 3D 캡처</td></tr>
+    <tr><td>맨 위 오른쪽</td><td>되돌리기·다시 하기, 새 프로젝트, 불러오기, 저장(.json), 2D 캡처, 3D 캡처</td></tr>
     <tr><td>오른쪽 속성 패널</td><td>가구·벽·방·창을 누르면 나타나 크기·위치·회전 등을 고칩니다</td></tr>
     <tr><td>맨 아래 상태줄</td><td>지금 할 일과 결과를 알려 줍니다</td></tr>
   </table>
@@ -219,6 +219,9 @@ run_ohmyhome.bat</pre>
 
   <h3>⑤ 창문</h3>
   <p>도면에서 벽 위에 연하게 그려진 창 자리와 바깥벽이 끊긴 곳은 자동으로 창이 됩니다. 직접 내려면 <span class="btn">🪟 창문</span> 도구로 벽을 누르세요. 창을 누르면 폭, 바닥에서 창 아래까지 높이, 창 높이를 고칠 수 있습니다(허리창 / 바닥까지 큰 창).</p>
+
+  <h3>⑥ 문</h3>
+  <p>벽 인식을 하면 도면에 여닫이 문 기호(문짝 선 + 여닫는 호)가 그려진 틈마다 문이 달립니다. 나중에 다시 찾으려면 <span class="btn">🚪 문 기호 찾아 문 달기</span>를 누르세요. 3D에서는 문 위를 천장까지 벽으로 채우고 문짝을 도면 기호처럼 열어 둡니다. 직접 달려면 <span class="btn">🚪 문</span> 도구로 벽이 끊긴 틈을 누르세요(누른 쪽으로 열립니다). 문을 누르면 <span class="btn">⇋ 경첩 반대로</span> · <span class="btn">⇅ 여는 쪽 반대로</span>로 고칠 수 있습니다. 미닫이 문 기호는 자동으로 찾지 않습니다.</p>
 </section>
 
 <section>
@@ -230,10 +233,15 @@ run_ohmyhome.bat</pre>
   <ol class="steps">
     <li>왼쪽 <span class="btn">② 가구</span> 탭에서 가구를 누르면 도면 가운데 빈자리에 놓입니다.</li>
     <li>2D나 3D 화면에서 가구를 <b>끌어서</b> 옮깁니다.</li>
+    <li><kbd>Shift</kbd>+클릭으로 가구를 <b>여러 개</b> 고르면 함께 옮기고·돌리고·복제·삭제할 수 있습니다. 2D에서는 빈 곳을 <kbd>Shift</kbd>+끌어 사각형 안의 가구를 한꺼번에 고릅니다.</li>
     <li>오른쪽 속성 패널에서 가로·깊이·높이, 회전, 바닥에서 띄움(벽걸이 TV 등), 색을 고칩니다.</li>
   </ol>
   <ul>
     <li><b>TV</b>는 인치(55·65·75…), <b>소파</b>는 인원(2~6인), <b>식탁</b>은 인원(2·4·6·8인)을 고르면 크기가 맞춰집니다.</li>
+    <li>왼쪽 <b>배치된 가구</b> 목록은 종류별(침대·소파·의자…)로 묶여 보입니다.</li>
+    <li><b>식물</b>은 놓은 뒤 속성 패널의 <b>식물 종류</b>(몬스테라·여인초·올리브나무·고무나무·아레카야자·산세베리아·금전수·스킨답서스)를 고르면 3D 모양과 크기가 바뀝니다. 색상은 화분 색입니다. 스킨답서스를 선반 위(바닥에서 띄움)에 두면 덩굴이 아래로 늘어집니다.</li>
+    <li>속성 패널에 <b>모델명</b>과 <b>가격</b>을 넣으면 배치된 가구 목록 위에 <b>전체 합계</b>, 종류 제목 옆에 소계가 나옵니다. 가격은 1,290,000 · 1290000원 · 129만 · 129만 9천처럼 넣을 수 있습니다.</li>
+    <li><b>ㄱ자 주방 싱크대</b>는 가로(뒤쪽)·세로(꺾인 쪽) 길이와 상판 깊이를 고치고, <span class="btn">⇋ 좌우 반전</span>으로 꺾인 쪽을 바꿉니다.</li>
     <li><span class="btn">🧲 벽에 붙이기</span>: 가장 가까운 벽에 가구 등을 붙입니다. 2D에서 <b>두꺼운 선이 가구의 앞면</b>입니다.</li>
     <li>벽이나 다른 가구와 겹치면 <b style="color:#d9363e">빨갛게</b> 표시됩니다. 의자는 책상·식탁·화장대 밑으로 들어가도 되고, 등받이가 닿을 때만 겹침으로 봅니다.</li>
   </ul>
@@ -254,7 +262,8 @@ run_ohmyhome.bat</pre>
     <tr><td>벽 투명도</td><td>벽을 반투명하게 해서 안쪽을 봅니다</td></tr>
     <tr><td>벽 낮게</td><td>벽을 허리 높이(1m)로 잘라 단면도처럼 봅니다</td></tr>
     <tr><td>바닥에 도면</td><td>3D 바닥에 도면 그림을 깔지 정합니다</td></tr>
-    <tr><td><span class="btn">3D 캡처</span></td><td>지금 3D 화면을 PNG 그림으로 받습니다</td></tr>
+    <tr><td><span class="btn">2D 캡처</span></td><td>2D 도면 전체를 가로 PNG 그림(3840×2160)으로 받습니다</td></tr>
+    <tr><td><span class="btn">3D 캡처</span></td><td>지금 3D 화면을 가로 PNG 그림(1920×1080)으로 받습니다. 화면 칸이 세로로 길어도 가로로 찍힙니다</td></tr>
   </table>
 </section>
 
@@ -297,15 +306,17 @@ run_ohmyhome.bat</pre>
   <h2 style="margin-top:22pt"><span class="no">10</span>단축키</h2>
   <table>
     <tr><th style="width:36%">키</th><th>동작</th></tr>
-    <tr><td><kbd>V</kbd> <kbd>W</kbd> <kbd>A</kbd> <kbd>M</kbd> <kbd>N</kbd> <kbd>X</kbd></td><td>선택 · 벽 · 방 · 길이 재기 · 창문 · 지우기 도구</td></tr>
+    <tr><td><kbd>V</kbd> <kbd>W</kbd> <kbd>A</kbd> <kbd>M</kbd> <kbd>N</kbd> <kbd>D</kbd> <kbd>X</kbd></td><td>선택 · 벽 · 방 · 길이 재기 · 창문 · 문 · 지우기 도구</td></tr>
     <tr><td><kbd>R</kbd> / <kbd>Shift</kbd>+<kbd>R</kbd></td><td>선택한 가구 90° 회전</td></tr>
     <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>15° 회전</td></tr>
     <tr><td>방향키 (<kbd>Shift</kbd>)</td><td>10mm (100mm) 이동</td></tr>
     <tr><td><kbd>Delete</kbd></td><td>선택한 것 삭제</td></tr>
     <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>Z</kbd> · <kbd>Ctrl/⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>되돌리기 · 다시 하기</td></tr>
     <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>D</kbd></td><td>복제</td></tr>
+    <tr><td><kbd>Shift</kbd>+클릭 · 빈 곳 <kbd>Shift</kbd>+끌기</td><td>가구 여러 개 고르기 (사각형)</td></tr>
+    <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>A</kbd></td><td>가구 전체 선택</td></tr>
     <tr><td><kbd>F</kbd></td><td>2D 도면 전체 보기</td></tr>
-    <tr><td><kbd>Esc</kbd></td><td>그리던 것 취소 / 선택 해제</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>그리던 것 취소 → 그리기 도구 끄기 → 선택 해제 (켜진 도구 버튼을 다시 눌러도 꺼집니다)</td></tr>
   </table>
   <p>2D 화면: 휠로 확대·축소, 빈 곳을 끌거나 <kbd>Space</kbd>+드래그로 화면 이동.</p>
 </section>
