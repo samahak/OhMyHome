@@ -1,6 +1,9 @@
 // 2D 도면 편집기 — 캔버스 하나에 도면 이미지·방·벽·가구를 그리고 도구별 마우스 입력을 받는다.
 // 좌표: 도면 mm. 화면 px = mm * view.s + view.o
-import { state, ui, on, checkpoint, select, uid, removeItem, emit, updateFurniture } from './store.js';
+import {
+  state, ui, on, checkpoint, select, uid, removeItem, emit,
+  selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
+} from './store.js';
 import * as G from './geometry.js';
 import { windowDefaults } from './catalog.js';
 
@@ -10,7 +13,7 @@ const SNAP_PX = 12;
 export const fmtMM = (v) => `${Math.round(v).toLocaleString('ko-KR')}`;
 
 const HINTS = {
-  select: '가구·벽·방을 눌러 선택하고, 가구는 끌어서 옮깁니다. 빈 곳을 끌면 화면 이동, 휠로 확대·축소.',
+  select: '가구·벽·방을 눌러 선택하고, 가구는 끌어서 옮깁니다. Shift+클릭이나 Shift+끌기로 가구 여러 개를 함께 고릅니다. 빈 곳을 끌면 화면 이동, 휠로 확대·축소.',
   wall: '클릭할 때마다 벽이 이어집니다. 더블클릭·Esc·오른쪽 클릭으로 끝. Shift를 누르면 자유 각도.',
   room: '방 꼭짓점을 차례로 찍으세요. 첫 점을 다시 누르거나 더블클릭하면 방이 완성됩니다.',
   scale: '방 안을 한 번 누르면 벽 사이 가로·세로가 지금 몇 mm로 보이는지 나옵니다. 도면 치수로 고치면 전체 크기가 바뀝니다. (Shift+클릭: 두 점으로 재기)',
@@ -210,11 +213,17 @@ export class PlanEditor {
     switch (this.tool) {
       case 'select': {
         const hit = this.hitAny(p);
-        select(hit ? { kind: hit.kind, id: hit.id } : null);
         if (hit?.kind === 'furniture') {
-          this.drag = { id: hit.id, dx: hit.obj.x - p.x, dy: hit.obj.y - p.y, started: false };
+          // Shift+클릭: 선택에 더하거나 빼기. 이미 고른 가구를 누르면 고른 것 전체를 함께 끈다
+          if (e.shiftKey) { if (!toggleFurnitureSelection(hit.id)) break; }
+          else if (!isFurnitureSelected(hit.id)) select({ kind: 'furniture', id: hit.id });
+          this.drag = beginFurnitureDrag(selectedFurnitureIds(), p);
           this.cv.style.cursor = 'grabbing';
+        } else if (e.shiftKey) {
+          // Shift+빈 곳 끌기: 사각형 안에 가운데가 든 가구를 선택에 더한다
+          this.box = { a: p, b: p, base: selectedFurnitureIds() };
         } else {
+          select(hit ? { kind: hit.kind, id: hit.id } : null);
           this.pan = { sx, sy, ox: this.view.ox, oy: this.view.oy, moved: false, button: 0 };
         }
         break;
@@ -292,11 +301,16 @@ export class PlanEditor {
       return;
     }
     if (this.drag) {
-      if (!this.drag.started) { checkpoint(); this.drag.started = true; }
-      updateFurniture(this.drag.id, {
-        x: Math.round((p.x + this.drag.dx) / 10) * 10,
-        y: Math.round((p.y + this.drag.dy) / 10) * 10,
-      });
+      dragFurnitureTo(this.drag, p);
+      return;
+    }
+    if (this.box) {
+      this.box.b = p;
+      const x0 = Math.min(this.box.a.x, p.x), x1 = Math.max(this.box.a.x, p.x);
+      const y0 = Math.min(this.box.a.y, p.y), y1 = Math.max(this.box.a.y, p.y);
+      const inside = state.furniture.filter((f) => f.x >= x0 && f.x <= x1 && f.y >= y0 && f.y <= y1).map((f) => f.id);
+      selectFurniture([...this.box.base, ...inside]);
+      this.draw();
       return;
     }
     if (this.tool === 'select') {
@@ -326,6 +340,7 @@ export class PlanEditor {
       this.drag = null;
       this.cv.style.cursor = 'grab';
     }
+    if (this.box) { this.box = null; this.draw(); }
   }
 
   onDblClick() {
@@ -451,9 +466,10 @@ export class PlanEditor {
     // 가구
     this.collisions = G.findCollisions(state.furniture, plan.walls);
     const sorted = [...state.furniture].sort((a, b) => a.elev - b.elev);
-    for (const f of sorted) this.drawFurniture(f, sel?.id === f.id, this.collisions.has(f.id));
+    for (const f of sorted) this.drawFurniture(f, isFurnitureSelected(f.id), this.collisions.has(f.id));
 
     this.drawTool();
+    this.drawBox();
 
     if (this.snapMark) {
       const s = this.toScr(this.snapMark);
@@ -652,6 +668,19 @@ export class PlanEditor {
         c.fillText(`${fmtMM(f.w)}×${fmtMM(f.d)}`, ct.x, ct.y + 8);
       }
     }
+  }
+
+  /** Shift+끌기 선택 사각형 */
+  drawBox() {
+    if (!this.box) return;
+    const c = this.ctx, a = this.toScr(this.box.a), b = this.toScr(this.box.b);
+    c.fillStyle = 'rgba(47,111,237,.08)';
+    c.strokeStyle = '#2f6fed';
+    c.lineWidth = 1;
+    c.setLineDash([5, 3]);
+    c.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    c.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    c.setLineDash([]);
   }
 
   drawTool() {

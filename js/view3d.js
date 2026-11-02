@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { state, ui, on, checkpoint, select, updateFurniture } from './store.js';
+import {
+  state, on, select, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
+} from './store.js';
 import { buildFurniture, buildWindow, disposeObject } from './models3d.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
@@ -315,16 +317,17 @@ export class View3D {
   syncFurniture(force = false) {
     const bad = G.findCollisions(state.furniture, state.plan.walls);
     const alive = new Set();
-    const selId = ui.selection?.kind === 'furniture' ? ui.selection.id : null;
+    const selIds = new Set(selectedFurnitureIds());
     for (const f of state.furniture) {
       alive.add(f.id);
-      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.color, f.libId, f.usePhoto, f.id === selId, bad.has(f.id)].join('|');
+      const picked = selIds.has(f.id);
+      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.color, f.libId, f.usePhoto, picked, bad.has(f.id)].join('|');
       let e = this.fmap.get(f.id);
       if (!e || e.key !== key || force) {
         if (e) { this.furnGroup.remove(e.obj); disposeObject(e.obj); }
         const obj = buildFurniture(f, this.textureFor(f));
         obj.traverse((o) => { o.userData.fid = f.id; });
-        if (!this.tourMode && (f.id === selId || bad.has(f.id))) {
+        if (!this.tourMode && (picked || bad.has(f.id))) {
           const outline = new THREE.LineSegments(
             new THREE.EdgesGeometry(new THREE.BoxGeometry(f.w * M + 0.02, f.h * M + 0.02, f.d * M + 0.02)),
             new THREE.LineBasicMaterial({ color: bad.has(f.id) ? '#e03b30' : '#2f6fed', depthTest: false, transparent: true }),
@@ -344,7 +347,8 @@ export class View3D {
       if (!alive.has(id)) { this.furnGroup.remove(e.obj); disposeObject(e.obj); this.fmap.delete(id); }
     }
 
-    const sel = !this.tourMode && state.furniture.find((f) => f.id === selId);
+    // 치수 이름표는 하나만 골랐을 때 보인다
+    const sel = !this.tourMode && selIds.size === 1 && state.furniture.find((f) => selIds.has(f.id));
     this.label.visible = !!sel;
     if (sel) {
       this.label.element.className = `label3d${bad.has(sel.id) ? ' bad' : ''}`;
@@ -377,11 +381,12 @@ export class View3D {
     this.down = { x: e.clientX, y: e.clientY };
     const fid = this.pickFurniture(e);
     if (!fid) return;
-    const f = state.furniture.find((x) => x.id === fid);
-    select({ kind: 'furniture', id: fid });
+    // Shift+클릭: 선택에 더하거나 빼기. 이미 고른 가구를 누르면 고른 것 전체를 함께 끈다
+    if (e.shiftKey) { if (!toggleFurnitureSelection(fid)) { this.down = null; return; } }   // 뺀 경우: 놓을 때 전체 해제로 읽지 않게
+    else if (!isFurnitureSelected(fid)) select({ kind: 'furniture', id: fid });
     const p = this.floorPoint(e);
     if (!p) return;
-    this.drag = { id: fid, dx: f.x - p.x, dy: f.y - p.y, started: false };
+    this.drag = beginFurnitureDrag(selectedFurnitureIds(), p);
     this.controls.enabled = false;
     this.renderer.domElement.setPointerCapture(e.pointerId);
     this.renderer.domElement.style.cursor = 'grabbing';
@@ -392,11 +397,7 @@ export class View3D {
     if (this.drag) {
       const p = this.floorPoint(e);
       if (!p) return;
-      if (!this.drag.started) { checkpoint(); this.drag.started = true; }
-      updateFurniture(this.drag.id, {
-        x: Math.round((p.x + this.drag.dx) / 10) * 10,
-        y: Math.round((p.y + this.drag.dy) / 10) * 10,
-      });
+      dragFurnitureTo(this.drag, p);
       return;
     }
     if (e.buttons === 0) this.renderer.domElement.style.cursor = this.pickFurniture(e) ? 'grab' : 'default';
