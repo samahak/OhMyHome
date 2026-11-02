@@ -1,6 +1,7 @@
 // 화면 조립 — 왼쪽 패널·가운데 2D/3D·오른쪽 속성 패널과 단축키를 묶는다.
 import {
   state, ui, on, emit, checkpoint, undo, redo, select, uid, removeItem, findSelected,
+  selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, removeFurniture,
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
@@ -457,17 +458,34 @@ function placeLibrary(id) {
   addFurniture(l, { libId: l.id, usePhoto: l.usePhoto, color: l.color });
 }
 
+const byName = new Intl.Collator('ko', { numeric: true }).compare;
+// 종류 순서는 SHAPES에 적힌 순서 (냉장고 → 세탁기 → 수납 → 침대 → 소파 → … → 설비)
+const TYPE_ORDER = new Map(Object.keys(SHAPES).map((k, i) => [k, i]));
+const typeRank = (t) => TYPE_ORDER.get(t) ?? TYPE_ORDER.size;
+const byTypeThenName = (a, b) => typeRank(a.type) - typeRank(b.type) || byName(a.name, b.name);
+
+/** 배치된 가구: 종류별로 묶고(제목 + 개수), 같은 종류 안에서는 이름순 */
 function renderPlaced() {
   const bad = G.findCollisions(state.furniture, state.plan.walls);
-  const selId = ui.selection?.kind === 'furniture' ? ui.selection.id : null;
+  const groups = new Map();
+  for (const f of [...state.furniture].sort(byTypeThenName)) {
+    if (!groups.has(f.type)) groups.set(f.type, []);
+    groups.get(f.type).push(f);
+  }
   $('placed-list').innerHTML = state.furniture.length
-    ? state.furniture.map((f) => `
-      <button data-id="${f.id}" class="${f.id === selId ? 'sel' : ''}">
-        <span>${iconFor(f.type)} ${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}</span>
+    ? [...groups].map(([type, fs]) => `
+      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span></div>
+      ${fs.map((f) => `
+      <button data-id="${f.id}" class="${isFurnitureSelected(f.id) ? 'sel' : ''}">
+        <span>${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}</span>
         <span class="sz">${f.w}×${f.d}×${f.h}</span>
-      </button>`).join('')
+      </button>`).join('')}`).join('')
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
-  $('placed-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => select({ kind: 'furniture', id: b.dataset.id })));
+  // Shift·Ctrl(⌘)+클릭: 선택에 더하거나 빼기
+  $('placed-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', (e) => {
+    if (e.shiftKey || e.ctrlKey || e.metaKey) toggleFurnitureSelection(b.dataset.id);
+    else select({ kind: 'furniture', id: b.dataset.id });
+  }));
 }
 
 const photo = initPhotoDialog({
@@ -490,9 +508,22 @@ function renderProps() {
   const sel = ui.selection;
   if (!obj) { el.hidden = true; propsFor = null; return; }
   el.hidden = false;
-  propsFor = `${sel.kind}:${sel.id}`;
+  propsFor = selKey(sel);
 
-  if (sel.kind === 'furniture') {
+  if (sel.ids) {
+    el.innerHTML = `
+      <h3><span>🗂️ 가구 ${sel.ids.length}개</span><button data-act="close" class="icon">✕</button></h3>
+      <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽이나 다른 가구와 겹치는 것이 있습니다.</div>
+      <ul class="multi-list">${sel.ids.map((id) => state.furniture.find((f) => f.id === id))
+        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}</li>`).join('')}</ul>
+      <div class="btns"><button data-act="rot-90">⟲ 90°</button><button data-act="rot90">⟳ 90°</button></div>
+      <div class="btns">
+        <button data-act="dup">함께 복제</button>
+        <button data-act="del" class="danger">모두 삭제</button>
+      </div>
+      <p class="hint">끌어서 함께 이동 · 방향키 10mm(Shift 100mm) · R 90° 회전(가운데를 축으로) · Ctrl+D 복제 · Delete 삭제<br>
+        Shift+클릭으로 더하거나 빼고, Shift+빈 곳 끌기로 한꺼번에 고릅니다. Ctrl+A는 가구 전체.</p>`;
+  } else if (sel.kind === 'furniture') {
     const lib = obj.libId && state.library.find((l) => l.id === obj.libId);
     const preset = SIZE_PRESETS[obj.type];
     el.innerHTML = `
@@ -519,7 +550,7 @@ function renderProps() {
         <button data-act="dup">복제</button>
         <button data-act="del" class="danger">삭제</button>
       </div>
-      <p class="hint">끌어서 이동 · R 90° 회전 · Q/E 15° · 방향키 10mm(Shift 100mm) · Delete 삭제<br>두꺼운 선이 가구의 앞면입니다.</p>`;
+      <p class="hint">끌어서 이동 · R 90° 회전 · Q/E 15° · 방향키 10mm(Shift 100mm) · Delete 삭제<br>두꺼운 선이 가구의 앞면입니다. Shift+클릭으로 여러 개를 함께 고릅니다.</p>`;
   } else if (sel.kind === 'wall') {
     el.innerHTML = `
       <h3><span>🧱 벽</span><button data-act="close" class="icon">✕</button></h3>
@@ -570,6 +601,11 @@ function refreshProps() {
   const sel = ui.selection;
   if (!obj) return;
   const el = $('props');
+  if (sel.ids) {
+    const bad = G.findCollisions(state.furniture, state.plan.walls);
+    el.querySelector('[data-warn]').hidden = !sel.ids.some((id) => bad.has(id));
+    return;
+  }
   const val = (k) => {
     if (sel.kind === 'wall' && k === 'len') return fmtMM(G.wallLength(obj));
     if (k === 'wlen') return fmtMM(G.dist(obj.a, obj.b));
@@ -674,7 +710,7 @@ function propAction(act) {
   const obj = findSelected();
   if (act === 'close') { select(null); return; }
   if (!obj) return;
-  if (act === 'del') { checkpoint(); removeItem(sel.kind, sel.id); return; }
+  if (act === 'del') { deleteSelected(); return; }
   if (act === 'rot90' || act === 'rot-90') rotateSelected(act === 'rot90' ? 90 : -90);
   if (act === 'dup') duplicateSelected();
   if (act === 'snap') {
@@ -686,22 +722,51 @@ function propAction(act) {
   }
 }
 
+const selectedFurniture = () => selectedFurnitureIds().map((id) => state.furniture.find((f) => f.id === id)).filter(Boolean);
+
+/** 고른 가구를 돌린다. 여러 개면 고른 가구들 가운데를 축으로 자리까지 함께 돈다 */
 function rotateSelected(deg) {
-  const f = findSelected();
-  if (ui.selection?.kind !== 'furniture' || !f) return;
+  const fs = selectedFurniture();
+  if (!fs.length) return;
   checkpoint();
-  f.rot = G.normDeg(f.rot + deg);
+  const b = G.boundsOf(fs.map((f) => ({ x: f.x, y: f.y })));
+  const cx = b.minX + b.w / 2, cy = b.minY + b.h / 2;
+  for (const f of fs) {
+    if (fs.length > 1) {
+      const p = G.rotatePt(f.x - cx, f.y - cy, deg * G.DEG);
+      f.x = Math.round(cx + p.x); f.y = Math.round(cy + p.y);
+    }
+    f.rot = G.normDeg(f.rot + deg);
+  }
   emit('furniture');
 }
 
+/** 고른 가구를 300mm 옆에 복제하고, 복제본을 고른다 */
 function duplicateSelected() {
-  const f = findSelected();
-  if (ui.selection?.kind !== 'furniture' || !f) return;
+  const fs = selectedFurniture();
+  if (!fs.length) return;
   checkpoint();
-  const c = { ...f, id: uid('f'), x: f.x + 300, y: f.y + 300 };
-  state.furniture.push(c);
+  const copies = fs.map((f) => ({ ...f, id: uid('f'), x: f.x + 300, y: f.y + 300 }));
+  state.furniture.push(...copies);
   emit('furniture');
-  select({ kind: 'furniture', id: c.id });
+  selectFurniture(copies.map((c) => c.id));
+  if (copies.length > 1) status(`가구 ${copies.length}개를 복제했습니다. 복제본이 선택되어 있으니 끌어서 옮기세요.`);
+}
+
+function moveSelected(dx, dy) {
+  const fs = selectedFurniture();
+  if (!fs.length) return;
+  checkpoint();
+  for (const f of fs) { f.x += dx; f.y += dy; }
+  emit('furniture');
+}
+
+function deleteSelected() {
+  const sel = ui.selection;
+  if (!sel) return;
+  checkpoint();
+  if (sel.ids) removeFurniture(sel.ids);
+  else removeItem(sel.kind, sel.id);
 }
 
 /* ---------- 둘러보기 ---------- */
@@ -825,25 +890,23 @@ window.addEventListener('keydown', (e) => {
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && key === 'y') { e.preventDefault(); redo(); return; }
   if (mod && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  if (mod && key === 'a') { e.preventDefault(); selectFurniture(state.furniture.map((f) => f.id)); return; }
   if (mod) return;
   const sel = ui.selection;
   if (e.key === 'Escape') {
     if (!editor.cancel()) { if (sel) select(null); else editor.setTool('select'); }
     return;
   }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); checkpoint(); removeItem(sel.kind, sel.id); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); deleteSelected(); return; }
   if (sel?.kind === 'furniture') {
     if (key === 'r') { rotateSelected(e.shiftKey ? -90 : 90); return; }
-    if (key === 'q') { rotateSelected(-15); return; }
-    if (key === 'e') { rotateSelected(15); return; }
+    if (key === 'q' && !sel.ids) { rotateSelected(-15); return; }
+    if (key === 'e' && !sel.ids) { rotateSelected(15); return; }
     const step = e.shiftKey ? 100 : 10;
     const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
     if (mv) {
       e.preventDefault();
-      const f = findSelected();
-      checkpoint();
-      f.x += mv[0]; f.y += mv[1];
-      emit('furniture');
+      moveSelected(mv[0], mv[1]);
       return;
     }
   }
@@ -868,9 +931,10 @@ on('selection', () => {
 });
 on('library', renderLibrary);
 
+function selKey(sel) { return sel && `${sel.kind}:${sel.id}:${sel.ids?.join(',') || ''}`; }
+
 function refreshOrRender() {
-  const sel = ui.selection;
-  const key = sel && `${sel.kind}:${sel.id}`;
+  const key = selKey(ui.selection);
   if (key && key === propsFor && findSelected()) refreshProps(); else renderProps();
 }
 

@@ -27,7 +27,8 @@ export function freshState() {
 }
 
 export const state = freshState();
-export const ui = { selection: null }; // { kind: 'furniture'|'wall'|'room'|'window', id }
+// { kind: 'furniture'|'wall'|'room'|'window', id, ids? } — ids: 가구를 여러 개 고른 경우의 id 목록(2개 이상, id는 마지막에 고른 것)
+export const ui = { selection: null };
 
 const listeners = new Map();
 export function on(type, fn) {
@@ -57,6 +58,7 @@ function snapshot() {
 function restore(s) {
   Object.assign(state.plan, JSON.parse(s.plan), { image: s.image });
   state.furniture = JSON.parse(s.furniture);
+  if (ui.selection?.ids) ui.selection = furnitureSelection(ui.selection.ids);
   if (ui.selection && !findSelected()) ui.selection = null;
   emit('plan', 'furniture', 'selection');
 }
@@ -80,10 +82,56 @@ export function redo() {
 
 /* ---------- 선택 ---------- */
 export function select(sel) {
-  const same = sel && ui.selection && sel.kind === ui.selection.kind && sel.id === ui.selection.id;
-  if (same || (!sel && !ui.selection)) return;
+  const key = (s) => s && `${s.kind}:${s.id}:${s.ids?.join(',') || ''}`;
+  if (key(sel) === key(ui.selection)) return;
   ui.selection = sel;
   emit('selection');
+}
+
+/** 가구 id 목록으로 선택을 만든다 (없는 id는 뺀다). 0개면 null, 1개면 보통 선택 */
+function furnitureSelection(ids) {
+  const alive = [...new Set(ids)].filter((id) => state.furniture.some((f) => f.id === id));
+  if (!alive.length) return null;
+  const sel = { kind: 'furniture', id: alive[alive.length - 1] };
+  if (alive.length > 1) sel.ids = alive;
+  return sel;
+}
+export function selectFurniture(ids) { select(furnitureSelection(ids)); }
+
+/** 지금 고른 가구 id 목록 (가구가 아니면 빈 목록) */
+export function selectedFurnitureIds() {
+  const s = ui.selection;
+  return s?.kind === 'furniture' ? s.ids || [s.id] : [];
+}
+export function isFurnitureSelected(id) { return selectedFurnitureIds().includes(id); }
+
+/** Shift+클릭: 가구를 선택에 더하거나 뺀다. 더해졌으면 true */
+export function toggleFurnitureSelection(id) {
+  const ids = selectedFurnitureIds();
+  const has = ids.includes(id);
+  selectFurniture(has ? ids.filter((x) => x !== id) : [...ids, id]);
+  return !has;
+}
+
+/* ---------- 가구 끌기 (2D·3D 함께 씀) ---------- */
+/** 고른 가구들을 도면 점 p(mm)에서 잡는다. 기록(checkpoint)은 처음 실제로 움직일 때 한 번만 남긴다 */
+export function beginFurnitureDrag(ids, p) {
+  const orig = ids.map((id) => state.furniture.find((f) => f.id === id)).filter(Boolean).map((f) => ({ id: f.id, x: f.x, y: f.y }));
+  return { start: p, orig, started: false };
+}
+export function dragFurnitureTo(drag, p) {
+  if (!drag.started) { checkpoint(); drag.started = true; }
+  const snap = (v) => Math.round(v / 10) * 10;
+  const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+  const one = drag.orig.length === 1;
+  for (const o of drag.orig) {
+    const f = state.furniture.find((x) => x.id === o.id);
+    if (!f) continue;
+    // 하나는 자리를 10mm 칸에 맞추고, 여럿은 서로 간격이 그대로이도록 이동량을 10mm 칸에 맞춘다
+    f.x = one ? snap(o.x + dx) : o.x + snap(dx);
+    f.y = one ? snap(o.y + dy) : o.y + snap(dy);
+  }
+  emit('furniture');
 }
 export function findSelected() {
   const s = ui.selection;
@@ -108,8 +156,16 @@ export function removeItem(kind, id) {
   if (kind === 'wall') state.plan.walls = state.plan.walls.filter((w) => w.id !== id);
   if (kind === 'room') state.plan.rooms = state.plan.rooms.filter((r) => r.id !== id);
   if (kind === 'window') state.plan.windows = state.plan.windows.filter((w) => w.id !== id);
-  if (ui.selection?.id === id) ui.selection = null;
+  if (ui.selection?.ids) ui.selection = furnitureSelection(ui.selection.ids);
+  else if (ui.selection?.id === id) ui.selection = null;
   emit(kind === 'furniture' ? 'furniture' : 'plan', 'selection');
+}
+
+/** 가구 여러 개를 한 번에 지운다 (되돌리기 한 번에 돌아오도록 checkpoint는 부르는 쪽에서 한 번) */
+export function removeFurniture(ids) {
+  state.furniture = state.furniture.filter((f) => !ids.includes(f.id));
+  if (ui.selection?.kind === 'furniture') ui.selection = furnitureSelection(selectedFurnitureIds());
+  emit('furniture', 'selection');
 }
 
 /**
