@@ -253,6 +253,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.
 - `view.capture()`·`editor.capture()`는 화면 크기와 상관없이 가로 그림(3D 1920×1080, 2D 3840×2160)을 따로 그린 뒤
   렌더러 크기·카메라(2D는 view·그리던 선)를 되돌린다. 3D는 카메라를 안 돌렸으면 가로에 맞춰 다시 잡고 20% 다가가 찍는다.
+- 왼쪽 '② 가구' 탭을 누르면 `endDrawTool()`로 선택·이동 도구가 된다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
 - 방 이름표는 `CSS2DObject`다. 그룹에서 빼면(`clear()`) three.js가 DOM 요소도 함께 지운다.
 
