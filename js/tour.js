@@ -8,6 +8,7 @@ import * as G from './geometry.js';
 import { buildGrid, isFree, nearestFree, findPath, roomCenters, orderByWalk } from './walkGrid.js';
 import { innerBox } from './fixtures.js';
 import { buildScenery } from './scenery.js';
+import { DOOR } from './catalog.js';
 
 const M = 0.001;
 const EYE = 1.55;          // 눈높이 m
@@ -16,7 +17,7 @@ const WALK = 1400;         // 직접 걸을 때 mm/s
 const TURN = 1.6;          // 방향키로 돌 때 rad/s
 const LOOK_SEC = 7;        // 한 곳에서 한 바퀴 둘러보는 시간
 const DOOR_SEC = 1.8;
-const DOOR_H = 2.1;        // 문 높이 m
+const DOOR_H = DOOR.h * M;  // 문 높이 m
 const COFFER_INSET = 450;  // 우물천장: 벽에서 안쪽으로 들어온 폭 mm
 const COFFER_DEPTH = 0.15; // 우물천장: 가운데가 올라간 높이 m
 const COFFER_ROOMS = /거실/;      // 우물천장은 거실만(이 이름의 방, 없으면 아래쪽에서 가로가 가장 넓은 공간). 다른 방은 네모난 LED 방등

@@ -97,6 +97,9 @@
             <button id="btn-detect" class="primary grow">벽 인식 실행</button>
             <button id="btn-clear-auto" title="자동 인식한 벽만 지웁니다">자동 벽 지우기</button>
           </div>
+          <div class="row">
+            <button id="btn-doors" class="grow" title="도면 이미지에 문 기호(문짝 선 + 여닫는 호)가 그려진 틈마다 문을 답니다">🚪 문 기호 찾아 문 달기</button>
+          </div>
           <p class="hint">치수선·문 같은 얇은 선은 ‘최소 벽 두께’로, 굵은 글씨처럼 떨어진 작은 덩어리는 ‘작은 조각 무시’로 걸러집니다. 빠진 벽은 직접 그리세요.</p>
         </div>
 
@@ -108,6 +111,7 @@
             <button class="tool-btn" data-tool="room" title="A">⬛ 방 영역</button>
             <button class="tool-btn" data-tool="measure" title="M">📐 길이 재기</button>
             <button class="tool-btn" data-tool="window" title="N">🪟 창문</button>
+            <button class="tool-btn" data-tool="door" title="D">🚪 문</button>
             <button class="tool-btn" data-tool="erase" title="X">🧽 지우기</button>
           </div>
           <label class="row">새 벽 두께 <input id="wall-thick" type="number" value="150" min="30" step="10"> mm</label>

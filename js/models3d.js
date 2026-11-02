@@ -437,6 +437,32 @@ function plain(g, W, D, H, c) {
 }
 
 /**
+ * 문틀 (m). 원점은 문 틈 가운데 바닥, x = 문 폭 방향, z = 벽 두께 방향. 양옆 기둥 + 위 인방.
+ */
+export function buildDoorFrame(W, H, T) {
+  const g = new THREE.Group(), m = mat('#e9e3da', { roughness: 0.6 }), fw = 0.04, fd = T + 0.02;
+  box(g, fw, H, fd, -W / 2 + fw / 2, H / 2, 0, m);
+  box(g, fw, H, fd, W / 2 - fw / 2, H / 2, 0, m);
+  box(g, W, fw, fd, 0, H - fw / 2, 0, m);
+  return g;
+}
+
+/**
+ * 문짝 (m). 원점은 경첩 바닥, 문짝은 +x로 W만큼 뻗고(열린 채로 벽에 수직), 두께는 z = 0~zSide*T 쪽에 둔다.
+ * 끝 쪽 양면에 손잡이를 단다.
+ */
+export function buildDoorLeaf(W, H, zSide = 1) {
+  const g = new THREE.Group(), T = 0.04, z = (zSide * T) / 2;
+  box(g, W - 0.01, H - 0.01, T, W / 2, H / 2, z, mat('#d9c3a5', { roughness: 0.6 }));
+  const metal = METAL();
+  for (const k of [1, -1]) {
+    box(g, 0.12, 0.02, 0.02, W - 0.1, 1.0, z + k * (T / 2 + 0.03), metal);   // 손잡이 (문짝에서 띄움)
+    box(g, 0.02, 0.02, 0.03, W - 0.05, 1.0, z + k * (T / 2 + 0.015), metal);
+  }
+  return g;
+}
+
+/**
  * 창틀 + 유리 (m). 원점은 창 가운데 아래(창 아래 높이), x = 창 폭 방향, y = 위, z = 벽 두께 방향.
  * 폭이 0.9m를 넘으면 미닫이 두 짝(앞뒤로 겹친 유리)으로 그린다. 바닥까지 내려오는 창이 아니면 안쪽에 창턱을 단다.
  */

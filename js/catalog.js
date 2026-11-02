@@ -90,6 +90,9 @@ export const SIZE_PRESETS = {
 export const L_COUNTER = { depth: 600, minDepth: 400, maxDepth: 900, minArm: 300 };
 export function lCounterDepth(f) { return f.counterD || L_COUNTER.depth; }
 
+/** 문 높이(mm) — 3D에서 문 위로는 천장까지 벽을 채운다 */
+export const DOOR = { h: 2100 };
+
 /** 창 기본 높이(mm) — sill: 바닥에서 창 아래까지, h: 창 높이. 폭 2.6m 이상인 창은 바닥까지 내려오는 큰 창(거실·발코니)으로 본다 */
 export function windowDefaults(width) {
   return width >= 2600 ? { sill: 0, h: 2100 } : { sill: 900, h: 1200 };

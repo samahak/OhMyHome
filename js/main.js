@@ -13,6 +13,7 @@ import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
 import { autoFixtures, hasFixtureRooms } from './fixtures.js';
 import { findWindows } from './windows.js';
+import { findDoors } from './doors.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -136,7 +137,7 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.mmPerPx = mmPerPx;
   p.scaleSet = scaleSet;
   p.scaleRef = null;
-  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.entrance = null; }
+  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; }
   ui.selection = null;
   emit('plan', 'selection');
   editor.fit();
@@ -358,9 +359,10 @@ async function runDetect() {
   checkpoint();
   p.walls = p.walls.filter((w) => !w.auto).concat(rects.map((r) => ({ id: uid('w'), ...rectToWall(r, mmPerPx), cap: false, auto: true })));
   p.windows = (await autoWindows()).windows;   // 바뀐 벽에 맞춰 창 자리도 다시 찾는다
+  p.doors = (await autoDoors()).doors;         // 문 기호가 그려진 틈에는 문을 단다
   emit('plan');
   status(rects.length
-    ? `벽 ${rects.length}개를 찾았습니다.${p.scaleSet ? '' : ' (축척을 맞추지 않아 크기는 어림값입니다)'} 잘못 잡힌 것은 🧽 지우기로, 빠진 벽은 🧱 벽 그리기로 고치세요.`
+    ? `벽 ${rects.length}개${p.doors.length ? `, 문 ${p.doors.length}개` : ''}를 찾았습니다.${p.scaleSet ? '' : ' (축척을 맞추지 않아 크기는 어림값입니다)'} 잘못 잡힌 것은 🧽 지우기로, 빠진 벽은 🧱 벽 그리기로 고치세요.`
     : '벽을 찾지 못했습니다. ‘어두움 기준’을 올리거나 ‘최소 벽 두께’를 낮춰 보세요. 색이 있는 도면은 ‘벽 색 찍기’를 쓰세요.');
 }
 
@@ -573,6 +575,14 @@ function renderProps() {
       <p class="hint">${state.plan.image
         ? '길이를 실제 치수로 고치면 이 벽을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.'
         : '길이를 고치면 시작점은 그대로 두고 끝점을 옮깁니다.'}</p>`;
+  } else if (sel.kind === 'door') {
+    el.innerHTML = `
+      <h3><span>🚪 문</span><button data-act="close" class="icon">✕</button></h3>
+      <div class="field"><span>종류</span><b>${obj.auto === false ? '직접 단 문' : '도면 기호에서 찾음'}</b></div>
+      <div class="field"><span>문 폭</span><b>${fmtMM(G.dist(obj.a, obj.b))} mm</b></div>
+      <div class="btns"><button data-act="hinge">⇋ 경첩 반대로</button><button data-act="swing">⇅ 여는 쪽 반대로</button></div>
+      <div class="btns"><button data-act="del" class="danger">문 삭제</button></div>
+      <p class="hint">3D에서는 문 위를 천장까지 벽으로 채우고, 문짝을 도면 기호처럼 90° 열어 둡니다.</p>`;
   } else if (sel.kind === 'window') {
     el.innerHTML = `
       <h3><span>🪟 창</span><button data-act="close" class="icon">✕</button></h3>
@@ -742,6 +752,16 @@ function propAction(act) {
   if (act === 'del') { deleteSelected(); return; }
   if (act === 'rot90' || act === 'rot-90') rotateSelected(act === 'rot90' ? 90 : -90);
   if (act === 'dup') duplicateSelected();
+  if (act === 'hinge' || act === 'swing') {
+    checkpoint();
+    // 경첩을 반대 끝으로 옮겨도 문짝은 같은 쪽으로 열리게: a↔b를 바꾸면 법선이 뒤집히므로 swing도 뒤집는다
+    if (act === 'hinge') Object.assign(obj, { a: obj.b, b: obj.a });
+    obj.swing = -obj.swing;
+    obj.auto = false;   // 손으로 고친 문은 다시 찾기에서 덮어쓰지 않는다
+    emit('plan');
+    renderProps();      // '종류' 표시가 바뀐다
+    return;
+  }
   if (act === 'mirror') {
     checkpoint();
     obj.mirror = !obj.mirror;
@@ -811,6 +831,55 @@ const currentViewMode = () => document.querySelector('#view-mode button.active')
 $('btn-tour').addEventListener('click', () => startTour());
 
 /**
+ * 자동 문을 다시 찾는다(도면 이미지의 문 기호). 직접 단 문(auto: false)은 그대로 두고, 예전 자동 문 가운데
+ * 지금 찾은 자리에 없는 것은 뺀다. 같은 자리의 자동 문은 새로 찾은 경첩·여는 쪽으로 바꾼다.
+ * 사용자가 지운 자리(plan.doorsRemoved)에는 기호가 있어도 다시 달지 않는다.
+ * state는 바꾸지 않고 { doors(새 목록), added, removed, skipped }를 돌려준다. 이미지가 없으면 지금 그대로다.
+ */
+async function autoDoors() {
+  const plan = state.plan;
+  if (!plan.image) return { doors: plan.doors, added: 0, removed: 0, skipped: 0 };
+  const mid = (d) => ({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 });
+  const all = findDoors(plan, await planImageData());
+  const found = all.filter((f) => !plan.doorsRemoved.some((r) => G.dist(mid(f), r) < 300));
+  const near = (a, b) => G.dist(mid(a), mid(b)) < 150;
+  const manual = plan.doors.filter((d) => d.auto === false);
+  const fresh = found.filter((f) => !manual.some((d) => near(f, d)));
+  const doors = manual.concat(fresh.map((f) => ({ id: plan.doors.find((d) => d.auto !== false && near(f, d))?.id || uid('d'), ...f, auto: true })));
+  const before = plan.doors.filter((d) => d.auto !== false);
+  return {
+    doors,
+    added: fresh.filter((f) => !before.some((d) => near(f, d))).length,
+    removed: before.filter((d) => !fresh.some((f) => near(f, d))).length,
+    skipped: all.length - found.length,
+  };
+}
+
+/** '문 기호 찾아 문 달기' 버튼 */
+async function placeDoors() {
+  if (!state.plan.image) { status('도면 이미지가 있어야 문 기호를 찾을 수 있습니다. 🚪 문 도구로 틈을 눌러 직접 달 수 있습니다.'); return; }
+  if (!state.plan.walls.length) { status('벽을 먼저 인식해 주세요. 문은 벽이 끊긴 틈에 답니다.'); return; }
+  const r = await autoDoors();
+  checkpoint();
+  state.plan.doors = r.doors;
+  emit('plan');
+  status(r.doors.length
+    ? `문 ${r.doors.length}개를 달았습니다${r.added || r.removed ? ` (새로 ${r.added}개, 뺀 것 ${r.removed}개)` : ''}.${r.skipped ? ` 지운 문 ${r.skipped}개는 다시 달지 않았습니다(🚪 문 도구로 다시 달 수 있습니다).` : ''} 문을 눌러 경첩·여는 쪽을 바꾸거나 지울 수 있습니다.`
+    : '문 기호를 찾지 못했습니다. 🚪 문 도구로 틈을 눌러 직접 달아 주세요.');
+}
+$('btn-doors').addEventListener('click', () => placeDoors());
+
+/** 문 목록이 없던 예전 프로젝트·저장본을 열면 문 기호를 한 번 찾아 단다 (되돌리기 기록은 남기지 않는다) */
+async function doorsForOldProject(data) {
+  if (!data?.plan || data.plan.doors !== undefined || !state.plan.image || !state.plan.walls.length) return;
+  const r = await autoDoors();
+  if (!r.doors.length) return;
+  state.plan.doors = r.doors;
+  emit('plan');
+  status(`도면의 문 기호를 찾아 문 ${r.doors.length}개를 달았습니다.`);
+}
+
+/**
  * 자동 창을 다시 찾는다. 직접 낸 창(auto: false)은 그대로 두고, 예전 자동 창 가운데 지금 찾은 자리에 없는 것은 뺀다.
  * state는 바꾸지 않고 { windows(새 목록), added, removed }를 돌려준다.
  */
@@ -833,19 +902,21 @@ async function startTour() {
   const plan = state.plan;
   tourStarting = true;
   let win;
-  try { win = await autoWindows(); } finally { tourStarting = false; }
+  let doors;
+  try { win = await autoWindows(); doors = await autoDoors(); } finally { tourStarting = false; }
   // 현관 신발장, 욕실·주방 이름이 붙은 방의 변기·세면대·욕조·싱크대가 없으면 놓는다. 창 자리는 벽으로 친다
   const fixtures = autoFixtures({ ...plan, walls: plan.walls.concat(win.windows) }, state.furniture, uid);
-  if (win.added || win.removed || fixtures.length) {
+  if (win.added || win.removed || doors.added || doors.removed || fixtures.length) {
     checkpoint();
     plan.windows = win.windows;
+    plan.doors = doors.doors;
     state.furniture.push(...fixtures);
     emit('plan', 'furniture');
   }
   viewBeforeTour = currentViewMode();
   setViewMode('3d');
   editor.setTool('select');
-  const names = [...new Set(fixtures.map((f) => f.name)), ...(win.added ? [`창 ${win.added}개`] : [])].join('·');
+  const names = [...new Set(fixtures.map((f) => f.name)), ...(win.added ? [`창 ${win.added}개`] : []), ...(doors.added ? [`문 ${doors.added}개`] : [])].join('·');
   const hint = hasFixtureRooms(state.plan) ? '' : " 방 영역에 '욕실'·'주방' 이름을 붙이면 변기·세면대·욕조·싱크대도 자동으로 놓입니다.";
   status((names
     ? `${names}을(를) 자동으로 놓았습니다 (옮기거나 지울 수 있고, 되돌리기도 됩니다). Esc로 나갑니다.`
@@ -898,12 +969,14 @@ $('file-project').addEventListener('change', async (e) => {
   e.target.value = '';
   if (!file) return;
   try {
-    loadProject(JSON.parse(await file.text()));
+    const data = JSON.parse(await file.text());
+    loadProject(data);
     $('wall-height').value = state.plan.wallHeight;
     $('floor-num').value = state.plan.floor;
     editor.fit();
     view.resetCamera('persp');
     status('프로젝트를 불러왔습니다.');
+    doorsForOldProject(data);
   } catch (err) {
     alert(`불러오지 못했습니다: ${err.message}`);
   }
@@ -948,7 +1021,7 @@ window.addEventListener('keydown', (e) => {
       return;
     }
   }
-  const tools = { v: 'select', w: 'wall', a: 'room', m: 'measure', n: 'window', x: 'erase' };
+  const tools = { v: 'select', w: 'wall', a: 'room', m: 'measure', n: 'window', d: 'door', x: 'erase' };
   if (tools[key]) { editor.setTool(tools[key]); return; }
   if (key === 'f') editor.fit();
 });
@@ -984,7 +1057,7 @@ renderLibrary();
 renderScaleInfo();
 renderPlanInfo();
 renderPlaced();
-if (restored) status('지난번 작업을 불러왔습니다. (브라우저에 자동 저장됩니다)');
+if (restored) { status('지난번 작업을 불러왔습니다. (브라우저에 자동 저장됩니다)'); doorsForOldProject(restored); }
 else status('📐 도면 이미지를 열거나 ‘샘플 도면으로 해 보기’를 눌러 시작하세요.');
 
 // 개발·점검용

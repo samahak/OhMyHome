@@ -6,6 +6,7 @@ import {
 } from './store.js';
 import * as G from './geometry.js';
 import { windowDefaults } from './catalog.js';
+import { doorGeometry } from './doors.js';
 
 export const ROOM_COLORS = ['#f6c48b', '#9fd3c7', '#b5c7f2', '#f2a9b5', '#c9e29b', '#d7b8f0', '#f5dd8b'];
 const SNAP_PX = 12;
@@ -18,7 +19,8 @@ const HINTS = {
   room: '방 꼭짓점을 차례로 찍으세요. 첫 점을 다시 누르거나 더블클릭하면 방이 완성됩니다.',
   scale: '방 안을 한 번 누르면 벽 사이 가로·세로가 지금 몇 mm로 보이는지 나옵니다. 도면 치수로 고치면 전체 크기가 바뀝니다. (Shift+클릭: 두 점으로 재기)',
   measure: '두 점을 찍어 길이를 잽니다. Shift를 누르면 자유 각도.',
-  erase: '지울 가구·창·벽·방을 누르세요.',
+  erase: '지울 가구·문·창·벽·방을 누르세요.',
+  door: '문을 달 틈(벽이 끊긴 곳)을 누르세요. 누른 쪽으로 열리는 여닫이 문이 생깁니다. 달린 문을 누르면 고릅니다.',
   window: '창을 낼 벽을 누르면 그 자리에 1.2m 창이 생기고, 벽이 끊긴 틈을 누르면 틈 전체가 창이 됩니다.',
   pick: '도면에서 벽 부분을 누르면 그 색과 비슷한 곳을 벽으로 찾습니다.',
   entrance: '현관문 자리(벽이 끊긴 곳)를 누르세요. 그곳에서 문을 열고 들어가며 둘러보기를 시작합니다.',
@@ -181,6 +183,16 @@ export class PlanEditor {
     }
     return null;
   }
+  hitDoor(p) {
+    const tol = 4 / this.view.s;
+    for (let i = state.plan.doors.length - 1; i >= 0; i--) {
+      const d = state.plan.doors[i];
+      if (G.pointInPoly(p, G.wallCorners({ ...d, cap: false }, -tol))) return d;
+      const g = doorGeometry(d);
+      if (G.distToSegment(p, g.hinge, g.tip).dist < tol * 1.5) return d;   // 열린 문짝 선
+    }
+    return null;
+  }
   hitRoom(p) {
     for (let i = state.plan.rooms.length - 1; i >= 0; i--) {
       if (G.pointInPoly(p, state.plan.rooms[i].pts)) return state.plan.rooms[i];
@@ -192,6 +204,8 @@ export class PlanEditor {
     if (f) return { kind: 'furniture', id: f.id, obj: f };
     const win = this.hitWindow(p);   // 창은 벽 위에 있으니 벽보다 먼저 본다
     if (win) return { kind: 'window', id: win.id, obj: win };
+    const door = this.hitDoor(p);
+    if (door) return { kind: 'door', id: door.id, obj: door };
     const w = this.hitWall(p);
     if (w) return { kind: 'wall', id: w.id, obj: w };
     const r = this.hitRoom(p);
@@ -278,6 +292,9 @@ export class PlanEditor {
         break;
       case 'window':
         this.addWindow(p);
+        break;
+      case 'door':
+        this.addDoor(p);
         break;
     }
     this.draw();
@@ -460,6 +477,7 @@ export class PlanEditor {
     }
 
     for (const w of plan.windows) this.drawWindow(w, sel?.id === w.id);
+    for (const d of plan.doors) this.drawDoor(d, sel?.id === d.id);
     this.drawScaleRef();
     this.drawEntrance();
 
@@ -525,6 +543,48 @@ export class PlanEditor {
     state.plan.windows.push(obj);
     emit('plan');
     select({ kind: 'window', id: obj.id });
+  }
+
+  /** 문 달기: 이미 달린 문을 누르면 고르고, 아니면 근처 틈에 누른 쪽으로 열리는 문을 단다 */
+  addDoor(p) {
+    const hit = this.hitDoor(p);
+    if (hit) { select({ kind: 'door', id: hit.id }); return; }
+    const g = G.findDoorGap(p, state.plan.walls, { min: 400, max: 2000, near: 900 });
+    if (!g) { this.hooks.status?.('벽이 끊긴 틈을 눌러 주세요.'); return; }
+    if (state.plan.doors.some((d) => G.dist({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 }, { x: (g.a.x + g.b.x) / 2, y: (g.a.y + g.b.y) / 2 }) < 150)) {
+      this.hooks.status?.('이 틈에는 이미 문이 있습니다.');
+      return;
+    }
+    // 누른 점이 틈의 어느 쪽인지로 여는 방향을 정한다
+    const ux = g.b.x - g.a.x, uy = g.b.y - g.a.y;
+    const swing = -uy * (p.x - g.a.x) + ux * (p.y - g.a.y) >= 0 ? 1 : -1;
+    checkpoint();
+    // 직접 다시 단 자리는 '지운 문' 목록에서 뺀다
+    const m = { x: (g.a.x + g.b.x) / 2, y: (g.a.y + g.b.y) / 2 };
+    state.plan.doorsRemoved = state.plan.doorsRemoved.filter((r) => G.dist(r, m) >= 300);
+    const obj = { id: uid('d'), a: g.a, b: g.b, t: g.t, swing, auto: false };
+    state.plan.doors.push(obj);
+    emit('plan');
+    select({ kind: 'door', id: obj.id });
+  }
+
+  /** 문: 틈 자리를 비우고 문짝 선 + 여닫는 호 (도면 기호) */
+  drawDoor(d, selected) {
+    const c = this.ctx, g = doorGeometry(d);
+    this.poly(G.wallCorners({ ...d, cap: false }));
+    c.fillStyle = '#ffffff';
+    c.fill();
+    const col = selected ? '#2f6fed' : '#8b5e34';
+    c.strokeStyle = col;
+    c.lineWidth = selected ? 2.5 : 1.2;
+    c.setLineDash([4, 3]);
+    c.beginPath();
+    for (let deg = 0; deg <= 90; deg += 5) { const s = this.toScr(g.arc(deg)); deg ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); }
+    c.stroke();
+    c.setLineDash([]);
+    c.lineWidth = selected ? 4 : 3;
+    const h = this.toScr(g.hinge), t = this.toScr(g.tip);
+    c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(t.x, t.y); c.stroke();
   }
 
   /** 창: 벽 자리를 하얗게 비우고 가는 선 세 줄 (도면 기호) */
