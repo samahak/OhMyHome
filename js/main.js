@@ -52,7 +52,10 @@ document.querySelectorAll('.tool-btn').forEach((b) => b.addEventListener('click'
 }));
 
 /* ---------- 탭 · 보기 방식 ---------- */
-document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+  showTab(t.dataset.tab);
+  if (t.dataset.tab === 'furniture') endDrawTool();   // 가구 탭으로 오면 바로 가구를 누르고 끌 수 있게 '선택·이동'으로
+}));
 function showTab(name) {
   document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
   $('tab-plan').hidden = name !== 'plan';
