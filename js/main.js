@@ -1049,6 +1049,7 @@ $('file-project').addEventListener('change', async (e) => {
   }
 });
 $('btn-capture').addEventListener('click', () => download(view.capture(), `ohmyhome-3d-${today()}.png`));
+$('btn-capture-2d').addEventListener('click', () => download(editor.capture(), `ohmyhome-2d-${today()}.png`));
 
 function download(url, name) {
   const a = document.createElement('a');
