@@ -634,8 +634,8 @@ function plain(g, W, D, H, c) {
 /**
  * 문틀 (m). 원점은 문 틈 가운데 바닥, x = 문 폭 방향, z = 벽 두께 방향. 양옆 기둥 + 위 인방.
  */
-export function buildDoorFrame(W, H, T) {
-  const g = new THREE.Group(), m = mat('#e9e3da', { roughness: 0.6 }), fw = 0.04, fd = T + 0.02;
+export function buildDoorFrame(W, H, T, color = '#e9e3da') {
+  const g = new THREE.Group(), m = mat(color, { roughness: 0.6 }), fw = 0.04, fd = T + 0.02;
   box(g, fw, H, fd, -W / 2 + fw / 2, H / 2, 0, m);
   box(g, fw, H, fd, W / 2 - fw / 2, H / 2, 0, m);
   box(g, W, fw, fd, 0, H - fw / 2, 0, m);
@@ -654,6 +654,59 @@ export function buildDoorLeaf(W, H, zSide = 1) {
     box(g, 0.12, 0.02, 0.02, W - 0.1, 1.0, z + k * (T / 2 + 0.03), metal);   // 손잡이 (문짝에서 띄움)
     box(g, 0.02, 0.02, 0.03, W - 0.05, 1.0, z + k * (T / 2 + 0.015), metal);
   }
+  return g;
+}
+
+/**
+ * 미닫이 문짝 (m). 원점은 문짝 바닥 가운데, 폭은 x, 두께는 z. 손잡이(세로 홈 손잡이)는 x = edge 쪽 끝 양면에.
+ * 가운데에 간살 무늬 유리를 넣는다.
+ */
+export function buildSlidingLeaf(W, H, T, edge = 1) {
+  const g = new THREE.Group(), wood = mat('#d9c3a5', { roughness: 0.6 }), sw = Math.min(0.09, W * 0.12);
+  box(g, sw, H, T, -W / 2 + sw / 2, H / 2, 0, wood);   // 양 옆 틀
+  box(g, sw, H, T, W / 2 - sw / 2, H / 2, 0, wood);
+  box(g, W - 2 * sw, 0.15, T, 0, 0.075, 0, wood);       // 아래·위·가운데 가로대
+  box(g, W - 2 * sw, sw, T, 0, H - sw / 2, 0, wood);
+  box(g, W - 2 * sw, sw, T, 0, H * 0.42, 0, wood);
+  box(g, W - 2 * sw, H * 0.42 - 0.15, T * 0.5, 0, 0.15 + (H * 0.42 - 0.15) / 2, 0, wood);   // 아래 판
+  const glass = new THREE.MeshStandardMaterial({ color: '#eef3f6', roughness: 0.3, metalness: 0.05, transparent: true, opacity: 0.55 });
+  const gy0 = H * 0.42 + sw / 2, gy1 = H - sw;
+  box(g, W - 2 * sw, gy1 - gy0, 0.008, 0, (gy0 + gy1) / 2, 0, glass);
+  for (const k of [1 / 3, 2 / 3]) box(g, 0.02, gy1 - gy0, T * 0.6, -W / 2 + sw + (W - 2 * sw) * k, (gy0 + gy1) / 2, 0, wood);   // 간살
+  const metal = METAL();
+  for (const k of [1, -1]) box(g, 0.025, 0.2, 0.006, edge * (W / 2 - sw / 2), 1.0, k * (T / 2 + 0.002), metal);
+  return g;
+}
+
+/** 중문 틀 색 (짙은 회색 알루미늄) */
+export const MIDDLE_FRAME = '#3b3f45';
+
+/**
+ * 현관 중문 유리 문짝 (m). 원점은 문짝 바닥 가운데, 폭 x, 두께 z. 가는 알루미늄 틀 + 투명 유리 + 허리 띠,
+ * x = edge 쪽 끝에 길쭉한 세로 손잡이.
+ */
+export function buildGlassLeaf(W, H, T, edge = 1) {
+  const g = new THREE.Group(), al = mat(MIDDLE_FRAME, { roughness: 0.4, metalness: 0.4 }), fw = 0.035;
+  box(g, fw, H, T, -W / 2 + fw / 2, H / 2, 0, al);
+  box(g, fw, H, T, W / 2 - fw / 2, H / 2, 0, al);
+  box(g, W - 2 * fw, 0.06, T, 0, 0.03, 0, al);
+  box(g, W - 2 * fw, fw, T, 0, H - fw / 2, 0, al);
+  box(g, W - 2 * fw, 0.012, T * 0.6, 0, H * 0.48, 0, al);   // 허리 띠
+  const glass = new THREE.MeshStandardMaterial({ color: '#dcebf2', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25, depthWrite: false });
+  box(g, W - 2 * fw, H - 0.06 - fw, 0.006, 0, 0.06 + (H - 0.06 - fw) / 2, 0, glass).castShadow = false;
+  for (const k of [1, -1]) box(g, 0.02, 0.6, 0.02, edge * (W / 2 - fw - 0.03), 1.0, k * (T / 2 + 0.012), al);
+  return g;
+}
+
+/** 중문 위 고정 유리 (m): 문 높이 ~ 천장. 원점은 바닥 가운데(y = 0이 상부창 아래), 폭 x, 두께 z */
+export function buildTransom(W, H, T) {
+  const g = new THREE.Group(), al = mat(MIDDLE_FRAME, { roughness: 0.4, metalness: 0.4 }), fw = 0.035;
+  box(g, W, fw, T, 0, fw / 2, 0, al);
+  box(g, W, fw, T, 0, H - fw / 2, 0, al);
+  box(g, fw, H, T, -W / 2 + fw / 2, H / 2, 0, al);
+  box(g, fw, H, T, W / 2 - fw / 2, H / 2, 0, al);
+  const glass = new THREE.MeshStandardMaterial({ color: '#dcebf2', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25, depthWrite: false });
+  box(g, W - 2 * fw, H - 2 * fw, 0.006, 0, H / 2, 0, glass).castShadow = false;
   return g;
 }
 

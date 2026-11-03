@@ -5,9 +5,11 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import {
   state, on, select, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
 } from './store.js';
-import { buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, disposeObject } from './models3d.js';
+import {
+  buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSlidingLeaf, buildGlassLeaf, buildTransom, disposeObject, MIDDLE_FRAME,
+} from './models3d.js';
 import { DOOR } from './catalog.js';
-import { doorGeometry } from './doors.js';
+import { doorGeometry, slidingPanels, doorStyle, SLIDE } from './doors.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
 import { Tour } from './tour.js';
@@ -302,17 +304,24 @@ export class View3D {
       g.rotation.y = -Math.atan2(u.y, u.x);
       this.planGroup.add(g);
     }
-    // 문: 문 위 벽(문 높이 ~ 천장) + 문틀 + 도면 기호대로 90° 열린 문짝. 둘러보기 중 현관문은 tour.js가 따로 여닫는다
+    // 문: 문 위 벽(문 높이 ~ 천장) + 문틀 + 도면 기호대로 90° 열린 문짝(미닫이는 벽 면을 따라 끝까지 연 문짝 + 레일).
+    // 둘러보기 중 현관문은 tour.js가 따로 여닫는다
     const e = p.entrance;
     for (const d of p.doors || []) {
       const g = doorGeometry(d), mid = { x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 };
       if (this.tourMode && e && G.distToSegment(mid, e.a, e.b).dist < 200) continue;
-      const doorH = Math.min(DOOR.h, Hmm);
-      if (Hmm > DOOR.h) this.wallPiece(d.a, g.u, 0, g.len, DOOR.h, Hmm, d.t, new THREE.MeshStandardMaterial({ color: '#f2efe9', roughness: 0.9 }));
-      const frame = buildDoorFrame(g.len * M, doorH * M, d.t * M);
+      const doorH = Math.min(DOOR.h, Hmm), style = doorStyle(d), rot = -Math.atan2(g.u.y, g.u.x);
+      if (style === 'middle' && Hmm - DOOR.h > 60) {   // 중문: 문 위는 벽 대신 고정 유리
+        const tr = buildTransom(g.len * M, (Hmm - DOOR.h) * M, 0.05);
+        tr.position.set(mid.x * M, DOOR.h * M, mid.y * M);
+        tr.rotation.y = rot;
+        this.planGroup.add(tr);
+      } else if (Hmm > DOOR.h) this.wallPiece(d.a, g.u, 0, g.len, DOOR.h, Hmm, d.t, new THREE.MeshStandardMaterial({ color: '#f2efe9', roughness: 0.9 }));
+      const frame = buildDoorFrame(g.len * M, doorH * M, d.t * M, style === 'middle' ? MIDDLE_FRAME : undefined);
       frame.position.set(mid.x * M, 0, mid.y * M);
-      frame.rotation.y = -Math.atan2(g.u.y, g.u.x);
+      frame.rotation.y = rot;
       this.planGroup.add(frame);
+      if (style !== 'swing') { this.slidingDoor(d, doorH); continue; }
       // 문짝: 로컬 +x → 도면 n(문짝이 뻗는 쪽). 로컬 +z는 도면 (-n.y, n.x) = -swing·u 이므로 두께는 틈 안쪽(+u)으로 둔다
       const leaf = buildDoorLeaf(g.len * M, doorH * M, -d.swing);
       leaf.position.set((g.hinge.x + g.u.x * 40) * M, 0, (g.hinge.y + g.u.y * 40) * M);
@@ -327,6 +336,32 @@ export class View3D {
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.position.set(cx + size * 0.4, size * 1.2, cz + size * 0.6);
     this.sun.target.position.set(cx, 0, cz);
+  }
+
+  /**
+   * 미닫이·중문: 문짝마다 열린 자리(shift)로 밀어 둔다 — 미닫이는 문짝 폭의 92%, 중문은 세 짝이 a 끝에 겹쳐 모인다.
+   * 문 높이에 닫힌 자리 ~ 열린 자리를 덮는 레일(중문은 레일 셋 폭)
+   */
+  slidingDoor(d, doorH) {
+    const s = slidingPanels(d), rot = -Math.atan2(s.u.y, s.u.x), T = SLIDE.t * M, glass = doorStyle(d) === 'middle';
+    let lo = Infinity, hi = -Infinity;
+    for (const pn of s.panels) {
+      const w = pn.s1 - pn.s0, m = (pn.s0 + pn.s1) / 2 + pn.shift, edge = pn.shift > 0 ? -1 : 1;   // 손잡이는 열린 뒤 틈 쪽 끝
+      lo = Math.min(lo, pn.s0, pn.s0 + pn.shift); hi = Math.max(hi, pn.s1, pn.s1 + pn.shift);
+      const leaf = glass ? buildGlassLeaf(w * M, (doorH - 15) * M, T, edge) : buildSlidingLeaf(w * M, (doorH - 15) * M, T, edge);
+      const c = s.at(m, pn.off);
+      leaf.position.set(c.x * M, 0.005, c.y * M);
+      leaf.rotation.y = rot;
+      this.planGroup.add(leaf);
+    }
+    const depth = s.reach - d.t / 2 + SLIDE.gap;
+    const rail = new THREE.Mesh(new THREE.BoxGeometry((hi - lo) * M, 0.04, depth * M),
+      new THREE.MeshStandardMaterial({ color: glass ? MIDDLE_FRAME : '#e9e3da', roughness: 0.6 }));
+    const c = s.at((lo + hi) / 2, d.t / 2 + depth / 2);
+    rail.position.set(c.x * M, doorH * M + 0.02, c.y * M);
+    rail.rotation.y = rot;
+    rail.castShadow = true;
+    this.planGroup.add(rail);
   }
 
   textureFor(f) {

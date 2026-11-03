@@ -14,7 +14,7 @@ import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
 import { autoFixtures, hasFixtureRooms } from './fixtures.js';
 import { findWindows } from './windows.js';
-import { findDoors } from './doors.js';
+import { findDoors, findMiddleDoorGap, moveDoorAlong, depthFromEntrance, doorStyle, DOOR_STYLES, SLIDE } from './doors.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -671,13 +671,24 @@ function renderProps() {
         ? '자동 인식한 벽은 길이를 실제 치수로 고치면 이 벽을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.'
         : '길이를 고치면 시작점은 그대로 두고 끝점을 옮깁니다(이 벽만 바뀝니다).'}</p>`;
   } else if (sel.kind === 'door') {
+    const style = doorStyle(obj);
     el.innerHTML = `
       <h3><span>🚪 문</span><button data-act="close" class="icon">✕</button></h3>
+      <div class="field"><span>모양</span></div>
+      <div class="btns preset-btns">${Object.entries(DOOR_STYLES).map(([k, v]) => `<button data-act="door-style-${k}" class="${style === k ? 'active' : ''}">${v}</button>`).join('')}</div>
       <div class="field"><span>종류</span><b>${obj.auto === false ? '직접 단 문' : '도면 기호에서 찾음'}</b></div>
-      <div class="field"><span>문 폭</span><b>${fmtMM(G.dist(obj.a, obj.b))} mm</b></div>
-      <div class="btns"><button data-act="hinge">⇋ 경첩 반대로</button><button data-act="swing">⇅ 여는 쪽 반대로</button></div>
+      <div class="field"><span>문 폭</span><b data-v="dwidth">${fmtMM(G.dist(obj.a, obj.b))} mm</b></div>
+      ${style === 'middle' && state.plan.entrance ? '<label class="field"><span>현관문에서 (mm)</span><input type="number" step="50" data-f="mdepth"></label>' : ''}
+      ${style === 'swing'
+        ? '<div class="btns"><button data-act="hinge">⇋ 경첩 반대로</button><button data-act="swing">⇅ 여는 쪽 반대로</button></div>'
+        : `<div class="btns">${style === 'sliding' && G.dist(obj.a, obj.b) > SLIDE.twoOver ? '' : '<button data-act="hinge">⇋ 여는 방향 반대로</button>'}<button data-act="swing">⇅ 붙는 벽 면 반대로</button></div>`}
       <div class="btns"><button data-act="del" class="danger">문 삭제</button></div>
-      <p class="hint">3D에서는 문 위를 천장까지 벽으로 채우고, 문짝을 도면 기호처럼 90° 열어 둡니다.</p>`;
+      <p class="hint">${{
+        swing: '3D에서는 문 위를 천장까지 벽으로 채우고, 문짝을 도면 기호처럼 90° 열어 둡니다.',
+        sliding: `미닫이는 벽 면을 따라 밀려 열립니다. 폭이 ${fmtMM(SLIDE.twoOver)}mm를 넘으면 두 짝이 양쪽으로 열립니다. 3D에서는 문짝을 끝까지 열어 둡니다.`,
+        middle: '현관 중문은 유리 세 짝이 한쪽으로 겹쳐 모이며 열리고(3연동), 문 위는 천장까지 고정 유리입니다. 2D에서 끌거나 ‘현관문에서’ 거리를 고치면 양옆 벽을 따라 앞뒤로 옮겨집니다(폭은 양옆 벽에 맞춥니다).',
+      }[style]}
+        🚪 문 도구로 새로 다는 문은 여기서 마지막에 고른 모양이 됩니다.</p>`;
   } else if (sel.kind === 'window') {
     el.innerHTML = `
       <h3><span>🪟 창</span><button data-act="close" class="icon">✕</button></h3>
@@ -731,6 +742,7 @@ function refreshProps() {
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
     if (k === 'counterD') return lCounterDepth(obj);
+    if (k === 'mdepth') return Math.round(depthFromEntrance(obj, state.plan.entrance) ?? 0);
     if (k === 'plant') return plantOf(obj);
     if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
     const p = SIZE_PRESETS[obj.type];
@@ -751,6 +763,10 @@ function refreshProps() {
     const lside = el.querySelector('[data-v=lside]');
     if (lside) lside.textContent = obj.mirror ? '왼쪽 (앞에서 볼 때)' : '오른쪽 (앞에서 볼 때)';
   }
+  if (sel.kind === 'door') {
+    const w = el.querySelector('[data-v=dwidth]');
+    if (w) w.textContent = `${fmtMM(G.dist(obj.a, obj.b))} mm`;   // 중문을 옮기면 폭이 양옆 벽에 맞춰 바뀐다
+  }
   if (sel.kind === 'room') {
     const a = G.polygonArea(obj.pts) / 1e6, b = G.boundsOf(obj.pts);
     const perim = obj.pts.reduce((s, p, i) => s + G.dist(p, obj.pts[(i + 1) % obj.pts.length]), 0);
@@ -767,6 +783,7 @@ function applyProp(inp) {
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
   if (k === 'plant') { applyPlant(obj, v); return; }
+  if (k === 'mdepth') { moveMiddleDoor(obj, v); return; }
   if (k === 'price') {
     const won = parseWon(v);
     if (Number.isNaN(won)) { status(`‘${v}’를 가격으로 읽지 못했습니다. 예: 1,290,000 · 1290000원 · 129만`); refreshProps(); return; }
@@ -841,6 +858,19 @@ function applyProp(inp) {
   if (k === 'type') renderProps();   // 모양마다 칸 이름·칸이 다르다 (ㄱ자 싱크대)
 }
 
+/** 중문을 현관문에서 depth mm 안쪽으로 옮긴다 (양옆 벽을 따라, 폭은 새 자리 양옆 벽에 맞춘다) */
+function moveMiddleDoor(door, depth) {
+  const e = state.plan.entrance, cur = depthFromEntrance(door, e);
+  const len = G.dist(door.a, door.b) || 1, nx = -(door.b.y - door.a.y) / len, ny = (door.b.x - door.a.x) / len;
+  const per = -(nx * e.out.x + ny * e.out.y);   // 왼쪽 법선으로 1mm 갈 때 늘어나는 깊이
+  if (Math.abs(per) < 0.3) { status('이 중문은 현관문과 나란하지 않아 거리로 옮길 수 없습니다. 2D에서 끌어 옮기세요.'); refreshProps(); return; }
+  const r = moveDoorAlong(door, state.plan.walls, (depth - cur) / per);
+  if (!r) { status(`현관문에서 ${fmtMM(depth)}mm 자리에는 양옆 벽이 없어 옮길 수 없습니다.`); refreshProps(); return; }
+  checkpoint();
+  Object.assign(door, r, { auto: false });
+  emit('plan');
+}
+
 /** ㄱ자 싱크대: 상판 깊이는 정해진 범위에서, 가로·세로는 상판 깊이 + 최소 팔 길이보다 길게 (세로가 가로보다 길어도 된다) */
 function clampKitchenL(obj, k, v) {
   const L = L_COUNTER;
@@ -895,6 +925,17 @@ function propAction(act) {
     emit('furniture');
     renderProps();   // 목록의 '기본 포함' 표시가 바뀐다
     status(act === 'builtin-on' ? `가구 ${fs.length}개를 기본 포함으로 표시해 합계에서 뺐습니다.` : `가구 ${fs.length}개의 기본 포함 표시를 지웠습니다.`);
+    return;
+  }
+  if (act.startsWith('door-style-')) {
+    const style = act.slice('door-style-'.length);
+    editor.doorStyle = style;   // 🚪 문 도구로 다음에 다는 문도 이 모양으로
+    if (doorStyle(obj) === style) return;
+    checkpoint();
+    if (style === 'swing') delete obj.style; else obj.style = style;
+    obj.auto = false;
+    emit('plan');
+    renderProps();
     return;
   }
   if (act === 'hinge' || act === 'swing') {
@@ -1013,6 +1054,28 @@ async function placeDoors() {
     : '문 기호를 찾지 못했습니다. 🚪 문 도구로 틈을 눌러 직접 달아 주세요.');
 }
 $('btn-doors').addEventListener('click', () => placeDoors());
+
+/** 현관 중문: 현관문 안쪽 틈에 유리 3연동 중문을 단다. 그 틈에 문이 이미 있으면 중문으로 바꾼다 */
+function placeMiddleDoor() {
+  const plan = state.plan;
+  if (!plan.entrance) { status('현관문 자리를 먼저 정해 주세요. 🚶 둘러보기를 누르면 2D 도면에서 현관문 자리를 고를 수 있습니다.'); return; }
+  const g = findMiddleDoorGap(plan);
+  if (!g) { status('현관 안쪽에서 중문을 달 틈을 찾지 못했습니다. 🚪 문 도구로 그 틈에 문을 달고, 속성에서 ‘중문’을 고르세요.'); return; }
+  const mid = (d) => ({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 });
+  const old = plan.doors.find((d) => G.dist(mid(d), mid(g)) < 150);
+  checkpoint();
+  let door;
+  if (old) door = Object.assign(old, { a: g.a, b: g.b, swing: g.swing, style: 'middle', auto: false });
+  else {
+    plan.doorsRemoved = plan.doorsRemoved.filter((r) => G.dist(r, mid(g)) >= 300);
+    door = { id: uid('d'), ...g, style: 'middle', auto: false };
+    plan.doors.push(door);
+  }
+  emit('plan');
+  select({ kind: 'door', id: door.id });
+  status(`현관 중문을 달았습니다 (폭 ${fmtMM(G.dist(g.a, g.b))}mm${old ? ', 있던 문을 중문으로 바꿈' : ''}). 속성에서 여는 방향·붙는 벽 면을 바꿀 수 있습니다.`);
+}
+$('btn-middle-door').addEventListener('click', () => placeMiddleDoor());
 
 /** 문 목록이 없던 예전 프로젝트·저장본을 열면 문 기호를 한 번 찾아 단다 (되돌리기 기록은 남기지 않는다) */
 async function doorsForOldProject(data) {

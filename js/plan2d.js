@@ -6,7 +6,7 @@ import {
 } from './store.js';
 import * as G from './geometry.js';
 import { windowDefaults } from './catalog.js';
-import { doorGeometry } from './doors.js';
+import { doorGeometry, slidingPanels, doorStyle, moveDoorAlong, SLIDE } from './doors.js';
 
 export const ROOM_COLORS = ['#f6c48b', '#9fd3c7', '#b5c7f2', '#f2a9b5', '#c9e29b', '#d7b8f0', '#f5dd8b'];
 const SNAP_PX = 12;
@@ -20,7 +20,7 @@ const HINTS = {
   scale: '방 안을 한 번 누르면 벽 사이 가로·세로가 지금 몇 mm로 보이는지 나옵니다. 도면 치수로 고치면 전체 크기가 바뀝니다. (Shift+클릭: 두 점으로 재기)',
   measure: '두 점을 찍어 길이를 잽니다. Shift를 누르면 자유 각도.',
   erase: '지울 가구·문·창·벽·방을 누르세요.',
-  door: '문을 달 틈(벽이 끊긴 곳)을 누르세요. 누른 쪽으로 열리는 여닫이 문이 생깁니다. 달린 문을 누르면 고릅니다.',
+  door: '문을 달 틈(벽이 끊긴 곳)을 누르세요. 누른 쪽으로 열리는 문이 생깁니다(마지막에 고른 여닫이·미닫이 모양). 달린 문을 누르면 고릅니다.',
   window: '창을 낼 벽을 누르면 그 자리에 1.2m 창이 생기고, 벽이 끊긴 틈을 누르면 틈 전체가 창이 됩니다.',
   pick: '도면에서 벽 부분을 누르면 그 색과 비슷한 곳을 벽으로 찾습니다.',
   entrance: '현관문 자리(벽이 끊긴 곳)를 누르세요. 그곳에서 문을 열고 들어가며 둘러보기를 시작합니다.',
@@ -33,6 +33,7 @@ export class PlanEditor {
     this.hooks = hooks;
     this.view = { s: 0.06, ox: 40, oy: 40 };
     this.tool = 'select';
+    this.doorStyle = 'swing';   // 🚪 문 도구로 새로 다는 문 모양 (속성에서 마지막에 고른 모양을 따른다)
     this.temp = null;
     this.mouse = null;     // 마지막 커서 위치 (mm)
     this.snapMark = null;
@@ -207,6 +208,10 @@ export class PlanEditor {
     for (let i = state.plan.doors.length - 1; i >= 0; i--) {
       const d = state.plan.doors[i];
       if (G.pointInPoly(p, G.wallCorners({ ...d, cap: false }, -tol))) return d;
+      if (doorStyle(d) !== 'swing') {   // 벽 면 밖에 붙은 문짝까지
+        if (G.pointInPoly(p, G.wallCorners({ ...d, t: 2 * slidingPanels(d).reach, cap: false }, -tol))) return d;
+        continue;
+      }
       const g = doorGeometry(d);
       if (G.distToSegment(p, g.hinge, g.tip).dist < tol * 1.5) return d;   // 열린 문짝 선
     }
@@ -251,6 +256,12 @@ export class PlanEditor {
           if (e.shiftKey) { if (!toggleFurnitureSelection(hit.id)) break; }
           else if (!isFurnitureSelected(hit.id)) select({ kind: 'furniture', id: hit.id });
           this.drag = beginFurnitureDrag(selectedFurnitureIds(), p);
+          this.cv.style.cursor = 'grabbing';
+        } else if (hit?.kind === 'door' && doorStyle(hit.obj) === 'middle' && !e.shiftKey) {
+          // 중문: 끌면 양옆 벽을 따라 앞뒤로만 움직인다 (처음 실제로 움직일 때 checkpoint)
+          select({ kind: 'door', id: hit.id });
+          const d = hit.obj, len = G.dist(d.a, d.b) || 1;
+          this.doorDrag = { id: d.id, p0: p, orig: { a: d.a, b: d.b }, n: { x: -(d.b.y - d.a.y) / len, y: (d.b.x - d.a.x) / len }, k: 0, started: false };
           this.cv.style.cursor = 'grabbing';
         } else if (e.shiftKey) {
           // Shift+빈 곳 끌기: 사각형 안에 가운데가 든 가구를 선택에 더한다
@@ -340,6 +351,18 @@ export class PlanEditor {
       dragFurnitureTo(this.drag, p);
       return;
     }
+    if (this.doorDrag) {
+      const dd = this.doorDrag, door = state.plan.doors.find((x) => x.id === dd.id);
+      const k = Math.round(((p.x - dd.p0.x) * dd.n.x + (p.y - dd.p0.y) * dd.n.y) / 10) * 10;
+      if (!door || k === dd.k) return;
+      const r = moveDoorAlong({ ...door, ...dd.orig }, state.plan.walls, k);
+      if (!r) return;   // 양옆 벽이 없는 자리(복도로 나가거나 벽 속)로는 가지 않는다
+      if (!dd.started) { checkpoint(); dd.started = true; }
+      dd.k = k;
+      Object.assign(door, r, { auto: false });
+      emit('plan');
+      return;
+    }
     if (this.box) {
       this.box.b = p;
       const x0 = Math.min(this.box.a.x, p.x), x1 = Math.max(this.box.a.x, p.x);
@@ -350,7 +373,8 @@ export class PlanEditor {
       return;
     }
     if (this.tool === 'select') {
-      this.cv.style.cursor = this.hitFurniture(p) ? 'grab' : 'default';
+      const door = !this.hitFurniture(p) && this.hitDoor(p);
+      this.cv.style.cursor = this.hitFurniture(p) || (door && doorStyle(door) === 'middle') ? 'grab' : 'default';
     }
     if (this.temp) {
       const last = this.temp.pts?.[this.temp.pts.length - 1] || (this.temp.b ? null : this.temp.a);
@@ -372,8 +396,8 @@ export class PlanEditor {
       if (wasClick && btn === 2 && (this.tool === 'wall' || this.tool === 'room')) this.onDblClick(e);
       return;
     }
-    if (this.drag) {
-      this.drag = null;
+    if (this.drag || this.doorDrag) {
+      this.drag = this.doorDrag = null;
       this.cv.style.cursor = 'grab';
     }
     if (this.box) { this.box = null; this.draw(); }
@@ -581,19 +605,20 @@ export class PlanEditor {
     // 직접 다시 단 자리는 '지운 문' 목록에서 뺀다
     const m = { x: (g.a.x + g.b.x) / 2, y: (g.a.y + g.b.y) / 2 };
     state.plan.doorsRemoved = state.plan.doorsRemoved.filter((r) => G.dist(r, m) >= 300);
-    const obj = { id: uid('d'), a: g.a, b: g.b, t: g.t, swing, auto: false };
+    const obj = { id: uid('d'), a: g.a, b: g.b, t: g.t, swing, auto: false, ...(this.doorStyle !== 'swing' ? { style: this.doorStyle } : {}) };
     state.plan.doors.push(obj);
     emit('plan');
     select({ kind: 'door', id: obj.id });
   }
 
-  /** 문: 틈 자리를 비우고 문짝 선 + 여닫는 호 (도면 기호) */
+  /** 문: 틈 자리를 비우고 문짝 선 + 여닫는 호 (도면 기호). 미닫이는 벽 면에 붙은 문짝 + 열리는 쪽 화살표 */
   drawDoor(d, selected) {
     const c = this.ctx, g = doorGeometry(d);
     this.poly(G.wallCorners({ ...d, cap: false }));
     c.fillStyle = '#ffffff';
     c.fill();
     const col = selected ? '#2f6fed' : '#8b5e34';
+    if (doorStyle(d) !== 'swing') { this.drawSlidingDoor(d, col, selected); return; }
     c.strokeStyle = col;
     c.lineWidth = selected ? 2.5 : 1.2;
     c.setLineDash([4, 3]);
@@ -604,6 +629,30 @@ export class PlanEditor {
     c.lineWidth = selected ? 4 : 3;
     const h = this.toScr(g.hinge), t = this.toScr(g.tip);
     c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(t.x, t.y); c.stroke();
+  }
+
+  /** 미닫이·중문: 닫힌 자리 문짝(중문은 레일 셋에 유리 세 짝) + 열리는 쪽 화살표 */
+  drawSlidingDoor(d, col, selected) {
+    const c = this.ctx, s = slidingPanels(d), h = SLIDE.t / 2, glass = doorStyle(d) === 'middle';
+    if (glass && !selected) col = '#3d4a57';
+    c.strokeStyle = col;
+    c.fillStyle = selected ? 'rgba(47,111,237,.18)' : glass ? 'rgba(120,180,220,.35)' : 'rgba(139,94,52,.18)';
+    c.lineWidth = selected ? 2.5 : 1.5;
+    for (const pn of s.panels) {
+      this.poly([s.at(pn.s0, pn.off - h), s.at(pn.s1, pn.off - h), s.at(pn.s1, pn.off + h), s.at(pn.s0, pn.off + h)]);
+      c.fill(); c.stroke();
+    }
+    // 열리는 쪽 화살표: 문짝 가운데에서 미는 쪽으로 (가장 바깥 문짝보다 조금 더 떨어진 줄 위)
+    for (const pn of s.panels.filter((x) => x.arrow)) {
+      const w = pn.s1 - pn.s0, m = (pn.s0 + pn.s1) / 2, o = s.reach + 70, dir = Math.sign(pn.shift);
+      const from = this.toScr(s.at(m - dir * w * 0.2, o)), to = this.toScr(s.at(m + dir * w * 0.25, o));
+      const ax = to.x - from.x, ay = to.y - from.y, al = Math.hypot(ax, ay) || 1, ux = ax / al, uy = ay / al, k = Math.min(7, al * 0.4);
+      c.beginPath();
+      c.moveTo(from.x, from.y); c.lineTo(to.x, to.y);
+      c.moveTo(to.x - ux * k - uy * k * 0.6, to.y - uy * k + ux * k * 0.6); c.lineTo(to.x, to.y);
+      c.lineTo(to.x - ux * k + uy * k * 0.6, to.y - uy * k - ux * k * 0.6);
+      c.stroke();
+    }
   }
 
   /** 창: 벽 자리를 하얗게 비우고 가는 선 세 줄 (도면 기호) */
