@@ -150,6 +150,8 @@ export class View3D {
     this.planGroup.traverse((o) => {
       if (o.userData.isWall) {
         o.material.opacity = v;
+        // 불투명 ↔ 투명이 바뀌면 셰이더를 다시 만들어야 한다 (three.js는 불투명 재질이면 opacity를 무시하는 셰이더로 그린다)
+        if (o.material.transparent !== v < 1) o.material.needsUpdate = true;
         o.material.transparent = v < 1;
         o.material.depthWrite = v >= 1;
         o.castShadow = v >= 0.6;
