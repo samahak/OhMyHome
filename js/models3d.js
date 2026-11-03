@@ -769,11 +769,45 @@ export function buildFurniture(f, photo) {
   return g;
 }
 
+/**
+ * 문짝을 '형태만' 보이게(on) 또는 원래대로. 둘러보기에서 집 안에 들어오면 문 너머 방이 보이도록 쓴다.
+ * 면은 반투명(GHOST_OPACITY, 원래 더 투명한 유리는 그대로)하게, 상자 모양 부품에는 진한 모서리 선을 붙인다.
+ * 처음 부를 때 원래 재질을 userData에 남겨 둔다.
+ */
+const GHOST_OPACITY = 0.35;
+export function setGhost(obj, on) {
+  obj.traverse((o) => {
+    if (!o.isMesh) return;
+    const u = o.userData;
+    if (!u.solid) {
+      if (!on) return;
+      u.solid = o.material;
+      u.ghost = [].concat(o.material).map((m) => Object.assign(m.clone(), {
+        transparent: true, opacity: m.transparent ? Math.min(m.opacity, GHOST_OPACITY) : GHOST_OPACITY, depthWrite: false,
+      }));
+      if (!Array.isArray(o.material)) u.ghost = u.ghost[0];
+      if (o.geometry?.type === 'BoxGeometry') {
+        // 공유 상자 지오메트리는 모서리 선도 공유한다 (disposeObject가 버리지 않게 geoCache에 둔다)
+        const edges = o.geometry === boxGeo() ? sharedGeo('boxEdges', () => new THREE.EdgesGeometry(boxGeo())) : new THREE.EdgesGeometry(o.geometry);
+        u.edges = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: '#3a2614' }));
+        u.edges.raycast = () => {};
+        o.add(u.edges);
+      }
+      u.shadow = o.castShadow;
+    }
+    o.material = on ? u.ghost : u.solid;
+    o.castShadow = on ? false : u.shadow;
+    if (u.edges) u.edges.visible = on;
+  });
+}
+
 export function disposeObject(obj) {
   obj.traverse((o) => {
     if (o.geometry && ![...geoCache.values()].includes(o.geometry)) o.geometry.dispose();
     if (o.material) {
       for (const m of [].concat(o.material)) m.dispose();
     }
+    // setGhost로 바꿔 둔 문짝: 안 보이는 쪽 재질도 버린다
+    for (const m of [].concat(o.userData?.solid || [], o.userData?.ghost || [])) if (m !== o.material) m.dispose();
   });
 }
