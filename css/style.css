@@ -121,6 +121,8 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .placed-group .sub { float: right; font-weight: 400; }
 .placed-list .model { display: block; color: var(--muted); font-size: 11px; text-align: left; }
 .placed-list .price { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.placed-list .price.builtin, .multi-list .price.builtin { color: var(--muted); font-weight: 400; }
+.multi-list .price { font-size: 12px; }
 .placed-total { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; }
 .placed-total b { font-size: 15px; }
 .placed-total small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
