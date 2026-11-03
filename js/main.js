@@ -485,16 +485,31 @@ function parseWon(text) {
   return Math.round((+m[1] || 0) * 10000 + (+m[2] || 0) * 1000 + (+m[3] || 0));
 }
 const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
-const sumPrice = (fs) => fs.reduce((s, f) => s + (f.price || 0), 0);
+/** 가격 합계: 기본 포함 가구(builtin, 집에 딸려 오는 것)는 더하지 않는다 */
+const sumPrice = (fs) => fs.reduce((s, f) => s + (f.builtin ? 0 : f.price || 0), 0);
 
-/** 배치된 가구 합계: 개수 · 가격 합계 (가격을 안 넣은 가구 수도 알린다) */
+/** 합계 아래 안내 문장들: 기본 포함이라 제외한 가구 수 · 가격을 안 넣은 가구 수 */
+function priceNotes(fs) {
+  const builtin = fs.filter((f) => f.builtin).length, noPrice = fs.filter((f) => !f.builtin && f.price == null).length;
+  return [
+    builtin && `총 ${fs.length}개 중 기본 가구 ${builtin}개는 제외했습니다`,
+    noPrice && `가격을 넣지 않은 가구 ${noPrice}개는 빼고 더했습니다`,
+  ].filter(Boolean);
+}
+
+/** 배치된 가구 합계: 기본 포함 가구를 뺀 개수 · 가격 합계 (뺀 가구·가격 안 넣은 가구 수도 알린다) */
 function renderPlacedTotal() {
-  const fs = state.furniture, priced = fs.filter((f) => f.price != null);
+  const fs = state.furniture, n = fs.filter((f) => !f.builtin).length;
   $('placed-total').hidden = !fs.length;
-  $('placed-total').innerHTML = priced.length
-    ? `가구 ${fs.length}개 · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priced.length < fs.length ? `<small>가격을 넣지 않은 가구 ${fs.length - priced.length}개는 빼고 더했습니다</small>` : ''}`
+  $('placed-total').innerHTML = fs.some((f) => f.price != null || f.builtin)
+    ? `가구 ${n}개 · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priceNotes(fs).map((s) => `<small>${s}</small>`).join('')}`
     : `가구 ${fs.length}개<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
 }
+
+/** 목록·묶음 패널의 가격 표시: 기본 포함 가구는 '기본 포함' 꼬리표, 가격은 지운 줄로 */
+const priceTag = (f) => f.builtin
+  ? `<span class="price builtin">기본 포함${f.price != null ? ` <s>${fmtWon(f.price)}</s>` : ''}</span>`
+  : f.price != null ? `<span class="price">${fmtWon(f.price)}</span>` : '';
 
 /** 배치된 가구: 종류별로 묶고(제목 + 개수 + 소계), 같은 종류 안에서는 이름순 */
 function renderPlaced() {
@@ -507,11 +522,11 @@ function renderPlaced() {
   }
   $('placed-list').innerHTML = state.furniture.length
     ? [...groups].map(([type, fs]) => `
-      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span>${fs.some((f) => f.price != null) ? `<span class="sub">${fmtWon(sumPrice(fs))}</span>` : ''}</div>
+      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span>${fs.some((f) => !f.builtin && f.price != null) ? `<span class="sub">${fmtWon(sumPrice(fs))}</span>` : ''}</div>
       ${fs.map((f) => `
       <button data-id="${f.id}" class="${isFurnitureSelected(f.id) ? 'sel' : ''}">
         <span>${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}${f.model ? `<span class="model">${esc(f.model)}</span>` : ''}</span>
-        ${f.price != null ? `<span class="price">${fmtWon(f.price)}</span>` : `<span class="sz">${f.w}×${f.d}×${f.h}</span>`}
+        ${priceTag(f) || `<span class="sz">${f.w}×${f.d}×${f.h}</span>`}
       </button>`).join('')}`).join('')
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
   // Shift·Ctrl(⌘)+클릭: 선택에 더하거나 빼기
@@ -549,11 +564,12 @@ function renderProps() {
       <h3><span>🗂️ 가구 ${sel.ids.length}개</span><button data-act="close" class="icon">✕</button></h3>
       <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽이나 다른 가구와 겹치는 것이 있습니다.</div>
       <ul class="multi-list">${sel.ids.map((id) => state.furniture.find((f) => f.id === id))
-        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}${f.price != null ? ` · ${fmtWon(f.price)}` : ''}</li>`).join('')}</ul>
+        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)} ${priceTag(f)}</li>`).join('')}</ul>
       ${(() => {
-        const fs = sel.ids.map((id) => state.furniture.find((f) => f.id === id)), n = fs.filter((f) => f.price != null).length;
-        return n ? `<div class="field"><span>고른 가구 가격 합계</span><b>${fmtWon(sumPrice(fs))}</b></div>${n < fs.length ? `<p class="hint">가격 없는 ${fs.length - n}개는 빼고 더했습니다.</p>` : ''}` : '';
+        const fs = sel.ids.map((id) => state.furniture.find((f) => f.id === id)), notes = priceNotes(fs);
+        return fs.some((f) => f.price != null || f.builtin) ? `<div class="field"><span>고른 가구 가격 합계</span><b>${fmtWon(sumPrice(fs))}</b></div>${notes.length ? `<p class="hint">${notes.join('.<br>')}.</p>` : ''}` : '';
       })()}
+      <div class="btns"><button data-act="builtin-on" title="집에 딸려 오는 가구로 표시해 가격 합계에서 뺍니다">기본 포함으로</button><button data-act="builtin-off">기본 포함 해제</button></div>
       <div class="btns"><button data-act="rot-90">⟲ 90°</button><button data-act="rot90">⟳ 90°</button></div>
       <div class="btns">
         <button data-act="dup">함께 복제</button>
@@ -573,6 +589,7 @@ function renderProps() {
       <label class="field"><span>이름</span><input type="text" data-f="name"></label>
       <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: LG 오브제 M873"></label>
       <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,290,000 · 129만"></label>
+      <label class="check" title="집에 딸려 오는 가구(빌트인·옵션)는 가격 합계에서 뺍니다"><input type="checkbox" data-f="builtin"> 기본 포함 가구 (합계에서 빼기)</label>
       <label class="field"><span>샘플 모양</span><select data-f="type">${Object.entries(SHAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${obj.type === 'plant' ? `
       <label class="field"><span>식물 종류</span><select data-f="plant">${Object.entries(PLANTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
@@ -715,6 +732,12 @@ function applyProp(inp) {
     emit('furniture');
     return;
   }
+  if (k === 'builtin') {
+    checkpoint();
+    if (v) obj.builtin = true; else delete obj.builtin;
+    emit('furniture');
+    return;
+  }
   if (k === 'model') {
     checkpoint();
     const m = String(v).trim();
@@ -822,6 +845,15 @@ function propAction(act) {
   if (act === 'del') { deleteSelected(); return; }
   if (act === 'rot90' || act === 'rot-90') rotateSelected(act === 'rot90' ? 90 : -90);
   if (act === 'dup') duplicateSelected();
+  if (act === 'builtin-on' || act === 'builtin-off') {
+    const fs = selectedFurniture();
+    checkpoint();
+    for (const f of fs) { if (act === 'builtin-on') f.builtin = true; else delete f.builtin; }
+    emit('furniture');
+    renderProps();   // 목록의 '기본 포함' 표시가 바뀐다
+    status(act === 'builtin-on' ? `가구 ${fs.length}개를 기본 포함으로 표시해 합계에서 뺐습니다.` : `가구 ${fs.length}개의 기본 포함 표시를 지웠습니다.`);
+    return;
+  }
   if (act === 'hinge' || act === 'swing') {
     checkpoint();
     // 경첩을 반대 끝으로 옮겨도 문짝은 같은 쪽으로 열리게: a↔b를 바꾸면 법선이 뒤집히므로 swing도 뒤집는다

@@ -86,6 +86,7 @@ state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, 
   door          { id, a, b, t, swing, auto } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
+  builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
 state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
 ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   (저장하지 않는다)
   ids           가구를 2개 이상 골랐을 때만 있다. id는 마지막에 고른 가구
@@ -269,6 +270,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   한 번만 불러 Ctrl+Z 한 번에 돌아온다. 묶음 회전은 고른 가구 가운데를 축으로 자리까지 돈다. 속성 패널은 묶음 화면(`sel.ids`)을 따로 그린다.
 - 가격 입력은 `parseWon()`(main.js)으로 읽는다: 쉼표·원·₩·공백을 빼고 `129만`·`129만 9천`·`12.9만`을 받는다. 화면은 `fmtWon()`.
   목록 위 `#placed-total`에 전체 합계(가격 없는 가구 수도 알림), 종류 제목에 소계, 여러 개 선택 패널에 고른 가구 합계를 보인다.
+  `builtin` 가구는 세 합계 모두에서 빼고(목록 위 개수도 뺀 수, `priceNotes()`가 '총 n개 중 기본 가구 m개는 제외' 안내), 목록에는 '기본 포함'과 지운 줄 가격(`priceTag()`)으로 보인다.
 - 왼쪽 '배치된 가구' 목록은 `SHAPES` 순서로 종류별로 묶고(제목 + 개수), 같은 종류 안은 이름순(`Intl.Collator('ko', { numeric })`)이다.
 - 새 가구는 `dropPoint()`가 화면 가운데에서 나선형으로 돌며 벽·가구와 겹치지 않는 첫 자리에 놓는다.
 - 겹침 판정은 `G.findCollisions()` 하나다. 맞닿기만 한 것은 겹침이 아니도록 꼭짓점을 1~2mm 안쪽으로 줄여 잰다.
