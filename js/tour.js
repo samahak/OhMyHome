@@ -9,6 +9,7 @@ import { buildGrid, isFree, nearestFree, findPath, roomCenters, orderByWalk } fr
 import { innerBox } from './fixtures.js';
 import { buildScenery } from './scenery.js';
 import { DOOR } from './catalog.js';
+import { setGhost } from './models3d.js';
 
 const M = 0.001;
 const EYE = 1.55;          // 눈높이 m
@@ -81,6 +82,7 @@ export class Tour {
     this.si = 0;
     this.auto = true;
     this.finished = false;
+    this.ghosted = null;  // 현관을 지나 집 안에 있는지 (바뀔 때만 문짝 모습을 바꾼다)
 
     const v = this.view;
     this.saved = { pos: v.camera.position.clone(), target: v.controls.target.clone(), fov: v.camera.fov, far: v.camera.far };
@@ -359,7 +361,18 @@ export class Tour {
     dt = Math.min(dt, 0.1);
     this.manual(dt);
     if (this.auto && !this.finished) this.autoStep(dt);
+    this.updateDoorsGhost();
     this.applyCamera();
+  }
+
+  /** 집 안(현관문 줄에서 안쪽으로 30cm 넘게)에 들어오면 현관문·방문 문짝을 형태만 보이게 해 문 너머 방이 보이도록 한다 */
+  updateDoorsGhost() {
+    const e = this.door, out = (this.pos.x - this.mid.x) * e.out.x + (this.pos.y - this.mid.y) * e.out.y;
+    const inside = out < -300;
+    if (inside === this.ghosted) return;
+    this.ghosted = inside;
+    this.view.setDoorsGhost(inside);
+    setGhost(this.pivot, inside);
   }
 
   autoStep(dt) {

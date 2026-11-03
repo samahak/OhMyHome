@@ -6,7 +6,7 @@ import {
   state, on, select, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
 } from './store.js';
 import {
-  buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSlidingLeaf, buildGlassLeaf, buildTransom, disposeObject, MIDDLE_FRAME,
+  buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSlidingLeaf, buildGlassLeaf, buildTransom, setGhost, disposeObject, MIDDLE_FRAME,
 } from './models3d.js';
 import { DOOR } from './catalog.js';
 import { doorGeometry, slidingPanels, doorStyle, SLIDE } from './doors.js';
@@ -193,6 +193,7 @@ export class View3D {
 
   setTourMode(v) {
     this.tourMode = v;
+    if (!v) this.doorsGhost = false;
     this.scene.background = new THREE.Color(v ? '#cfe2f3' : '#e9edf2');   // 둘러보기: 창밖 하늘
     this.labels.domElement.style.display = v ? 'none' : '';
     this.buildPlan();
@@ -305,8 +306,9 @@ export class View3D {
       this.planGroup.add(g);
     }
     // 문: 문 위 벽(문 높이 ~ 천장) + 문틀 + 도면 기호대로 90° 열린 문짝(미닫이는 벽 면을 따라 끝까지 연 문짝 + 레일).
-    // 둘러보기 중 현관문은 tour.js가 따로 여닫는다
+    // 둘러보기 중 현관문은 tour.js가 따로 여닫는다. 문짝은 doorLeaves에 모아 둘러보기 중 형태만 보이게 한다(setDoorsGhost)
     const e = p.entrance;
+    this.doorLeaves = [];
     for (const d of p.doors || []) {
       const g = doorGeometry(d), mid = { x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 };
       if (this.tourMode && e && G.distToSegment(mid, e.a, e.b).dist < 200) continue;
@@ -327,7 +329,9 @@ export class View3D {
       leaf.position.set((g.hinge.x + g.u.x * 40) * M, 0, (g.hinge.y + g.u.y * 40) * M);
       leaf.rotation.y = -Math.atan2(g.n.y, g.n.x);
       this.planGroup.add(leaf);
+      this.doorLeaves.push(leaf);
     }
+    if (this.doorsGhost) this.setDoorsGhost(true);
     this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity);
 
     // 그림자 범위를 도면에 맞춘다
@@ -336,6 +340,12 @@ export class View3D {
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.position.set(cx + size * 0.4, size * 1.2, cz + size * 0.6);
     this.sun.target.position.set(cx, 0, cz);
+  }
+
+  /** 문짝을 형태(모서리 선)만 보이게 / 원래대로. 도면을 다시 그려도 이 상태를 지킨다 */
+  setDoorsGhost(on) {
+    this.doorsGhost = on;
+    for (const leaf of this.doorLeaves || []) setGhost(leaf, on);
   }
 
   /**
@@ -353,6 +363,7 @@ export class View3D {
       leaf.position.set(c.x * M, 0.005, c.y * M);
       leaf.rotation.y = rot;
       this.planGroup.add(leaf);
+      this.doorLeaves.push(leaf);
     }
     const depth = s.reach - d.t / 2 + SLIDE.gap;
     const rail = new THREE.Mesh(new THREE.BoxGeometry((hi - lo) * M, 0.04, depth * M),
