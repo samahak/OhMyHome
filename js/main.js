@@ -5,7 +5,7 @@ import {
   applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makeXlsx, STYLE } from './xlsx.js';
@@ -489,22 +489,36 @@ const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 /** 가격 합계: 기본 포함 가구(builtin, 집에 딸려 오는 것)는 더하지 않는다 */
 const sumPrice = (fs) => fs.reduce((s, f) => s + (f.builtin ? 0 : f.price || 0), 0);
 
-/** 합계 아래 안내 문장들: 기본 포함이라 제외한 가구 수 · 가격을 안 넣은 가구 수 */
+/**
+ * 비용에 넣는 문: 현관 중문은 늘(사서 다는 것이라), 다른 문은 가격을 넣었을 때만. 가구 항목과 같은 꼴로 바꿔 합계·목록·엑셀에 함께 쓴다.
+ * door: true, 크기는 문 폭 × 벽 두께 × 문 높이
+ */
+const DOOR_NAMES = { swing: '여닫이문', sliding: '미닫이문', middle: '현관 중문' };
+function costDoors() {
+  return state.plan.doors.filter((d) => doorStyle(d) === 'middle' || d.price != null).map((d) => ({
+    id: d.id, door: true, style: doorStyle(d), name: d.name || DOOR_NAMES[doorStyle(d)], model: d.model, price: d.price, builtin: d.builtin,
+    w: Math.round(G.dist(d.a, d.b)), d: Math.round(d.t), h: DOOR.h,
+  }));
+}
+const costItems = () => [...state.furniture, ...costDoors()];
+
+/** 합계 아래 안내 문장들: 기본 포함이라 제외한 수 · 가격을 안 넣은 수 */
 function priceNotes(fs) {
-  const builtin = fs.filter((f) => f.builtin).length, noPrice = fs.filter((f) => !f.builtin && f.price == null).length;
+  const builtin = fs.filter((f) => f.builtin).length, noPrice = fs.filter((f) => !f.builtin && f.price == null);
+  const what = noPrice.some((f) => f.door) ? (noPrice.every((f) => f.door) ? '문' : '가구·문') : '가구';
   return [
     builtin && `총 ${fs.length}개 중 기본 가구 ${builtin}개는 제외했습니다`,
-    noPrice && `가격을 넣지 않은 가구 ${noPrice}개는 빼고 더했습니다`,
+    noPrice.length && `가격을 넣지 않은 ${what} ${noPrice.length}개는 빼고 더했습니다`,
   ].filter(Boolean);
 }
 
-/** 배치된 가구 합계: 기본 포함 가구를 뺀 개수 · 가격 합계 (뺀 가구·가격 안 넣은 가구 수도 알린다) */
+/** 배치된 가구(+ 비용에 넣는 문) 합계: 기본 포함을 뺀 개수 · 가격 합계 (뺀 것·가격 안 넣은 것 수도 알린다) */
 function renderPlacedTotal() {
-  const fs = state.furniture, n = fs.filter((f) => !f.builtin).length;
+  const fs = costItems(), nf = fs.filter((f) => !f.builtin && !f.door).length, nd = fs.filter((f) => !f.builtin && f.door).length;
   $('placed-total').hidden = $('placed-export').hidden = !fs.length;
   $('placed-total').innerHTML = fs.some((f) => f.price != null || f.builtin)
-    ? `가구 ${n}개 · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priceNotes(fs).map((s) => `<small>${s}</small>`).join('')}`
-    : `가구 ${fs.length}개<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
+    ? `가구 ${nf}개${nd ? ` · 문 ${nd}개` : ''} · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priceNotes(fs).map((s) => `<small>${s}</small>`).join('')}`
+    : `가구 ${state.furniture.length}개${nd ? ` · 문 ${nd}개` : ''}<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
 }
 
 /**
@@ -512,16 +526,16 @@ function renderPlacedTotal() {
  * all이면 기본 가구가 아닌 것을 모두(가격 없는 것도) 위에, 합계 줄 아래에 기본 가구를 따로 모은다.
  */
 function furnitureSheet(all) {
-  const fs = [...state.furniture].sort(byTypeThenName);
+  const fs = [...[...state.furniture].sort(byTypeThenName), ...costDoors()];   // 문(중문 등)은 가구 뒤에
   const paid = fs.filter((f) => !f.builtin && (all || f.price != null)), builtin = all ? fs.filter((f) => f.builtin) : [];
   const H = (v) => ({ v, s: STYLE.header });
-  const row = (f, i, muted) => [i + 1, SHAPES[f.type]?.label || f.type, f.name, f.model || '',
+  const row = (f, i, muted) => [i + 1, f.door ? DOOR_STYLES[f.style] : SHAPES[f.type]?.label || f.type, f.name, f.model || '',
     f.price != null ? { v: f.price, s: muted ? STYLE.mutedWon : STYLE.won } : '', f.w, f.d, f.h, f.builtin ? '기본 포함' : '구매']
     .map((v) => (muted && typeof v !== 'object' ? { v, s: STYLE.muted } : v));
   const head = 4;   // 제목 · 요약 · 빈 줄 다음 줄이 머리글
   const rows = [
     [{ v: 'OhMyHome 가구 목록', s: STYLE.title }],
-    [`${today()} · 가구 ${paid.length}개 · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
+    [`${today()} · 가구 ${paid.filter((f) => !f.door).length}개${paid.some((f) => f.door) ? ` · 문 ${paid.filter((f) => f.door).length}개` : ''} · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
     [],
     ['번호', '종류', '이름', '모델명', '가격(원)', '가로(mm)', '깊이(mm)', '높이(mm)', '구분'].map(H),
     ...paid.map((f, i) => row(f, i)),
@@ -538,7 +552,7 @@ function furnitureSheet(all) {
 
 $('btn-xlsx').addEventListener('click', () => {
   const all = $('xlsx-all').checked;
-  if (!all && !state.furniture.some((f) => !f.builtin && f.price != null)) {
+  if (!all && !costItems().some((f) => !f.builtin && f.price != null)) {
     status('가격이 계산된 가구가 없습니다. 가구에 가격을 넣거나 ‘모든 가구’를 켜고 다시 눌러 주세요.');
     return;
   }
@@ -572,10 +586,22 @@ function renderPlaced() {
         ${priceTag(f) || `<span class="sz">${f.w}×${f.d}×${f.h}</span>`}
       </button>`).join('')}`).join('')
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
+  // 비용에 넣는 문(현관 중문 등)은 맨 아래 '문' 묶음으로. 누르면 그 문을 고른다
+  const ds = costDoors(), selDoor = ui.selection?.kind === 'door' && ui.selection.id;
+  if (ds.length) {
+    $('placed-list').insertAdjacentHTML('beforeend', `
+      <div class="placed-group">🚪 문 <span class="n">${ds.length}</span>${ds.some((f) => !f.builtin && f.price != null) ? `<span class="sub">${fmtWon(sumPrice(ds))}</span>` : ''}</div>
+      ${ds.map((f) => `
+      <button data-door="${f.id}" class="${selDoor === f.id ? 'sel' : ''}">
+        <span>${esc(f.name)}${f.model ? `<span class="model">${esc(f.model)}</span>` : ''}</span>
+        ${priceTag(f) || `<span class="sz">폭 ${fmtMM(f.w)}</span>`}
+      </button>`).join('')}`);
+  }
   // Shift·Ctrl(⌘)+클릭: 선택에 더하거나 빼기
   $('placed-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', (e) => {
     endDrawTool();
-    if (e.shiftKey || e.ctrlKey || e.metaKey) toggleFurnitureSelection(b.dataset.id);
+    if (b.dataset.door) select({ kind: 'door', id: b.dataset.door });
+    else if (e.shiftKey || e.ctrlKey || e.metaKey) toggleFurnitureSelection(b.dataset.id);
     else select({ kind: 'furniture', id: b.dataset.id });
   }));
 }
@@ -677,6 +703,11 @@ function renderProps() {
       <div class="field"><span>모양</span></div>
       <div class="btns preset-btns">${Object.entries(DOOR_STYLES).map(([k, v]) => `<button data-act="door-style-${k}" class="${style === k ? 'active' : ''}">${v}</button>`).join('')}</div>
       <div class="field"><span>종류</span><b>${obj.auto === false ? '직접 단 문' : '도면 기호에서 찾음'}</b></div>
+      <label class="field"><span>이름</span><input type="text" data-f="name" placeholder="${DOOR_NAMES[style]}"></label>
+      <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: 3연동 슬림 중문"></label>
+      <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,500,000 · 150만"></label>
+      <label class="check" title="집에 딸려 오는 문은 가격 합계에서 뺍니다"><input type="checkbox" data-f="builtin"> 기본 포함 (합계에서 빼기)</label>
+      ${style === 'middle' ? '' : '<p class="hint">가격을 넣은 문은 가구 합계·엑셀에 함께 들어갑니다(현관 중문은 늘 들어갑니다).</p>'}
       <div class="field"><span>문 폭</span><b data-v="dwidth">${fmtMM(G.dist(obj.a, obj.b))} mm</b></div>
       ${style === 'middle' && state.plan.entrance ? '<label class="field"><span>현관문에서 (mm)</span><input type="number" step="50" data-f="mdepth"></label>' : ''}
       ${style === 'swing'
@@ -789,20 +820,20 @@ function applyProp(inp) {
     if (Number.isNaN(won)) { status(`‘${v}’를 가격으로 읽지 못했습니다. 예: 1,290,000 · 1290000원 · 129만`); refreshProps(); return; }
     checkpoint();
     if (won === null) delete obj.price; else obj.price = won;
-    emit('furniture');
+    emit(sel.kind === 'door' ? 'plan' : 'furniture');
     return;
   }
   if (k === 'builtin') {
     checkpoint();
     if (v) obj.builtin = true; else delete obj.builtin;
-    emit('furniture');
+    emit(sel.kind === 'door' ? 'plan' : 'furniture');
     return;
   }
   if (k === 'model') {
     checkpoint();
     const m = String(v).trim();
     if (m) obj.model = m; else delete obj.model;
-    emit('furniture');
+    emit(sel.kind === 'door' ? 'plan' : 'furniture');
     return;
   }
   const preset = sel.kind === 'furniture' && SIZE_PRESETS[obj.type];
