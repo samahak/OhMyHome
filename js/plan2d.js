@@ -751,9 +751,12 @@ export class PlanEditor {
       c.font = `600 ${Math.min(13, Math.max(10, minSide / 4))}px sans-serif`;
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillText(f.name, ct.x, ct.y - (selected ? 7 : 0));
-      if (selected) {
+      // 가로×깊이는 선택과 상관없이 늘 쓴다 (두 줄이 들어갈 만큼 클 때)
+      const size = minSide > 30;
+      c.fillText(f.name, ct.x, ct.y - (size ? 7 : 0));
+      if (size) {
         c.font = '11px sans-serif';
+        c.fillStyle = selected ? '#1f2833' : '#4a5563';
         c.fillText(`${fmtMM(f.w)}×${fmtMM(f.d)}`, ct.x, ct.y + 8);
       }
     }
