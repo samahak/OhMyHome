@@ -62,6 +62,7 @@ js/windows.js          창 자동 찾기 — 도면 이미지에서 벽 위의 �
 js/doors.js            문 자동 찾기 — 벽 틈 중 도면 이미지에 여닫이 문 기호(문짝 선 + 호)가 있는 곳   (DOM 없음)
 js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 숲, 먼 산, 하늘
 js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
+js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
 sample/                실제 세대 예시 — 55㎡ A-2형 · A-1형(좌우 반전)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
 ```
@@ -271,6 +272,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 가격 입력은 `parseWon()`(main.js)으로 읽는다: 쉼표·원·₩·공백을 빼고 `129만`·`129만 9천`·`12.9만`을 받는다. 화면은 `fmtWon()`.
   목록 위 `#placed-total`에 전체 합계(가격 없는 가구 수도 알림), 종류 제목에 소계, 여러 개 선택 패널에 고른 가구 합계를 보인다.
   `builtin` 가구는 세 합계 모두에서 빼고(목록 위 개수도 뺀 수, `priceNotes()`가 '총 n개 중 기본 가구 m개는 제외' 안내), 목록에는 '기본 포함'과 지운 줄 가격(`priceTag()`)으로 보인다.
+- 가구 목록 엑셀(`furnitureSheet(all)`, main.js): 기본은 가격이 계산된 가구(`!builtin && price != null`)와 합계 줄(`SUM` 수식 + 미리 계산한 값).
+  `모든 가구`(`#xlsx-all`)면 기본 가구가 아닌 것을 모두 위에, 합계 줄 아래에 기본 가구를 회색으로 따로 모은다. 순서는 목록과 같은 `byTypeThenName`.
 - 왼쪽 '배치된 가구' 목록은 `SHAPES` 순서로 종류별로 묶고(제목 + 개수), 같은 종류 안은 이름순(`Intl.Collator('ko', { numeric })`)이다.
 - 새 가구는 `dropPoint()`가 화면 가운데에서 나선형으로 돌며 벽·가구와 겹치지 않는 첫 자리에 놓는다.
 - 겹침 판정은 `G.findCollisions()` 하나다. 맞닿기만 한 것은 겹침이 아니도록 꼭짓점을 1~2mm 안쪽으로 줄여 잰다.
@@ -291,5 +294,5 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 길이는 상태에서 언제나 mm 정수(또는 실수)로 다룬다. m는 3D 변환과 화면 표시에서만 쓴다.
   화면에 mm를 보일 때는 `fmtMM()`(천 단위 쉼표)을 쓰고, 면적은 ㎡와 평(÷ 3.3058)을 함께 보인다.
 - 가구 기본 크기는 `catalog.js`에만 둔다. 화면이나 3D 코드에 하드코딩하지 말 것.
-- `geometry.js` · `wallDetect.js` · `catalog.js`에는 DOM·three.js 의존을 넣지 않는다(Node에서 시험할 수 있게).
+- `geometry.js` · `wallDetect.js` · `catalog.js` · `xlsx.js`에는 DOM·three.js 의존을 넣지 않는다(Node에서 시험할 수 있게).
 - 도면·사진은 사용자 브라우저에만 저장한다. 서버로 보내는 코드는 없으며, 그렇게 두어야 한다.

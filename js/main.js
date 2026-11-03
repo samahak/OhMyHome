@@ -8,6 +8,7 @@ import * as G from './geometry.js';
 import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
+import { makeXlsx, STYLE } from './xlsx.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
 import { initPhotoDialog } from './furniturePhoto.js';
@@ -500,11 +501,53 @@ function priceNotes(fs) {
 /** 배치된 가구 합계: 기본 포함 가구를 뺀 개수 · 가격 합계 (뺀 가구·가격 안 넣은 가구 수도 알린다) */
 function renderPlacedTotal() {
   const fs = state.furniture, n = fs.filter((f) => !f.builtin).length;
-  $('placed-total').hidden = !fs.length;
+  $('placed-total').hidden = $('placed-export').hidden = !fs.length;
   $('placed-total').innerHTML = fs.some((f) => f.price != null || f.builtin)
     ? `가구 ${n}개 · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priceNotes(fs).map((s) => `<small>${s}</small>`).join('')}`
     : `가구 ${fs.length}개<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
 }
+
+/**
+ * 가구 목록 엑셀: 기본은 가격이 계산된 가구(기본 가구 아님 + 가격 있음)만 + 합계 줄.
+ * all이면 기본 가구가 아닌 것을 모두(가격 없는 것도) 위에, 합계 줄 아래에 기본 가구를 따로 모은다.
+ */
+function furnitureSheet(all) {
+  const fs = [...state.furniture].sort(byTypeThenName);
+  const paid = fs.filter((f) => !f.builtin && (all || f.price != null)), builtin = all ? fs.filter((f) => f.builtin) : [];
+  const H = (v) => ({ v, s: STYLE.header });
+  const row = (f, i, muted) => [i + 1, SHAPES[f.type]?.label || f.type, f.name, f.model || '',
+    f.price != null ? { v: f.price, s: muted ? STYLE.mutedWon : STYLE.won } : '', f.w, f.d, f.h, f.builtin ? '기본 포함' : '구매']
+    .map((v) => (muted && typeof v !== 'object' ? { v, s: STYLE.muted } : v));
+  const head = 4;   // 제목 · 요약 · 빈 줄 다음 줄이 머리글
+  const rows = [
+    [{ v: 'OhMyHome 가구 목록', s: STYLE.title }],
+    [`${today()} · 가구 ${paid.length}개 · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
+    [],
+    ['번호', '종류', '이름', '모델명', '가격(원)', '가로(mm)', '깊이(mm)', '높이(mm)', '구분'].map(H),
+    ...paid.map((f, i) => row(f, i)),
+  ];
+  const end = head + paid.length;
+  rows.push(['', '', { v: '합계', s: STYLE.totalLabel }, { v: `${paid.length}개`, s: STYLE.totalLabel },
+    { f: paid.length ? `SUM(E${head + 1}:E${end})` : '0', v: sumPrice(paid), s: STYLE.totalWon },
+    ...Array(4).fill({ v: '', s: STYLE.totalLabel })]);
+  if (builtin.length) {
+    rows.push([], [{ v: `기본 포함 가구 ${builtin.length}개 (합계에서 제외)`, s: STYLE.section }], ...builtin.map((f, i) => row(f, i, true)));
+  }
+  return makeXlsx({ name: '가구 목록', cols: [6, 14, 22, 26, 14, 10, 10, 10, 10], rows, freeze: head });
+}
+
+$('btn-xlsx').addEventListener('click', () => {
+  const all = $('xlsx-all').checked;
+  if (!all && !state.furniture.some((f) => !f.builtin && f.price != null)) {
+    status('가격이 계산된 가구가 없습니다. 가구에 가격을 넣거나 ‘모든 가구’를 켜고 다시 눌러 주세요.');
+    return;
+  }
+  const blob = new Blob([furnitureSheet(all)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  download(url, `ohmyhome-가구-${today()}.xlsx`);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  status(all ? '모든 가구를 엑셀로 저장했습니다(가격이 계산된 가구 위, 기본 가구 아래).' : '가격이 계산된 가구를 엑셀로 저장했습니다.');
+});
 
 /** 목록·묶음 패널의 가격 표시: 기본 포함 가구는 '기본 포함' 꼬리표, 가격은 지운 줄로 */
 const priceTag = (f) => f.builtin
