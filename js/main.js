@@ -667,9 +667,9 @@ function renderProps() {
       <label class="field"><span>길이 (mm)</span><input type="text" data-f="len"></label>
       <label class="field"><span>두께 (mm)</span><input type="number" min="10" step="10" data-f="t"></label>
       <div class="btns"><button data-act="del" class="danger">벽 삭제</button></div>
-      <p class="hint">${state.plan.image
-        ? '길이를 실제 치수로 고치면 이 벽을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.'
-        : '길이를 고치면 시작점은 그대로 두고 끝점을 옮깁니다.'}</p>`;
+      <p class="hint">${state.plan.image && obj.auto
+        ? '자동 인식한 벽은 길이를 실제 치수로 고치면 이 벽을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.'
+        : '길이를 고치면 시작점은 그대로 두고 끝점을 옮깁니다(이 벽만 바뀝니다).'}</p>`;
   } else if (sel.kind === 'door') {
     el.innerHTML = `
       <h3><span>🚪 문</span><button data-act="close" class="icon">✕</button></h3>
@@ -790,12 +790,12 @@ function applyProp(inp) {
   }
   const preset = sel.kind === 'furniture' && SIZE_PRESETS[obj.type];
   if (preset && k === preset.key) { applyPreset(obj, v); return; }
-  // 길이로 도면 전체 크기를 맞추는 칸들
+  // 길이로 도면 전체 크기를 맞추는 칸들 (직접 그린 벽의 길이는 그 벽만 바꾼다 — 사용자가 더한 벽은 도면 이미지의 치수가 아니다)
   if ((sel.kind === 'wall' && k === 'len') || k === 'rw' || k === 'rh') {
     const mm = G.parseLengthMM(v);
     if (!(mm > 0)) { status(`‘${v}’를 길이로 읽지 못했습니다. 3.8m 또는 3800처럼 넣어 주세요.`); refreshProps(); return; }
     v = mm;
-    if (state.plan.image) {
+    if (state.plan.image && !(sel.kind === 'wall' && !obj.auto)) {
       let a, b;
       if (sel.kind === 'wall') {
         const len = G.dist(obj.a, obj.b) || 1, ux = (obj.b.x - obj.a.x) / len, uy = (obj.b.y - obj.a.y) / len, e = obj.cap ? obj.t / 2 : 0;
