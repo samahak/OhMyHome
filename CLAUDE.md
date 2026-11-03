@@ -59,7 +59,7 @@ js/tour.js             둘러보기 — 현관문 열기 · 1인칭 카메라 ·
 js/walkGrid.js         둘러보기용 걸을 수 있는 칸 지도 · A* 길 찾기 · 들를 곳 고르기             (DOM 없음)
 js/fixtures.js         현관·욕실·주방 설비 자동 배치 (신발장·변기·세면대·욕조·주방 싱크대)          (DOM 없음)
 js/windows.js          창 자동 찾기 — 도면 이미지에서 벽 위의 연한 구간 + 바깥벽 틈                 (DOM 없음)
-js/doors.js            문 자동 찾기 — 벽 틈 중 도면 이미지에 여닫이 문 기호(문짝 선 + 호)가 있는 곳   (DOM 없음)
+js/doors.js            문 자동 찾기 — 벽 틈 중 도면 이미지에 여닫이 문 기호(문짝 선 + 호)가 있는 곳 · 미닫이 문짝 자리 (DOM 없음)
 js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 숲, 먼 산, 하늘
 js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
@@ -84,10 +84,12 @@ state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, 
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
   room          { id, name, pts:[{x,y}], hidden? }
   window        { id, a, b, t, sill, h, auto } — a–b는 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이 (mm)
-  door          { id, a, b, t, swing, auto } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
+  door          { id, a, b, t, swing, auto, style? } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
+                style: 'sliding'(미닫이) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
   builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
+  문도 name·model·price·builtin을 가질 수 있다(속성 패널). 현관 중문은 늘, 다른 문은 price가 있을 때만 비용 항목이다(`costDoors()`)
 state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
 ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   (저장하지 않는다)
   ids           가구를 2개 이상 골랐을 때만 있다. id는 마지막에 고른 가구
@@ -118,8 +120,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   벽이 있으면 `G.spanAt()`(벽 다각형에 반직선), 아직 없으면 도면 이미지에서 어두운 픽셀이 `minRun` 이상
   이어지는 곳을 벽으로 본다(얇은 글자·치수선은 지나친다). 문·창 틈으로 새는 축은 null이고 창에 안내가 뜬다.
   Shift+클릭이거나 벽 사이가 아니면 두 점 모드로 넘어간다.
-- 벽 속성의 '길이', 방 속성의 '가로'·'세로': 도면 이미지가 있으면 그 길이로 **전체 크기**를 맞춘다
-  (도면 없이 빈 모눈에 그린 벽은 예전처럼 끝점만 옮긴다).
+- 자동 인식 벽 속성의 '길이', 방 속성의 '가로'·'세로': 도면 이미지가 있으면 그 길이로 **전체 크기**를 맞춘다
+  (도면 없이 빈 모눈에 그린 벽과 **직접 그린 벽(`auto: false`)**은 끝점만 옮겨 그 벽만 바꾼다 — 사용자가 더한 벽은 도면 치수가 아니다).
 - '도면 전체 가로': 이미지 윗변 전체를 기준선으로 쓴다.
 
 길이 입력은 언제나 `G.parseLengthMM()`으로 읽는다. `3.8m` · `3.8` · `3800` · `3,800` · `380cm`를 모두 받고,
@@ -191,7 +193,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   `findWindowGaps`로는 복도에서 방으로 꺾이는 문을 놓친다). 창 자리 틈은 뺀다.
 - 틈마다 경첩(양 끝) × 여는 쪽(양쪽) 네 가지 기호를 가정해 이미지와 맞춰 본다. 경첩은 **벽 면 위**(중심선에서 t/2), 문짝은 문 폭 길이로
   벽에 수직, 호는 반대 끝까지. 호 10~80° 표본의 60%, 문짝 선 표본의 50% 이상이 어두우면(< 180, 법선 방향 ±25mm) 문이다.
-  미닫이(평행한 두 선)는 찾지 않는다 — 🚪 문 도구로 직접 단다.
+  미닫이(평행한 두 선)는 찾지 않는다 — 🚪 문 도구로 달고 속성에서 '미닫이'로 바꾼다.
 - 자동 문은 벽 인식·'문 기호 찾아 문 달기'·둘러보기 시작 때 다시 찾는다(`autoDoors`, 창과 같은 방식: `auto: false`는 그대로).
   문 목록이 없는 예전 프로젝트·저장본을 열면 한 번 찾아 단다(`doorsForOldProject`, 그래서 `loadSaved()`는 불러온 원본을 돌려준다).
 - 자동 문을 지우면 그 가운데를 `plan.doorsRemoved`에 남기고(`store.removeItem`), 다시 찾을 때 300mm 안의 문은 달지 않는다.
@@ -199,6 +201,22 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 경첩·여는 쪽을 손으로 바꾸면 `auto: false`가 된다. 경첩을 반대로 하면 a↔b를 바꾸고 swing도 뒤집는다(법선이 뒤집히므로).
 - 3D: 문 위 벽(`catalog.DOOR.h` ~ 천장, `wallPiece`) + 문틀 + 90° 열린 문짝(`models3d.buildDoorFrame/buildDoorLeaf`).
   둘러보기 중 현관 자리의 문은 그리지 않는다(`tour.js`가 여닫는 현관문을 따로 만든다). 문짝은 길 찾기 장애물에 넣지 않는다.
+- **미닫이·중문(`style`)**: `doors.slidingPanels(d)`가 문짝 자리를 준다 — 짝마다 닫힌 자리 [s0, s1], 벽 중심선에서 떨어진 거리 `off`,
+  열린 자리까지 밀 길이 `shift`(-면 a 쪽). 2D(닫힌 자리 + 화살표)·3D(shift만큼 민 자리)·클릭 범위(`reach`)가 모두 이것을 쓴다.
+  - 미닫이: 틈이 `SLIDE.twoOver`(1,300)보다 넓으면 두 짝이 양쪽으로, 아니면 한 짝이 a 쪽으로 문짝 폭의 92%만큼 열린다
+    (그래서 '여는 방향 반대로'는 경첩 반대로와 같은 a↔b + swing 뒤집기). 3D는 `models3d.buildSlidingLeaf` + 레일.
+  - 중문(`middle`): 유리 3연동. 세 짝이 레일 셋(`off`가 짝마다 `SLIDE.t + track`씩 바깥)에 `middleLap`씩 겹쳐 놓이고, a 끝 짝 위로 모여
+    열린다. 3D는 `buildGlassLeaf`(짙은 회색 `MIDDLE_FRAME` 틀 + 유리), 문 위는 벽 대신 고정 유리 `buildTransom`.
+  - '현관 중문' 버튼(`placeMiddleDoor`)은 `doors.findMiddleDoorGap(plan)`으로 자리를 찾는다: 현관문 바로 안쪽 점이 든 방 영역이 있으면 그 방
+    가장자리(250mm 안)에 걸친 틈, 없으면 현관문과 나란하고 0.6~3.5m 안쪽인 가장 가까운 틈. 문짝은 현관 반대쪽 면에 붙인다. 그 틈에 문이 있으면
+    중문으로 바꾼다.
+  - 중문은 2D에서 끌거나(`editor.doorDrag`, 처음 움직일 때 checkpoint) 속성의 '현관문에서 (mm)'(`depthFromEntrance`)로 옮긴다. 둘 다
+    `doors.moveDoorAlong(door, walls, dist)` — 문 폭에 수직으로만 옮기고, 새 가운데에서 양쪽으로 쏜 반직선이 닿는 벽까지로 a·b를 다시 잡는다.
+    양옆 벽이 없거나(복도로 나감) 벽 속이면 null이라 그 자리로는 가지 않는다.
+  - 속성에서 모양을 고르면 `editor.doorStyle`에 남아 🚪 문 도구로 새로 다는 문도 그 모양이 된다.
+- 둘러보기에서 현관문 줄보다 300mm 넘게 안쪽에 있으면 문짝(`view.doorLeaves`, 현관문 `Tour.pivot`)을 `models3d.setGhost()`로
+  거의 투명한 면 + 모서리 선으로 바꾼다(`Tour.updateDoorsGhost`, 바뀔 때만). 원래 재질은 `userData.solid`에 두고 되돌린다.
+  `view.doorsGhost`는 도면을 다시 그려도 유지되고, `setTourMode(false)`에서 끈다.
 
 ### 창 (`windows.js`, `G.findWindowGaps`)
 
@@ -272,6 +290,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 가격 입력은 `parseWon()`(main.js)으로 읽는다: 쉼표·원·₩·공백을 빼고 `129만`·`129만 9천`·`12.9만`을 받는다. 화면은 `fmtWon()`.
   목록 위 `#placed-total`에 전체 합계(가격 없는 가구 수도 알림), 종류 제목에 소계, 여러 개 선택 패널에 고른 가구 합계를 보인다.
   `builtin` 가구는 세 합계 모두에서 빼고(목록 위 개수도 뺀 수, `priceNotes()`가 '총 n개 중 기본 가구 m개는 제외' 안내), 목록에는 '기본 포함'과 지운 줄 가격(`priceTag()`)으로 보인다.
+- 합계·'배치된 가구' 목록(맨 아래 🚪 문 묶음, 누르면 문 선택)·엑셀은 `costItems()` = 가구 + `costDoors()`(가구 꼴로 바꾼 문,
+  `door: true`, 크기는 문 폭 × 벽 두께 × `DOOR.h`)를 쓴다. 문의 가격·모델명·기본 포함을 고치면 'plan' 이벤트를 낸다.
 - 가구 목록 엑셀(`furnitureSheet(all)`, main.js): 기본은 가격이 계산된 가구(`!builtin && price != null`)와 합계 줄(`SUM` 수식 + 미리 계산한 값).
   `모든 가구`(`#xlsx-all`)면 기본 가구가 아닌 것을 모두 위에, 합계 줄 아래에 기본 가구를 회색으로 따로 모은다. 순서는 목록과 같은 `byTypeThenName`.
 - 왼쪽 '배치된 가구' 목록은 `SHAPES` 순서로 종류별로 묶고(제목 + 개수), 같은 종류 안은 이름순(`Intl.Collator('ko', { numeric })`)이다.
@@ -280,6 +300,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
+  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장)에 더한다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 사진 대화상자가 열려 있으면 무시한다.
