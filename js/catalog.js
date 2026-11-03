@@ -19,6 +19,7 @@ export const SHAPES = {
   plant: { label: '식물', photoFront: false },
   tvstand: { label: '거실장', photoFront: true },
   tv: { label: 'TV', photoFront: true },
+  wallpad: { label: '월패드', photoFront: true },
   aircon: { label: '스탠드 에어컨', photoFront: true },
   aircon_outdoor: { label: '에어컨 실외기', photoFront: true },
   bed: { label: '침대', photoFront: false },
@@ -138,6 +139,8 @@ export const CATALOG = [
   { type: 'chair', name: '의자', icon: '🪑', w: 450, d: 500, h: 850, color: '#6f7d8c' },
   { type: 'tvstand', name: '거실장', icon: '🗄️', w: 1800, d: 400, h: 450, color: '#f0ece6' },
   { type: 'tv', name: '65인치 TV', icon: '📺', inch: 65, ...tvSizeFromInch(65), d: 60, color: '#1d2025', elev: 500 },
+  // 월패드(세대 단말기): 10인치 화면급, 화면 가운데가 눈높이(약 1.4m)쯤 오게 벽에 단다
+  { type: 'wallpad', name: '월패드', icon: '📟', w: 270, d: 25, h: 190, color: '#f4f5f7', elev: 1300 },
   { type: 'shelf', name: '책장', icon: '📚', w: 800, d: 300, h: 1800, color: '#e3d3bd' },
   { type: 'wood_shelf', name: '나무 선반', icon: '🪵', w: 800, d: 350, h: 1500, color: '#c49a6c' },
   { type: 'plant', name: PLANTS.monstera.label, icon: '🪴', plant: 'monstera', w: PLANTS.monstera.w, d: PLANTS.monstera.d, h: PLANTS.monstera.h, color: '#e3dbd0' },

@@ -446,6 +446,22 @@ function tv(g, W, D, H, c) {
   box(g, W * 0.97, H * 0.95, 0.003, 0, H / 2, D / 2 + 0.002, mat('#1b2836', { roughness: 0.15, metalness: 0.4, emissive: '#0a1420', emissiveIntensity: 0.6 }));
 }
 
+/** 월패드: 흰 본체 + 앞면 화면(메뉴 타일) + 화면 아래 버튼 셋 + 위 가운데 카메라 */
+function wallpad(g, W, D, H, c) {
+  box(g, W, H, D, 0, H / 2, 0, mat(c, { roughness: 0.35 }));
+  const sw = W * 0.86, sh = H * 0.68, sy = H * 0.57, z = D / 2 + 0.001;
+  box(g, sw, sh, 0.002, 0, sy, z, mat('#14202c', { roughness: 0.15, metalness: 0.3, emissive: '#0b1724', emissiveIntensity: 0.6 }));
+  // 화면 메뉴 타일 (3 × 2)
+  const tiles = ['#3b82c4', '#46a37a', '#d99a3b', '#7b6cc9', '#c95b6c', '#4aa3b5'];
+  const tw = sw * 0.26, th = sh * 0.34;
+  tiles.forEach((col, i) => {
+    const x = (i % 3 - 1) * sw * 0.31, y = sy + (i < 3 ? 1 : -1) * sh * 0.2;
+    box(g, tw, th, 0.001, x, y, z + 0.0015, mat(col, { roughness: 0.4, emissive: col, emissiveIntensity: 0.35 }));
+  });
+  for (const k of [-1, 0, 1]) box(g, W * 0.16, H * 0.06, 0.004, k * W * 0.22, H * 0.11, z + 0.001, mat('#d9dce1', { roughness: 0.5 }));
+  box(g, 0.008, 0.008, 0.003, 0, H * 0.95, z + 0.001, DARK());   // 카메라
+}
+
 function aircon(g, W, D, H, c) {
   box(g, W, H, D, 0, H / 2, 0, mat(c, { roughness: 0.35 }));
   box(g, W * 0.7, H * 0.18, 0.01, 0, H * 0.84, D / 2 + 0.005, DARK());
@@ -677,7 +693,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
