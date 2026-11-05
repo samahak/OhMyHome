@@ -13,7 +13,6 @@ import { makePdf, dataURLBytes } from './pdf.js';
 import { makeXlsx, STYLE } from './xlsx.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
-import { initPhotoDialog } from './furniturePhoto.js';
 import { autoFixtures, hasFixtureRooms } from './fixtures.js';
 import { findWindows } from './windows.js';
 import { findDoors, findMiddleDoorGap, moveDoorAlong, depthFromEntrance, doorStyle, DOOR_STYLES, SLIDE } from './doors.js';
@@ -639,16 +638,6 @@ $('btn-layout-del').addEventListener('click', () => {
 /** 파일 이름에 넣을 안 이름 (안이 하나면 넣지 않는다) */
 const layoutTag = () => (state.layouts.length > 1 ? `${currentLayout().name.replace(/[\\/:*?"<>|\s]+/g, '_')}-` : '');
 
-const photo = initPhotoDialog({
-  status,
-  onSave: (item, place) => {
-    state.library.push(item);
-    emit('library');
-    if (place) placeLibrary(item.id);
-    else status(`‘${item.name}’을(를) 내 가구에 저장했습니다. 눌러서 배치하세요.`);
-  },
-});
-$('btn-photo').addEventListener('click', () => photo.open());
 
 /* ---------- 속성 패널 ---------- */
 let propsFor = null;
@@ -1303,7 +1292,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 
 /* ---------- 단축키 ---------- */
 window.addEventListener('keydown', (e) => {
-  if (view.tour || isTyping() || $('photo-dialog').open) return;   // 둘러보기 중 키는 tour.js가 받는다
+  if (view.tour || isTyping()) return;   // 둘러보기 중 키는 tour.js가 받는다
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }

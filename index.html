@@ -140,11 +140,6 @@
             <button id="btn-layout-del" class="grow danger">이 안 삭제</button>
           </div>
         </div>
-        <div class="card">
-          <h3>사진으로 가구 추가</h3>
-          <button id="btn-photo" class="primary block">📷 가구 사진 넣고 크기 재기</button>
-          <p class="hint">사진에서 가구 영역을 찾고, 아는 치수 하나(또는 사진 속 기준 물체)로 나머지 크기를 계산합니다.</p>
-        </div>
         <div class="card" id="library-card" hidden>
           <h3>내 가구</h3>
           <div id="library" class="cat-grid"></div>
@@ -196,76 +191,6 @@
     <aside class="props" id="props" hidden></aside>
   </div>
 
-  <!-- 가구 사진 측정 -->
-  <dialog id="photo-dialog">
-    <form method="dialog" class="dlg-head">
-      <h2>📷 사진으로 가구 크기 재기</h2>
-      <button value="cancel" class="icon">✕</button>
-    </form>
-    <div class="dlg-body">
-      <div class="photo-left">
-        <label class="btn primary block" id="photo-pick">사진 선택<input id="file-photo" type="file" accept="image/*" hidden></label>
-        <div class="photo-stage">
-          <canvas id="photo-canvas" width="640" height="480"></canvas>
-          <div class="photo-empty" id="photo-empty">가구가 잘 보이는 정면 사진을 넣어 주세요</div>
-        </div>
-        <div class="row">
-          <button id="photo-auto" type="button">🔍 가구 영역 자동 찾기</button>
-          <label>배경 구분 <input id="photo-tol" type="range" min="10" max="120" value="45"></label>
-        </div>
-        <p class="hint">초록 상자 = 가구 영역(모서리를 끌어 조정). 기준 물체 방식은 사진 위에 기준선을 그립니다.</p>
-      </div>
-      <div class="photo-right">
-        <label class="row">이름 <input id="ph-name" type="text" placeholder="예: 우리집 냉장고"></label>
-        <label class="row">샘플 모양 <select id="ph-type"></select></label>
-        <p class="hint" id="ph-suggest"></p>
-
-        <fieldset>
-          <legend>크기 기준</legend>
-          <label class="check"><input type="radio" name="ph-ref" value="known" checked> 아는 치수 하나 입력</label>
-          <div id="ref-known" class="indent">
-            <div class="row">
-              <select id="ph-known-axis">
-                <option value="w">가로(W)</option>
-                <option value="h">높이(H)</option>
-              </select>
-              <input id="ph-known-mm" type="number" min="1" placeholder="mm"> mm
-            </div>
-          </div>
-          <label class="check"><input type="radio" name="ph-ref" value="object"> 사진 속 기준 물체</label>
-          <div id="ref-object" class="indent" hidden>
-            <div class="row">
-              <select id="ph-ref-preset">
-                <option value="297">A4 용지 긴 변 (297mm)</option>
-                <option value="210">A4 용지 짧은 변 (210mm)</option>
-                <option value="85.6">신용카드 가로 (85.6mm)</option>
-                <option value="0">직접 입력</option>
-              </select>
-              <input id="ph-ref-mm" type="number" value="297" min="1"> mm
-            </div>
-            <button id="ph-draw-ref" type="button" class="block">✏️ 사진에 기준선 그리기 (두 점 클릭)</button>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>측정 결과 (mm)</legend>
-          <div class="dims">
-            <label>가로 W<input id="ph-w" type="number" min="1"></label>
-            <label>깊이 D<input id="ph-d" type="number" min="1"></label>
-            <label>높이 H<input id="ph-h" type="number" min="1"></label>
-          </div>
-          <p class="hint" id="ph-measure-note">깊이는 정면 사진으로 알 수 없어 샘플 모양의 기본 비율로 채웁니다.</p>
-          <label class="row">색상 <input id="ph-color" type="color" value="#d9dde3">
-            <button id="ph-color-auto" type="button">사진에서</button></label>
-          <label class="check"><input id="ph-use-photo" type="checkbox" checked> 사진을 가구 앞면에 입히기</label>
-        </fieldset>
-      </div>
-    </div>
-    <div class="dlg-foot">
-      <button id="ph-save" type="button">내 가구에 저장</button>
-      <button id="ph-place" type="button" class="primary">저장하고 바로 배치</button>
-    </div>
-  </dialog>
 
   <script type="module" src="js/main.js"></script>
 </body>
