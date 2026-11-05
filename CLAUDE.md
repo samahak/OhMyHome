@@ -8,11 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 실행 — 정적 파일 서버를 띄우고 브라우저를 연다 (기본 포트 8190)
 ./run_ohmyhome.sh           # macOS / Linux  (PORT=9000 ./run_ohmyhome.sh 로 변경)
 run_ohmyhome.bat            # Windows
-python3 serve.py 8190      # 직접 띄울 때 (no-cache 헤더를 붙이는 정적 서버, 기본 127.0.0.1만)
+python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
 # 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·LICENSE만.
-#   README와 sample의 png는 넣지 않는다. 브라우저 localStorage의 작업 데이터는 애초에 파일에 없다)
+#   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
 
@@ -37,7 +37,9 @@ CDN(`three@0.160.0`)에서 받으므로 실행에 인터넷이 필요하다. ES 
 - 페이지는 점검용으로 `window.__ohmyhome = { state, editor, view, runDetect }`를 내놓는다.
 - `window.prompt` / `confirm`(축척 길이·방 이름·새 도면)은 CDP의 `Page.javascriptDialogOpening` →
   `Page.handleJavaScriptDialog({ accept, promptText })`로 처리한다.
-- 깨끗한 상태에서 시작하려면 `localStorage.clear()` 후 새로 고친다(자동 저장 키 `ohmyhome.project.v1`).
+- 깨끗한 상태에서 시작하려면 `localStorage.clear()` 후 새로 고친다(자동 저장 키 `ohmyhome.project.v1`). serve.py로 띄웠으면
+  프로젝트 폴더의 `ohmyhome-project.json`도 지운다 — **이 폴더에서 시험하면 사용자 작업 파일을 덮어쓰므로**, 서버 저장을 시험할 때는
+  작업 트리를 임시 폴더에 복사해 다른 포트로 띄운다.
 - 2D 캔버스 좌표는 `editor.toScr({x, y})`(mm → 캔버스 px)에 캔버스의 `getBoundingClientRect()`를 더해 구한다.
   두 화면을 나란히 띄우면 2D 칸이 좁아서, 도면 바깥쪽 점은 3D 캔버스 위를 누르게 되니 조심한다.
 
@@ -47,7 +49,7 @@ CDN(`three@0.160.0`)에서 받으므로 실행에 인터넷이 필요하다. ES 
 index.html             화면 뼈대 + importmap (three.js CDN)
 css/style.css
 js/main.js             화면 조립 — 왼쪽 패널, 속성 패널, 상단 버튼, 단축키, 벽 인식 실행
-js/store.js            상태 하나 + 이벤트 + 되돌리기 + localStorage 자동 저장
+js/store.js            상태 하나 + 이벤트 + 되돌리기 + 자동 저장(serve.py의 ohmyhome-project.json + localStorage) + 배치 안
 js/geometry.js         평면 기하 — 꼭짓점, 겹침(SAT), 벽에 붙이기, 면적·무게중심   (DOM 없음)
 js/wallDetect.js       도면 이미지 → 벽 사각형                                    (DOM 없음)
 js/catalog.js          샘플 가구 목록·기본 크기·모양(SHAPES)·사진 비율로 모양 추천 (DOM 없음)
@@ -85,18 +87,33 @@ state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, 
   room          { id, name, pts:[{x,y}], hidden? }
   window        { id, a, b, t, sill, h, auto } — a–b는 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이 (mm)
   door          { id, a, b, t, swing, auto, style? } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
-                style: 'sliding'(미닫이) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
+                style: 'sliding'(미닫이) | 'bypass'(미서기) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
   builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
   문도 name·model·price·builtin을 가질 수 있다(속성 패널). 현관 중문은 늘, 다른 문은 price가 있을 때만 비용 항목이다(`costDoors()`)
 state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
+state.layouts   배치 안 [{ id, name, furniture, locked? }], state.layoutId — 지금 안의 가구는 state.furniture에 있고 그 안의 furniture 칸은 비워 둔다
+  locked        보호 중인 안이면 true(없으면 키가 없다) — 그 안의 가구를 바꾸지 못하고 안도 지우지 못한다
 ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   (저장하지 않는다)
   ids           가구를 2개 이상 골랐을 때만 있다. id는 마지막에 고른 가구
 ```
 
-- 화면들은 `on('plan' | 'furniture' | 'library' | 'selection')`을 듣고 다시 그린다. 상태를 바꾼 쪽이 `emit()`한다.
-  `selection` 말고 다른 이벤트가 나면 600ms 뒤 localStorage에 자동 저장된다.
+- 화면들은 `on('plan' | 'furniture' | 'library' | 'layouts' | 'selection')`을 듣고 다시 그린다. 상태를 바꾼 쪽이 `emit()`한다.
+  `selection` 말고 다른 이벤트가 나면 600ms 뒤 자동 저장된다(`saveNow`): localStorage에 늘, 그리고 serve.py로 열었으면
+  `PUT api/project`로 프로젝트 폴더의 `ohmyhome-project.json`에(차례대로 보내 늦은 요청이 새 내용을 덮지 않게).
+  시작할 때(`main.js` 맨 위 top-level await) `loadFromServer()`가 그 파일을 먼저 읽는다 — 응답 머리글 `X-OhMyHome: 1`이 없으면
+  저장 서버가 아닌 것으로 보고 localStorage만 쓴다. 폴더 파일로 열면 localStorage 예비본도 같게 맞추고, localStorage에만 있던 작업은
+  바로 폴더에 써 둔다. 그래서 localhost·127.0.0.1·IP 어느 주소로 열어도 같은 작업이다(동시에 고치면 나중 저장이 남는다).
+- **배치 안**: `store.addLayout()`(지금 안을 새 id로 복사해 맨 끝에 더하고 넘어감) · `switchLayout(id)` · `renameLayout` · `deleteLayout`
+  (하나뿐이면 안 지움, 지금 안이면 옆 안으로). 부르는 쪽이 먼저 `checkpoint()` — 스냅숏에 안 목록과 지금 안이 들어가 Ctrl+Z로 안 바꾸기도
+  돌아온다. 저장 데이터의 `furniture`는 지금 안(예전 앱도 연다), `layouts`는 모든 안(지금 안도 채워서), 안이 없는 예전 파일은 '1안' 하나.
+  도면·문(중문 비용 포함)·내 가구는 모든 안이 함께 쓴다. 엑셀·캡처 파일 이름에 안 이름(`layoutTag()`, 안이 둘 이상일 때)을 붙인다.
+  `setScale()`은 다른 안의 가구도 함께 옮긴다(보호 중인 안도 — 도면 위 자리를 지키는 것이다).
+- **안 보호**(`setLayoutLocked`, 🔒 보호 버튼 — 부르는 쪽이 `checkpoint()`): 가구를 바꾸는 곳마다 먼저 `store.furnitureLocked()`를 부른다 —
+  보호 중이면 `setLockedHandler`로 상태줄에 알리고 true. 가구 추가·속성 칸·식물/크기 빠른 선택·속성 버튼·회전·복제·방향키·삭제·지우개 도구가 쓰고,
+  끌기는 `dragFurnitureTo()`가 처음 움직일 때 본다(누르면 고르기만 된다). 보호 중인 안의 가구 속성 패널은 칸을 모두 `disabled`로 그린다.
+  둘러보기 시작 때 설비 자동 배치는 보호 중인 안에서 건너뛴다. 새로 가구를 바꾸는 길을 만들면 여기에도 `furnitureLocked()`를 넣는다.
 - **상태를 바꾸기 전에 `checkpoint()`를 부른다**(되돌리기 기록). 끌기처럼 연속으로 바뀌는 것은 **처음 실제로 움직일 때 한 번만**
   부른다. 클릭만 하고 놓아도 기록이 쌓이지 않게 하려는 것이다(`drag.started`).
 - 되돌리기 스냅숏은 도면 이미지 dataURL을 복사하지 않고 **참조만** 들고 있다. 이미지가 커서다.
@@ -160,9 +177,18 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   모두 막는다** — 이미지에서 인식한 벽은 창 자리가 틈이라 그대로 두면 창으로 걸어 나간다.
 - 둘러보기 중에는 **현관문 틈을 벽으로 막은 지도**를 쓴다. 막지 않으면 들를 곳이 공용 홀(밖)까지 잡힌다.
   현관 앞 → 문 → 현관 안쪽 구간은 지도를 쓰지 않고 정해진 직선으로 걷는다.
-- 들를 곳(`roomCenters`)은 거리 변환의 봉우리다. 벽만 있는 지도(`sightGrid`)에서 서로 보이고 3.2m 안이면 같은 방으로 묶는다.
-  이름은 그 점이 든 방(`rooms`) 이름이고, 같은 이름은 한 번만 들른다. **이름 붙은 방은 봉우리가 안 잡혀도 꼭 들른다**
-  (`Tour.roomSpot` — 욕실은 설비가 차서 봉우리가 안 생긴다). 순서는 `orderByWalk`(걷는 칸 수 기준 욕심 순서 + 2-opt).
+- 현관 안쪽(`inside`)에 들어서면 먼저 현관을 한 바퀴 둘러본다(steps[3], 들를 곳 개수에는 안 든다).
+- 들를 곳은 `Tour.planPlaces()`가 정한다. **방문(중문 포함 `plan.doors` 전부)을 벽으로 막은 가구 없는 지도**를 `zonesOf()`로 이어진 칸
+  덩어리(구역)로 나눈다. 가장 넓은 구역이 거실·주방·복도가 트인 공간이고, 현관 안쪽 점의 구역(중문이 있으면 따로)은 현관이다.
+  - 나머지 구역(방문 너머, 몸 반지름만큼 줄인 넓이 1㎡ 이상)은 **모두 들른다**. 설 자리는 구역 무게중심에 가장 가까운, 걸어서 닿고 벽·가구에서
+    30cm 더 떨어진 칸(`clearance` ≥ 3칸, 없으면 가장 넉넉한 칸). 이름은 그 점이 든 방(`rooms`) 이름, 없으면 구역 안 가구로 짐작(`guessRoom`:
+    변기·욕조 → 욕실, 침대 → 침실, 옷장 → 드레스룸, 실외기 → 실외기실, 김치냉장고·냉장고 → 펜트리 …, 없으면 '방').
+  - 트인 공간에서는 거실(`findLiving`의 방·칸 가운데)과 주방(싱크대 앞 80cm, ㄱ자는 가운데. 없으면 냉장고)을 한 번씩. 그래도 두 곳이 안 되면
+    빈 칸 봉우리(`roomCenters`)로 채운다.
+  - **이름 붙은 방은 꼭 들른다**(`Tour.roomSpot` — 욕실은 설비가 차서 봉우리가 안 생긴다). 같은 이름이 여럿이면 '침실 1·침실 2'로 번호를 붙인다.
+  - 방문이 하나도 없는 도면은 구역이 안 나뉘므로 예전처럼 봉우리로 고른다: `roomCenters`는 거리 변환의 봉우리이고, 벽만 있는 지도
+    (`sightGrid`)에서 서로 보이고 3.2m 안이면 같은 방으로 묶는다.
+  - 순서는 `orderByWalk`(걷는 칸 수 기준 욕심 순서 + 2-opt).
 - 둘러보기를 시작할 때 `fixtures.autoFixtures()`가 설비를 놓는다(일반 가구로 들어가 되돌리기·삭제 가능). 그 방에 같은 종류가
   이미 있으면 건너뛰고, 벽·가구와 겹치는 설비(`findCollisions`)는 빼고 놓는다.
   - 신발장(`shoe_cabinet`): 방 이름 없이 `plan.entrance`만 본다. 현관문 안쪽 옆벽에 문틀부터 세우되, 문 폭 바깥이고
@@ -193,7 +219,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   `findWindowGaps`로는 복도에서 방으로 꺾이는 문을 놓친다). 창 자리 틈은 뺀다.
 - 틈마다 경첩(양 끝) × 여는 쪽(양쪽) 네 가지 기호를 가정해 이미지와 맞춰 본다. 경첩은 **벽 면 위**(중심선에서 t/2), 문짝은 문 폭 길이로
   벽에 수직, 호는 반대 끝까지. 호 10~80° 표본의 60%, 문짝 선 표본의 50% 이상이 어두우면(< 180, 법선 방향 ±25mm) 문이다.
-  미닫이(평행한 두 선)는 찾지 않는다 — 🚪 문 도구로 달고 속성에서 '미닫이'로 바꾼다.
+  여닫이 기호가 없는 틈(600~2,400mm)에서는 **미서기 기호**를 본다(`bypassSymbol`): 벽 두께 안(±t/2+20mm)을 법선 방향으로 훑어,
+  a 쪽 절반(8~40%)에만 있는 선과 다른 자리에서 b 쪽 절반(60~92%)에만 있는 선(75% 이상 어둡고 반대쪽 25% 이하)이 둘 다 있으면
+  `style: 'bypass'`로 단다. 틈 전체를 가로지르는 창 기호는 이 엇갈림 조건에서 빠진다. 벽 면 밖에 붙는 미닫이는 찾지 않는다.
 - 자동 문은 벽 인식·'문 기호 찾아 문 달기'·둘러보기 시작 때 다시 찾는다(`autoDoors`, 창과 같은 방식: `auto: false`는 그대로).
   문 목록이 없는 예전 프로젝트·저장본을 열면 한 번 찾아 단다(`doorsForOldProject`, 그래서 `loadSaved()`는 불러온 원본을 돌려준다).
 - 자동 문을 지우면 그 가운데를 `plan.doorsRemoved`에 남기고(`store.removeItem`), 다시 찾을 때 300mm 안의 문은 달지 않는다.
@@ -201,10 +229,12 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 경첩·여는 쪽을 손으로 바꾸면 `auto: false`가 된다. 경첩을 반대로 하면 a↔b를 바꾸고 swing도 뒤집는다(법선이 뒤집히므로).
 - 3D: 문 위 벽(`catalog.DOOR.h` ~ 천장, `wallPiece`) + 문틀 + 90° 열린 문짝(`models3d.buildDoorFrame/buildDoorLeaf`).
   둘러보기 중 현관 자리의 문은 그리지 않는다(`tour.js`가 여닫는 현관문을 따로 만든다). 문짝은 길 찾기 장애물에 넣지 않는다.
-- **미닫이·중문(`style`)**: `doors.slidingPanels(d)`가 문짝 자리를 준다 — 짝마다 닫힌 자리 [s0, s1], 벽 중심선에서 떨어진 거리 `off`,
+- **미닫이·미서기·중문(`style`)**: `doors.slidingPanels(d)`가 문짝 자리를 준다 — 짝마다 닫힌 자리 [s0, s1], 벽 중심선에서 떨어진 거리 `off`,
   열린 자리까지 밀 길이 `shift`(-면 a 쪽). 2D(닫힌 자리 + 화살표)·3D(shift만큼 민 자리)·클릭 범위(`reach`)가 모두 이것을 쓴다.
   - 미닫이: 틈이 `SLIDE.twoOver`(1,300)보다 넓으면 두 짝이 양쪽으로, 아니면 한 짝이 a 쪽으로 문짝 폭의 92%만큼 열린다
     (그래서 '여는 방향 반대로'는 경첩 반대로와 같은 a↔b + swing 뒤집기). 3D는 `models3d.buildSlidingLeaf` + 레일.
+  - 미서기(`bypass`): 벽 중심선 양쪽 레일(±(T/2 + track/2))에 반씩, 가운데 `middleLap`만큼 겹친다. 3D는 b 쪽 짝을 a 쪽 짝 위로 밀어
+    반쯤 열어 두고, 레일은 벽 두께 안에 놓는다.
   - 중문(`middle`): 유리 3연동. 세 짝이 레일 셋(`off`가 짝마다 `SLIDE.t + track`씩 바깥)에 `middleLap`씩 겹쳐 놓이고, a 끝 짝 위로 모여
     열린다. 3D는 `buildGlassLeaf`(짙은 회색 `MIDDLE_FRAME` 틀 + 유리), 문 위는 벽 대신 고정 유리 `buildTransom`.
   - '현관 중문' 버튼(`placeMiddleDoor`)은 `doors.findMiddleDoorGap(plan)`으로 자리를 찾는다: 현관문 바로 안쪽 점이 든 방 영역이 있으면 그 방
@@ -316,4 +346,5 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   화면에 mm를 보일 때는 `fmtMM()`(천 단위 쉼표)을 쓰고, 면적은 ㎡와 평(÷ 3.3058)을 함께 보인다.
 - 가구 기본 크기는 `catalog.js`에만 둔다. 화면이나 3D 코드에 하드코딩하지 말 것.
 - `geometry.js` · `wallDetect.js` · `catalog.js` · `xlsx.js`에는 DOM·three.js 의존을 넣지 않는다(Node에서 시험할 수 있게).
-- 도면·사진은 사용자 브라우저에만 저장한다. 서버로 보내는 코드는 없으며, 그렇게 두어야 한다.
+- 도면·사진은 사용자 PC에만 저장한다: 브라우저 localStorage와, 사용자가 띄운 로컬 serve.py가 쓰는 프로젝트 폴더의
+  `ohmyhome-project.json`(.gitignore). 바깥 서버로 보내는 코드는 없으며, 그렇게 두어야 한다.

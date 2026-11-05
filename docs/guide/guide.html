@@ -90,14 +90,14 @@
     <tr><th style="width:28%">항목</th><th>내용</th></tr>
     <tr><td>Python 3</td><td>프로그램 파일을 브라우저에 보내 주는 작은 서버를 띄우는 데 씁니다. macOS에는 보통 들어 있고, Windows는 <b>python.org</b>에서 받아 설치할 때 <b>“Add python.exe to PATH”</b>를 꼭 체크하세요.</td></tr>
     <tr><td>웹 브라우저</td><td>Chrome · Edge · Safari 최신 버전.</td></tr>
-    <tr><td>인터넷 연결</td><td>3D 그래픽 라이브러리를 인터넷에서 받아 옵니다. 도면과 가구 정보는 밖으로 보내지 않고 내 브라우저에만 저장됩니다.</td></tr>
+    <tr><td>인터넷 연결</td><td>3D 그래픽 라이브러리를 인터넷에서 받아 옵니다. 도면과 가구 정보는 밖으로 보내지 않고 내 PC(프로그램 폴더·브라우저)에만 저장됩니다.</td></tr>
   </table>
 
   <h3>배포 파일 구성</h3>
   <table>
     <tr><th style="width:38%">파일</th><th>설명</th></tr>
     <tr><td><code>run_ohmyhome.sh</code> / <code>run_ohmyhome.bat</code></td><td>실행 파일 (macOS·Linux / Windows)</td></tr>
-    <tr><td><code>serve.py</code></td><td>실행 파일이 띄우는 서버</td></tr>
+    <tr><td><code>serve.py</code></td><td>실행 파일이 띄우는 서버 — 작업을 같은 폴더의 <code>ohmyhome-project.json</code>에 저장합니다</td></tr>
     <tr><td><code>index.html</code>, <code>css/</code>, <code>js/</code></td><td>프로그램 본체</td></tr>
     <tr><td><code>sample/*.ohmyhome.json</code></td><td>바로 열어 볼 수 있는 예시 도면 (55㎡ A-1형 · A-2형)</td></tr>
     <tr><td><code>OhMyHome_Guide.pdf</code></td><td>이 문서</td></tr>
@@ -221,7 +221,7 @@ run_ohmyhome.bat</pre>
   <p>도면에서 벽 위에 연하게 그려진 창 자리와 바깥벽이 끊긴 곳은 자동으로 창이 됩니다. 직접 내려면 <span class="btn">🪟 창문</span> 도구로 벽을 누르세요. 창을 누르면 폭, 바닥에서 창 아래까지 높이, 창 높이를 고칠 수 있습니다(허리창 / 바닥까지 큰 창).</p>
 
   <h3>⑥ 문</h3>
-  <p>벽 인식을 하면 도면에 여닫이 문 기호(문짝 선 + 여닫는 호)가 그려진 틈마다 문이 달립니다. 나중에 다시 찾으려면 <span class="btn">🚪 문 기호 찾아 문 달기</span>를 누르세요. 3D에서는 문 위를 천장까지 벽으로 채우고 문짝을 도면 기호처럼 열어 둡니다. 직접 달려면 <span class="btn">🚪 문</span> 도구로 벽이 끊긴 틈을 누르세요(누른 쪽으로 열립니다). 문을 누르면 <span class="btn">⇋ 경첩 반대로</span> · <span class="btn">⇅ 여는 쪽 반대로</span>로 고칠 수 있습니다. 문 모양은 <span class="btn">여닫이</span> · <span class="btn">미닫이</span> · <span class="btn">중문</span>으로 바꿉니다. 미닫이는 벽 면을 따라 밀려 열리고(<span class="btn">⇋ 여는 방향 반대로</span> · <span class="btn">⇅ 붙는 벽 면 반대로</span>), 폭이 1.3m를 넘으면 두 짝이 양쪽으로 열립니다. <span class="btn">🚪 문</span> 도구로 새로 다는 문은 마지막에 고른 모양이 됩니다. 미닫이 문 기호는 자동으로 찾지 않습니다.</p>
+  <p>벽 인식을 하면 도면에 여닫이 문 기호(문짝 선 + 여닫는 호)나 미서기 문 기호(벽 사이에 엇갈린 두 선)가 그려진 틈마다 문이 달립니다. 나중에 다시 찾으려면 <span class="btn">🚪 문 기호 찾아 문 달기</span>를 누르세요. 3D에서는 문 위를 천장까지 벽으로 채우고 문짝을 도면 기호처럼 열어 둡니다. 직접 달려면 <span class="btn">🚪 문</span> 도구로 벽이 끊긴 틈을 누르세요(누른 쪽으로 열립니다). 문을 누르면 <span class="btn">⇋ 경첩 반대로</span> · <span class="btn">⇅ 여는 쪽 반대로</span>로 고칠 수 있습니다. 문 모양은 <span class="btn">여닫이</span> · <span class="btn">미닫이</span> · <span class="btn">미서기</span> · <span class="btn">중문</span>으로 바꿉니다. 미닫이는 벽 면을 따라 밀려 열리고(<span class="btn">⇋ 여는 방향 반대로</span> · <span class="btn">⇅ 붙는 벽 면 반대로</span>), 폭이 1.3m를 넘으면 두 짝이 양쪽으로 열립니다. 미서기는 벽 두께 안에 두 짝이 엇갈려 있어 한 짝을 옆으로 밀어 엽니다. <span class="btn">🚪 문</span> 도구로 새로 다는 문은 마지막에 고른 모양이 됩니다. 벽 면 밖에 붙는 미닫이 문 기호는 자동으로 찾지 않습니다.</p>
   <p><span class="btn">현관 중문</span>을 누르면 현관문 안쪽, 현관과 집 안 사이의 틈에 <b>유리 3연동 중문</b>을 답니다. 세 짝이 한쪽으로 겹쳐 모이며 열리고, 문 위는 천장까지 고정 유리입니다. 현관 방 영역(이름 ‘현관’)을 그려 두면 그 가장자리에서 자리를 찾습니다. 현관문 자리를 먼저 정해야 합니다(🚶 둘러보기를 한 번 하면 정해집니다). 현관과 너무 가깝거나 멀면 2D에서 중문을 끌거나 속성의 <b>현관문에서 (mm)</b>를 고치세요. 양옆 벽을 따라 앞뒤로만 움직이고, 폭은 그 자리의 양옆 벽에 맞춰집니다.</p>
 </section>
 
@@ -273,7 +273,7 @@ run_ohmyhome.bat</pre>
 
 <section>
   <h2><span class="no">8</span>둘러보기 (1인칭 걷기)</h2>
-  <p><span class="btn">🚶 둘러보기</span>를 누르면 현관 앞에서 문을 열고 들어가 방을 차례로 돌아봅니다. 처음 한 번은 2D 도면에서 <b>현관문 자리(벽이 끊긴 곳)</b>를 눌러 알려 주세요. 다시 정하려면 둘러보기 안내판의 <span class="btn">현관 다시 지정</span>을 누릅니다. 현관을 지나 집 안에 들어오면 문짝은 투명하게 모양(테두리 선)만 보여서 문 너머 방 안이 다 보입니다.</p>
+  <p><span class="btn">🚶 둘러보기</span>를 누르면 현관 앞에서 문을 열고 들어가 현관을 한 번 둘러보고, 방문 너머 방은 모두 들어가서, 거실·주방은 한 번씩 차례로 돌아봅니다(방 이름이 없으면 침대가 있으면 침실, 변기가 있으면 욕실처럼 가구로 짐작합니다). 처음 한 번은 2D 도면에서 <b>현관문 자리(벽이 끊긴 곳)</b>를 눌러 알려 주세요. 다시 정하려면 둘러보기 안내판의 <span class="btn">현관 다시 지정</span>을 누릅니다. 현관을 지나 집 안에 들어오면 문짝은 투명하게 모양(테두리 선)만 보여서 문 너머 방 안이 다 보입니다.</p>
   <div class="two">
     <figure><img src="img/06-entrance.jpg" alt="현관문을 열고 들어가는 장면"><figcaption>현관문을 열고 들어갑니다 (신발장·LED 방등)</figcaption></figure>
     <figure><img src="img/05-tour.jpg" alt="거실 창밖 풍경"><figcaption>거실 창밖 — 정한 층 높이에서 도로·빌라·아파트·산이 보입니다</figcaption></figure>
@@ -300,12 +300,13 @@ run_ohmyhome.bat</pre>
 <section id="save">
   <h2><span class="no">9</span>저장하고 옮기기</h2>
   <ul>
-    <li>작업은 <b>브라우저에 자동 저장</b>됩니다. 같은 PC, 같은 브라우저, 같은 주소로 다시 열면 이어서 할 수 있습니다.</li>
+    <li>작업은 <b>프로그램 폴더의 <code>ohmyhome-project.json</code></b>에 자동 저장됩니다. 실행 파일로 띄운 서버가 저장해 주므로, localhost나 내 PC IP 주소, 같은 와이파이의 휴대폰 등 <b>어느 주소로 열어도 같은 작업</b>이 보입니다. 다른 기기에서 고쳤으면 새로 고침하세요. 브라우저에도 예비로 함께 저장합니다.</li>
+    <li><b>배치 안</b>: <span class="btn">② 가구</span> 탭 맨 위에서 가구 배치를 1안 · 2안 · 3안…으로 여러 개 둘 수 있습니다. <span class="btn">＋ 지금 안 복사해서 추가</span>는 보고 있는 안을 그대로 복사해 새 안을 만들고, 안을 누르면 그 배치로 바뀝니다. 안마다 가구 수와 합계가 보이고, <span class="btn">이름 바꾸기</span> · <span class="btn">이 안 삭제</span>도 됩니다. 도면과 문은 모든 안이 함께 씁니다.<br>마음에 드는 안은 <span class="btn">🔓 보호하기</span>를 눌러 잠가 두세요. 안 이름 옆에 🔒이 붙고, 그 안의 가구는 옮기거나 고치거나 지울 수 없습니다(가구를 눌러 정보를 보는 것은 됩니다). 다시 누르면 풀립니다. 보호 중인 안은 지울 수 없고, 복사해 만든 새 안은 자유롭게 고칠 수 있습니다.</li>
     <li><span class="btn">저장(.json)</span>을 누르면 도면 그림·벽·가구·사진까지 파일 하나로 받습니다. 다른 PC로 옮기거나 보관할 때 쓰세요.</li>
     <li><span class="btn">불러오기</span>로 그 파일을 다시 엽니다.</li>
     <li><span class="btn">새 프로젝트</span>는 도면과 놓은 가구를 지웁니다(사진으로 만든 내 가구 목록은 남습니다). 실수했다면 <span class="btn">되돌리기</span>로 돌아갑니다.</li>
   </ul>
-  <div class="warn"><b>주의</b>브라우저 방문 기록·사이트 데이터를 지우면 자동 저장된 작업도 지워집니다. 중요한 작업은 <b>저장(.json)</b>으로 파일을 받아 두세요. localhost와 IP 주소처럼 주소가 다르면 저장 공간도 따로입니다.</div>
+  <div class="warn"><b>주의</b>실행 파일 없이 다른 방법으로 열면 브라우저에만 저장되고, 이때는 localhost와 IP 주소처럼 주소마다 저장 공간이 따로입니다. 두 기기에서 동시에 고치면 나중에 저장한 쪽이 남습니다. 중요한 작업은 <b>저장(.json)</b>으로 파일을 받아 두세요.</div>
 
   <h2 style="margin-top:22pt"><span class="no">10</span>단축키</h2>
   <table>
