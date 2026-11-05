@@ -23,7 +23,6 @@
       <button id="btn-redo" title="다시 하기 (Ctrl+Shift+Z)">↷</button>
       <span class="sep"></span>
       <button id="btn-new">새 프로젝트</button>
-      <label class="btn">불러오기<input id="file-project" type="file" accept=".json,application/json" hidden></label>
       <button id="btn-export">저장(.json)</button>
       <button id="btn-capture-2d" title="2D 도면 전체를 가로 그림(PNG)으로 저장">2D 캡처</button>
       <button id="btn-capture" title="3D를 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히 세 장의 가로 그림(PNG)으로 저장">3D 캡처</button>
@@ -41,9 +40,9 @@
       <section class="tab-body" id="tab-plan">
         <div class="card">
           <h3>도면 불러오기</h3>
-          <label class="btn primary block">📐 도면 이미지 열기<input id="file-plan" type="file" accept="image/*" hidden></label>
+          <label class="btn primary block">📂 도면 불러오기(json)<input id="file-project" type="file" accept=".json,application/json" hidden></label>
           <button id="btn-sample" class="block">샘플 도면으로 해 보기</button>
-          <p class="hint">PNG·JPG 도면을 넣으세요. PDF는 캡처해서 이미지로 넣으면 됩니다.</p>
+          <p class="hint">상단 ‘저장(.json)’으로 받은 파일이나 예시 도면 파일(.ohmyhome.json)을 엽니다.</p>
           <label class="row">도면 진하기
             <input id="img-opacity" type="range" min="0" max="1" step="0.05" value="0.75">
           </label>
@@ -188,7 +187,7 @@
         <div class="view" id="view3d"></div>
       </div>
       <div class="statusbar">
-        <span id="status">도면 이미지를 열거나 샘플 도면으로 시작하세요.</span>
+        <span id="status">도면 불러오기(json)로 시작하거나 샘플 도면으로 해 보세요.</span>
         <span id="cursor-pos"></span>
       </div>
     </main>
