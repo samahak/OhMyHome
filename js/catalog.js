@@ -12,6 +12,8 @@ export const SHAPES = {
   wash_tower: { label: '타워형 세탁건조기', photoFront: true },
   wardrobe: { label: '붙박이장/옷장', photoFront: true },
   shoe_cabinet: { label: '신발장', photoFront: true },
+  microwave_cabinet: { label: '전자레인지 장', photoFront: true },
+  curtain: { label: '커튼', photoFront: false },
   drawer: { label: '서랍장', photoFront: true },
   vanity: { label: '화장대', photoFront: false },
   shelf: { label: '책장', photoFront: true },
@@ -129,6 +131,10 @@ export const CATALOG = [
   { type: 'wardrobe', name: '붙박이장', icon: '🚪', w: 2400, d: 600, h: 2300, color: '#efe9df' },
   { type: 'wardrobe', name: '옷장', icon: '🚪', w: 1200, d: 600, h: 2000, color: '#cfb497' },
   { type: 'shoe_cabinet', name: '신발장', icon: '👟', w: 1200, d: 380, h: 2300, color: '#efe9df' },
+  // 키큰 렌지대: 아래 수납 · 전자레인지 칸 · 밥솥 칸 · 위 수납
+  { type: 'microwave_cabinet', name: '전자레인지 장', icon: '♨️', w: 600, d: 450, h: 1800, color: '#f2efea' },
+  // 커튼: 창을 덮는 폭 × 레일 깊이 × 천장 높이. 등(-y)을 창 쪽 벽에 대고(🧲 벽에 붙이기) 쓴다. 색은 겉 커튼 천 색
+  { type: 'curtain', name: '커튼', icon: '🪟', w: 2400, d: 150, h: 2300, color: '#c9b9a3' },
   { type: 'bed', name: '싱글 침대', icon: '🛏️', w: 1000, d: 2050, h: 900, color: '#b89a7a' },
   { type: 'bed', name: '슈퍼싱글 침대', icon: '🛏️', w: 1150, d: 2050, h: 900, color: '#b89a7a' },
   { type: 'bed', name: '퀸 침대', icon: '🛏️', w: 1550, d: 2100, h: 1000, color: '#9c7b5b' },
