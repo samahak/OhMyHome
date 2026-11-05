@@ -631,7 +631,7 @@ export class PlanEditor {
     c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(t.x, t.y); c.stroke();
   }
 
-  /** 미닫이·중문: 닫힌 자리 문짝(중문은 레일 셋에 유리 세 짝) + 열리는 쪽 화살표 */
+  /** 미닫이·미서기·중문: 닫힌 자리 문짝(미서기는 벽 두께 안 엇갈린 두 짝, 중문은 레일 셋에 유리 세 짝) + 열리는 쪽 화살표 */
   drawSlidingDoor(d, col, selected) {
     const c = this.ctx, s = slidingPanels(d), h = SLIDE.t / 2, glass = doorStyle(d) === 'middle';
     if (glass && !selected) col = '#3d4a57';

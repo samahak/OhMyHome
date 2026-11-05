@@ -500,7 +500,7 @@ const sumPrice = (fs) => fs.reduce((s, f) => s + (f.builtin ? 0 : f.price || 0),
  * 비용에 넣는 문: 현관 중문은 늘(사서 다는 것이라), 다른 문은 가격을 넣었을 때만. 가구 항목과 같은 꼴로 바꿔 합계·목록·엑셀에 함께 쓴다.
  * door: true, 크기는 문 폭 × 벽 두께 × 문 높이
  */
-const DOOR_NAMES = { swing: '여닫이문', sliding: '미닫이문', middle: '현관 중문' };
+const DOOR_NAMES = { swing: '여닫이문', sliding: '미닫이문', bypass: '미서기문', middle: '현관 중문' };
 function costDoors() {
   return state.plan.doors.filter((d) => doorStyle(d) === 'middle' || d.price != null).map((d) => ({
     id: d.id, door: true, style: doorStyle(d), name: d.name || DOOR_NAMES[doorStyle(d)], model: d.model, price: d.price, builtin: d.builtin,
@@ -778,6 +778,7 @@ function renderProps() {
       <p class="hint">${{
         swing: '3D에서는 문 위를 천장까지 벽으로 채우고, 문짝을 도면 기호처럼 90° 열어 둡니다.',
         sliding: `미닫이는 벽 면을 따라 밀려 열립니다. 폭이 ${fmtMM(SLIDE.twoOver)}mm를 넘으면 두 짝이 양쪽으로 열립니다. 3D에서는 문짝을 끝까지 열어 둡니다.`,
+        bypass: '미서기는 벽 두께 안에 두 짝이 엇갈려 있어 한 짝을 다른 짝 쪽으로 밀어 엽니다. 3D에서는 한 짝을 밀어 반쯤 열어 둡니다. ‘여는 방향’은 움직이는 짝을, ‘붙는 벽 면’은 앞뒤 레일을 바꿉니다.',
         middle: '현관 중문은 유리 세 짝이 한쪽으로 겹쳐 모이며 열리고(3연동), 문 위는 천장까지 고정 유리입니다. 2D에서 끌거나 ‘현관문에서’ 거리를 고치면 양옆 벽을 따라 앞뒤로 옮겨집니다(폭은 양옆 벽에 맞춥니다).',
       }[style]}
         🚪 문 도구로 새로 다는 문은 여기서 마지막에 고른 모양이 됩니다.</p>`;
