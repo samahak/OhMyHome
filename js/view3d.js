@@ -349,7 +349,8 @@ export class View3D {
   }
 
   /**
-   * 미닫이·중문: 문짝마다 열린 자리(shift)로 밀어 둔다 — 미닫이는 문짝 폭의 92%, 중문은 세 짝이 a 끝에 겹쳐 모인다.
+   * 미닫이·미서기·중문: 문짝마다 열린 자리(shift)로 밀어 둔다 — 미닫이는 문짝 폭의 92%, 미서기는 b 쪽 짝이 a 쪽 짝 위로,
+   * 중문은 세 짝이 a 끝에 겹쳐 모인다.
    * 문 높이에 닫힌 자리 ~ 열린 자리를 덮는 레일(중문은 레일 셋 폭)
    */
   slidingDoor(d, doorH) {
@@ -365,10 +366,13 @@ export class View3D {
       this.planGroup.add(leaf);
       this.doorLeaves.push(leaf);
     }
-    const depth = s.reach - d.t / 2 + SLIDE.gap;
-    const rail = new THREE.Mesh(new THREE.BoxGeometry((hi - lo) * M, 0.04, depth * M),
+    // 레일: 문짝 레일들을 덮는 폭. 벽 면 밖에 붙는 미닫이·중문은 벽 면까지 이어 붙인다(미서기는 벽 두께 안)
+    const offs = s.panels.map((pn) => pn.off);
+    let o0 = Math.min(...offs) - SLIDE.t / 2 - 5, o1 = Math.max(...offs) + SLIDE.t / 2 + 5;
+    if (doorStyle(d) !== 'bypass') o0 = Math.min(o0, d.t / 2);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry((hi - lo) * M, 0.04, (o1 - o0) * M),
       new THREE.MeshStandardMaterial({ color: glass ? MIDDLE_FRAME : '#e9e3da', roughness: 0.6 }));
-    const c = s.at((lo + hi) / 2, d.t / 2 + depth / 2);
+    const c = s.at((lo + hi) / 2, (o0 + o1) / 2);
     rail.position.set(c.x * M, doorH * M + 0.02, c.y * M);
     rail.rotation.y = rot;
     rail.castShadow = true;
