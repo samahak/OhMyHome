@@ -84,34 +84,42 @@ export class PlanEditor {
   }
 
   /**
-   * 2D 도면을 가로 그림(W×H, scale배 해상도)으로. 도면 전체가 들어오게 맞춰 그린다.
-   * 화면의 확대·위치, 그리던 선, 마우스 표시는 건드리지 않는다.
+   * 2D 도면을 그림(W×H, scale배 해상도)으로. 기본은 도면 전체가 들어오게, house면 벽·방·가구(집 부분)만 꽉 차게 맞춘다
+   * (도면 그림의 제목·설명·바깥 치수는 화면 밖으로 빠진다). 화면의 확대·위치, 그리던 선, 마우스 표시는 건드리지 않는다.
    */
-  capture(W = 1920, H = 1080, scale = 2) {
+  capture(W = 1920, H = 1080, scale = 2, { house = false, type = 'image/png', quality = 0.92 } = {}) {
     const keep = { ctx: this.ctx, w: this.w, h: this.h, dpr: this.dpr, view: this.view, mouse: this.mouse, snapMark: this.snapMark, temp: this.temp };
     const cv = document.createElement('canvas');
     cv.width = W * scale; cv.height = H * scale;
     Object.assign(this, { ctx: cv.getContext('2d'), w: W, h: H, dpr: scale, view: { ...this.view }, mouse: null, snapMark: null, temp: null });
     try {
-      this.fit();
+      this.fit(house ? this.houseBounds() : null, house ? 24 : 40);
       this.render();
-      return cv.toDataURL('image/png');
+      return cv.toDataURL(type, quality);
     } finally {
       Object.assign(this, keep);
       this.draw();
     }
   }
 
-  /** 도면 전체가 보이게 맞춘다 */
-  fit() {
+  /** 도면 전체가 보이게 맞춘다 (b: 맞출 범위, 없으면 도면 전체) */
+  fit(b = null, pad = 40) {
     if (!this.w) return;
-    const b = this.contentBounds();
-    const pad = 40;
+    b = b || this.contentBounds();
     const s = Math.min((this.w - pad * 2) / Math.max(b.w, 1000), (this.h - pad * 2) / Math.max(b.h, 1000));
     this.view.s = s;
     this.view.ox = (this.w - b.w * s) / 2 - b.minX * s;
     this.view.oy = (this.h - b.h * s) / 2 - b.minY * s;
     this.draw();
+  }
+
+  /** 집 부분 범위: 벽(두께 포함)·방·가구. 아무것도 없으면 도면 전체 */
+  houseBounds() {
+    const p = state.plan;
+    const pts = p.walls.flatMap((w) => G.wallCorners(w));
+    for (const r of p.rooms) pts.push(...r.pts);
+    for (const f of state.furniture) pts.push(...G.furnitureCorners(f));
+    return pts.length ? G.boundsOf(pts) : this.contentBounds();
   }
 
   contentBounds() {

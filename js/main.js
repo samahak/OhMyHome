@@ -9,6 +9,7 @@ import * as G from './geometry.js';
 import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
+import { makePdf, dataURLBytes } from './pdf.js';
 import { makeXlsx, STYLE } from './xlsx.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
@@ -1260,13 +1261,38 @@ $('file-project').addEventListener('change', async (e) => {
     alert(`불러오지 못했습니다: ${err.message}`);
   }
 });
+/* ---------- 캡처 → PDF ---------- */
+// 그림은 A4 비율로 찍어 PDF 쪽을 꽉 채운다 (가로로 긴 집은 가로 A4, 세로로 긴 집은 세로 A4)
+const A4_LAND = [1980, 1400], A4_PORT = [1400, 1980];
+const a4For = (b) => (b && b.h > b.w * 1.05 ? A4_PORT : A4_LAND);
+function savePdf(shots, name) {
+  const pages = shots.map((s) => ({ jpeg: dataURLBytes(s.url), width: s.width, height: s.height }));
+  const url = URL.createObjectURL(new Blob([makePdf(pages)], { type: 'application/pdf' }));
+  download(url, name);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 $('btn-capture').addEventListener('click', () => {
-  if (view.tour) { download(view.capture(), `ohmyhome-3d-${layoutTag()}${today()}.png`); return; }   // 둘러보기 중: 1인칭 화면 그대로
-  // 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히 세 장 (파일을 하나씩 내려받게 조금씩 띄운다)
-  view.captureShots(SHOTS).forEach((s, i) => setTimeout(() => download(s.url, `ohmyhome-3d-${layoutTag()}${s.name}-${today()}.png`), i * 400));
-  status('3D 그림 세 장(위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히)을 저장합니다. 브라우저가 여러 파일 받기를 물으면 허용해 주세요.');
+  const opt = { type: 'image/jpeg', quality: 0.9 };
+  if (view.tour) {   // 둘러보기 중: 1인칭 화면 그대로 한 쪽
+    savePdf(view.captureShots([{ name: '' }], ...A4_LAND, opt), `ohmyhome-3d-${layoutTag()}${today()}.pdf`);
+    status('지금 둘러보기 화면을 PDF로 저장했습니다.');
+    return;
+  }
+  // 전체(바닥 도면 그림 그대로) 위·왼쪽·오른쪽 + 집만(바닥 도면 그림을 빼고) 위·왼쪽·오른쪽
+  const top = SHOTS[0], [tw, th] = a4For(editor.houseBounds());
+  const shots = (floorImage) => view.captureShots(SHOTS.map((s) => (s === top ? { ...s, W: tw, H: th } : s)), ...A4_LAND, { ...opt, floorImage });
+  savePdf([...shots(undefined), ...shots(false)], `ohmyhome-3d-${layoutTag()}${today()}.pdf`);
+  status('3D를 PDF로 저장했습니다: 위 · 왼쪽 비스듬히 · 오른쪽 비스듬히 (전체 3쪽 + 바닥 도면 그림을 뺀 집만 3쪽).');
 });
-$('btn-capture-2d').addEventListener('click', () => download(editor.capture(), `ohmyhome-2d-${layoutTag()}${today()}.png`));
+$('btn-capture-2d').addEventListener('click', () => {
+  const opt = { type: 'image/jpeg', quality: 0.9 };
+  const page = (house) => {
+    const [w, h] = a4For(house ? editor.houseBounds() : editor.contentBounds());
+    return { url: editor.capture(w, h, 2, { ...opt, house }), width: w * 2, height: h * 2 };
+  };
+  savePdf([page(false), page(true)], `ohmyhome-2d-${layoutTag()}${today()}.pdf`);
+  status('2D 도면을 PDF로 저장했습니다: 도면 전체 1쪽 + 제목·설명·바깥 치수를 뺀 집 부분만 크게 1쪽.');
+});
 
 function download(url, name) {
   const a = document.createElement('a');
