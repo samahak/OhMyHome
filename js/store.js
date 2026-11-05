@@ -364,6 +364,18 @@ export function loadProject(data) {
   ui.selection = null;
   emit('plan', 'furniture', 'library', 'layouts', 'selection');
 }
+/**
+ * 도면만 바꾼다 — 같은 집의 도면이 조금 고쳐졌을 때 쓴다. data.plan(도면 그림·축척·벽·방·창·문·현관)으로 바꾸고,
+ * 배치 안·가구(기본 포함 가구도)·내 가구·층수는 그대로 둔다. 가구는 도면 좌표(mm) 그대로 남는다.
+ */
+export function replacePlan(data) {
+  if (!data || !data.plan) throw new Error('OhMyHome 프로젝트 파일이 아닙니다.');
+  checkpoint();
+  const floor = state.plan.floor;
+  Object.assign(state.plan, freshState().plan, data.plan, { floor });
+  ui.selection = null;
+  emit('plan', 'selection');
+}
 /** 저장된 작업을 연다: from(프로젝트 폴더에서 읽은 것)이 있으면 그것, 없으면 브라우저 저장소 */
 export function loadSaved(from = null) {
   try {

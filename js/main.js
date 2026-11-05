@@ -2,7 +2,7 @@
 import {
   state, ui, on, emit, checkpoint, undo, redo, select, uid, removeItem, findSelected,
   selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, removeFurniture,
-  applyScaleRef, serialize, loadProject, loadSaved, loadFromServer, savesToServer, saveNow, resetProject, setSaveErrorHandler,
+  applyScaleRef, serialize, loadProject, replacePlan, loadSaved, loadFromServer, savesToServer, saveNow, resetProject, setSaveErrorHandler,
   addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
@@ -1248,6 +1248,29 @@ $('file-project').addEventListener('change', async (e) => {
     doorsForOldProject(data);
   } catch (err) {
     alert(`불러오지 못했습니다: ${err.message}`);
+  }
+});
+// 도면만 바꾸기 — 같은 집 도면이 조금 고쳐졌을 때. 한 번 경고하고, 가구·배치 안은 그대로 둔 채 도면만 바꾼다
+$('btn-plan-only').addEventListener('click', () => {
+  if (!confirm('도면만 바꿉니다.\n\n벽·방·창·문·도면 그림이 고른 파일의 것으로 바뀌고, 배치한 가구(기본 포함 가구도)는 지금 자리 그대로 남습니다.\n'
+    + '같은 집 도면이 조금 고쳐진 경우에만 쓰세요. 다른 집 도면이면 가구가 엉뚱한 자리에 놓입니다.\n\n계속할까요?')) return;
+  $('file-plan-only').click();
+});
+$('file-plan-only').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    replacePlan(data);
+    $('wall-height').value = state.plan.wallHeight;
+    editor.fit();
+    view.resetCamera('persp');
+    const bad = G.findCollisions(state.furniture, state.plan.walls).size;
+    status(`도면만 바꿨습니다. 가구 배치는 그대로입니다.${bad ? ` 벽·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''} 되돌리기(Ctrl+Z)로 예전 도면으로 돌아갈 수 있습니다.`);
+    doorsForOldProject(data);
+  } catch (err) {
+    alert(`도면을 바꾸지 못했습니다: ${err.message}`);
   }
 });
 /* ---------- 캡처 → PDF ---------- */
