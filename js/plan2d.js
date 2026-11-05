@@ -2,7 +2,7 @@
 // 좌표: 도면 mm. 화면 px = mm * view.s + view.o
 import {
   state, ui, on, checkpoint, select, uid, removeItem, emit,
-  selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
+  selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo, furnitureLocked,
 } from './store.js';
 import * as G from './geometry.js';
 import { windowDefaults } from './catalog.js';
@@ -274,7 +274,7 @@ export class PlanEditor {
       }
       case 'erase': {
         const hit = this.hitAny(p);
-        if (hit) { checkpoint(); removeItem(hit.kind, hit.id); }
+        if (hit && !(hit.kind === 'furniture' && furnitureLocked())) { checkpoint(); removeItem(hit.kind, hit.id); }
         break;
       }
       case 'wall': {

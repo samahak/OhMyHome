@@ -130,6 +130,18 @@
 
       <section class="tab-body" id="tab-furniture" hidden>
         <div class="card">
+          <h3>배치 안 <small>안마다 가구 배치를 따로 둡니다 (도면은 함께 씀)</small></h3>
+          <div id="layout-list" class="layout-list"></div>
+          <div class="row">
+            <button id="btn-layout-add" class="grow" title="지금 보고 있는 안의 가구 배치를 그대로 복사해 새 안을 만듭니다">＋ 지금 안 복사해서 추가</button>
+          </div>
+          <div class="row">
+            <button id="btn-layout-rename" class="grow">이름 바꾸기</button>
+            <button id="btn-layout-lock" class="grow" title="이 안의 가구를 옮기거나 고치거나 지우지 못하게 막습니다 (다시 누르면 풉니다)">🔓 보호하기</button>
+            <button id="btn-layout-del" class="grow danger">이 안 삭제</button>
+          </div>
+        </div>
+        <div class="card">
           <h3>사진으로 가구 추가</h3>
           <button id="btn-photo" class="primary block">📷 가구 사진 넣고 크기 재기</button>
           <p class="hint">사진에서 가구 영역을 찾고, 아는 치수 하나(또는 사진 속 기준 물체)로 나머지 크기를 계산합니다.</p>
@@ -143,7 +155,7 @@
           <div id="catalog" class="cat-grid"></div>
         </div>
         <div class="card">
-          <h3>배치된 가구</h3>
+          <h3>배치된 가구 <small id="placed-layout"></small></h3>
           <div id="placed-total" class="placed-total"></div>
           <div id="placed-export" class="placed-export" hidden>
             <button id="btn-xlsx" title="가구 목록을 엑셀(.xlsx) 파일로 받습니다">📊 엑셀로 내보내기</button>
