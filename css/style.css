@@ -126,6 +126,12 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .placed-total { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; }
 .placed-total b { font-size: 15px; }
 .placed-total small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.layout-list { display: flex; flex-direction: column; gap: 4px; }
+.layout-list button { justify-content: space-between; }
+.layout-list button.sel { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.layout-list .sz { color: var(--muted); font-size: 12px; font-weight: 400; }
+.layout-list .lock { margin-left: 4px; font-size: 12px; }
+.props-lock { margin: 0 0 8px; padding: 6px 8px; border-radius: 6px; background: var(--accent-soft); font-size: 12px; }
 .placed-export { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
 .placed-export button { flex: 1; }
 .placed-export .check { margin: 0; font-size: 13px; white-space: nowrap; }

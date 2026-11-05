@@ -3,6 +3,7 @@ import {
   state, ui, on, emit, checkpoint, undo, redo, select, uid, removeItem, findSelected,
   selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, removeFurniture,
   applyScaleRef, serialize, loadProject, loadSaved, loadFromServer, savesToServer, saveNow, resetProject, setSaveErrorHandler,
+  addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
 import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
@@ -29,6 +30,7 @@ const restored = loadSaved(fromServer);
 setSaveErrorHandler((e, where) => status(where === 'server'
   ? `⚠ 프로젝트 폴더(ohmyhome-project.json)에 저장하지 못했습니다 (${e.message}). 로컬 서버가 켜져 있는지 확인하고, 상단 ‘저장(.json)’으로도 보관하세요.`
   : '⚠ 브라우저 저장 공간이 부족해 자동 저장하지 못했습니다. 상단 ‘저장(.json)’으로 파일에 보관하세요.'));
+setLockedHandler((l) => status(`🔒 ‘${l.name}’은(는) 보호 중이라 가구를 옮기거나 고칠 수 없습니다. 배치 안의 ‘🔒 보호’를 눌러 풀거나, ‘지금 안 복사해서 추가’로 새 안을 만들어 고치세요.`));
 
 /* ---------- 2D / 3D ---------- */
 const editor = new PlanEditor($('plan-canvas'), {
@@ -419,6 +421,7 @@ function dropPoint(def) {
 }
 
 function addFurniture(def, extra = {}) {
+  if (furnitureLocked()) return null;
   const { x, y } = dropPoint(def);
   checkpoint();
   const f = {
@@ -538,7 +541,7 @@ function furnitureSheet(all) {
     .map((v) => (muted && typeof v !== 'object' ? { v, s: STYLE.muted } : v));
   const head = 4;   // 제목 · 요약 · 빈 줄 다음 줄이 머리글
   const rows = [
-    [{ v: 'OhMyHome 가구 목록', s: STYLE.title }],
+    [{ v: `OhMyHome 가구 목록${state.layouts.length > 1 ? ` — ${currentLayout().name}` : ''}`, s: STYLE.title }],
     [`${today()} · 가구 ${paid.filter((f) => !f.door).length}개${paid.some((f) => f.door) ? ` · 문 ${paid.filter((f) => f.door).length}개` : ''} · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
     [],
     ['번호', '종류', '이름', '모델명', '가격(원)', '가로(mm)', '깊이(mm)', '높이(mm)', '구분'].map(H),
@@ -562,7 +565,7 @@ $('btn-xlsx').addEventListener('click', () => {
   }
   const blob = new Blob([furnitureSheet(all)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
-  download(url, `ohmyhome-가구-${today()}.xlsx`);
+  download(url, `ohmyhome-가구-${layoutTag()}${today()}.xlsx`);
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   status(all ? '모든 가구를 엑셀로 저장했습니다(가격이 계산된 가구 위, 기본 가구 아래).' : '가격이 계산된 가구를 엑셀로 저장했습니다.');
 });
@@ -609,6 +612,60 @@ function renderPlaced() {
     else select({ kind: 'furniture', id: b.dataset.id });
   }));
 }
+
+/* ---------- 배치 안 ---------- */
+/** 안 목록: 이름 · 가구 수 · 합계 (문 비용은 모든 안이 함께) */
+function renderLayouts() {
+  const doors = costDoors();
+  $('layout-list').innerHTML = state.layouts.map((l) => {
+    const fs = layoutFurniture(l.id), all = [...fs, ...doors], priced = all.some((f) => f.price != null);
+    return `<button data-layout="${l.id}" class="${l.id === state.layoutId ? 'sel' : ''}">
+      <span>${esc(l.name)}${l.locked ? '<span class="lock" title="보호 중 — 가구를 고칠 수 없습니다">🔒</span>' : ''}</span><span class="sz">가구 ${fs.filter((f) => !f.builtin).length}개${priced ? ` · ${fmtWon(sumPrice(all))}` : ''}</span></button>`;
+  }).join('');
+  $('layout-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.layout === state.layoutId) return;
+    endDrawTool();
+    checkpoint();
+    switchLayout(b.dataset.layout);
+    status(`‘${currentLayout().name}’ 배치를 봅니다.`);
+  }));
+  const locked = !!currentLayout().locked;
+  $('btn-layout-del').disabled = state.layouts.length < 2 || locked;
+  $('btn-layout-del').title = locked ? '보호 중인 안은 지울 수 없습니다' : '';
+  $('btn-layout-lock').classList.toggle('active', locked);
+  $('btn-layout-lock').textContent = locked ? '🔒 보호 중' : '🔓 보호하기';
+  $('placed-layout').textContent = state.layouts.length > 1 ? `— ${currentLayout().name}` : '';
+}
+$('btn-layout-add').addEventListener('click', () => {
+  const from = currentLayout().name;
+  checkpoint();
+  const l = addLayout();
+  status(`‘${from}’을(를) 그대로 복사해 ‘${l.name}’을(를) 만들었습니다. 이제 ‘${l.name}’에서 가구를 옮겨 보세요.`);
+});
+$('btn-layout-lock').addEventListener('click', () => {
+  const l = currentLayout(), on = !l.locked;
+  checkpoint();
+  setLayoutLocked(l.id, on);
+  if (ui.selection?.kind === 'furniture') renderProps();   // 속성 칸을 막거나 푼다
+  status(on ? `🔒 ‘${l.name}’을(를) 보호합니다. 가구를 옮기거나 고치거나 지울 수 없습니다(다시 누르면 풉니다).`
+    : `🔓 ‘${l.name}’의 보호를 풀었습니다.`);
+});
+$('btn-layout-rename').addEventListener('click', () => {
+  const l = currentLayout();
+  const name = prompt('안 이름', l.name)?.trim();
+  if (!name || name === l.name) return;
+  checkpoint();
+  renameLayout(l.id, name);
+});
+$('btn-layout-del').addEventListener('click', () => {
+  const l = currentLayout();
+  if (state.layouts.length < 2 || !confirm(`‘${l.name}’ 배치를 지울까요? (되돌리기로 살릴 수 있습니다)`)) return;
+  checkpoint();
+  deleteLayout(l.id);
+  status(`‘${l.name}’을(를) 지우고 ‘${currentLayout().name}’을(를) 봅니다.`);
+});
+/** 파일 이름에 넣을 안 이름 (안이 하나면 넣지 않는다) */
+const layoutTag = () => (state.layouts.length > 1 ? `${currentLayout().name.replace(/[\\/:*?"<>|\s]+/g, '_')}-` : '');
 
 const photo = initPhotoDialog({
   status,
@@ -744,6 +801,11 @@ function renderProps() {
       <div class="btns"><button data-act="del" class="danger">방 삭제</button></div>
       <p class="hint">${state.plan.image ? '가로·세로를 도면에 적힌 치수로 고치면 이 방을 기준으로 <b>도면 전체 크기</b>가 바뀝니다.' : ''}</p>`;
   }
+  if (sel.kind === 'furniture' && currentLayout().locked) {
+    // 보호 중인 안: 값은 보이되 고치지 못하게
+    el.querySelector('h3').insertAdjacentHTML('afterend', `<p class="props-lock">🔒 ‘${esc(currentLayout().name)}’은(는) 보호 중입니다. 배치 안의 ‘🔒 보호’를 눌러 풀면 고칠 수 있습니다.</p>`);
+    el.querySelectorAll('input, select, button:not([data-act=close])').forEach((x) => { x.disabled = true; });
+  }
   el.querySelectorAll('[data-f]').forEach((inp) => inp.addEventListener('change', () => applyProp(inp)));
   el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => propAction(b.dataset.act)));
   el.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => applyPreset(findSelected(), +b.dataset.preset)));
@@ -815,6 +877,7 @@ function applyProp(inp) {
   const sel = ui.selection;
   if (!obj) return;
   const k = inp.dataset.f;
+  if (sel.kind === 'furniture' && furnitureLocked()) { refreshProps(); return; }
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
   if (k === 'plant') { applyPlant(obj, v); return; }
@@ -924,7 +987,7 @@ function clampKitchenL(obj, k, v) {
  */
 function applyPlant(obj, key) {
   const p = PLANTS[key];
-  if (!obj || obj.type !== 'plant' || !p) return;
+  if (!obj || obj.type !== 'plant' || !p || furnitureLocked()) return;
   checkpoint();
   const named = obj.name === '식물' || Object.values(PLANTS).some((x) => x.label === obj.name);
   Object.assign(obj, { plant: key, w: p.w, d: p.d, h: p.h });
@@ -936,7 +999,7 @@ function applyPlant(obj, key) {
 /** TV 인치·소파 인원처럼 숫자 하나로 크기를 정한다 (catalog.SIZE_PRESETS) */
 function applyPreset(obj, v) {
   const p = obj && SIZE_PRESETS[obj.type];
-  if (!p) return;
+  if (!p || furnitureLocked()) return;
   if (!(v >= p.min && v <= p.max)) { status(`${p.label}는 ${p.min}~${p.max} 사이로 넣어 주세요.`); refreshProps(); return; }
   checkpoint();
   Object.assign(obj, { [p.key]: v, ...p.size(v) });
@@ -949,7 +1012,7 @@ function propAction(act) {
   const sel = ui.selection;
   const obj = findSelected();
   if (act === 'close') { select(null); return; }
-  if (!obj) return;
+  if (!obj || (sel.kind === 'furniture' && furnitureLocked())) return;
   if (act === 'del') { deleteSelected(); return; }
   if (act === 'rot90' || act === 'rot-90') rotateSelected(act === 'rot90' ? 90 : -90);
   if (act === 'dup') duplicateSelected();
@@ -1003,7 +1066,7 @@ const selectedFurniture = () => selectedFurnitureIds().map((id) => state.furnitu
 /** 고른 가구를 돌린다. 여러 개면 고른 가구들 가운데를 축으로 자리까지 함께 돈다 */
 function rotateSelected(deg) {
   const fs = selectedFurniture();
-  if (!fs.length) return;
+  if (!fs.length || furnitureLocked()) return;
   checkpoint();
   const b = G.boundsOf(fs.map((f) => ({ x: f.x, y: f.y })));
   const cx = b.minX + b.w / 2, cy = b.minY + b.h / 2;
@@ -1020,7 +1083,7 @@ function rotateSelected(deg) {
 /** 고른 가구를 300mm 옆에 복제하고, 복제본을 고른다 */
 function duplicateSelected() {
   const fs = selectedFurniture();
-  if (!fs.length) return;
+  if (!fs.length || furnitureLocked()) return;
   checkpoint();
   const copies = fs.map((f) => ({ ...f, id: uid('f'), x: f.x + 300, y: f.y + 300 }));
   state.furniture.push(...copies);
@@ -1031,7 +1094,7 @@ function duplicateSelected() {
 
 function moveSelected(dx, dy) {
   const fs = selectedFurniture();
-  if (!fs.length) return;
+  if (!fs.length || furnitureLocked()) return;
   checkpoint();
   for (const f of fs) { f.x += dx; f.y += dy; }
   emit('furniture');
@@ -1039,7 +1102,7 @@ function moveSelected(dx, dy) {
 
 function deleteSelected() {
   const sel = ui.selection;
-  if (!sel) return;
+  if (!sel || (sel.kind === 'furniture' && furnitureLocked())) return;
   checkpoint();
   if (sel.ids) removeFurniture(sel.ids);
   else removeItem(sel.kind, sel.id);
@@ -1148,7 +1211,8 @@ async function startTour() {
   let doors;
   try { win = await autoWindows(); doors = await autoDoors(); } finally { tourStarting = false; }
   // 현관 신발장, 욕실·주방 이름이 붙은 방의 변기·세면대·욕조·싱크대가 없으면 놓는다. 창 자리는 벽으로 친다
-  const fixtures = autoFixtures({ ...plan, walls: plan.walls.concat(win.windows) }, state.furniture, uid);
+  // 보호 중인 안에는 설비를 더하지 않는다
+  const fixtures = currentLayout().locked ? [] : autoFixtures({ ...plan, walls: plan.walls.concat(win.windows) }, state.furniture, uid);
   if (win.added || win.removed || doors.added || doors.removed || fixtures.length) {
     checkpoint();
     plan.windows = win.windows;
@@ -1225,12 +1289,12 @@ $('file-project').addEventListener('change', async (e) => {
   }
 });
 $('btn-capture').addEventListener('click', () => {
-  if (view.tour) { download(view.capture(), `ohmyhome-3d-${today()}.png`); return; }   // 둘러보기 중: 1인칭 화면 그대로
+  if (view.tour) { download(view.capture(), `ohmyhome-3d-${layoutTag()}${today()}.png`); return; }   // 둘러보기 중: 1인칭 화면 그대로
   // 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히 세 장 (파일을 하나씩 내려받게 조금씩 띄운다)
-  view.captureShots(SHOTS).forEach((s, i) => setTimeout(() => download(s.url, `ohmyhome-3d-${s.name}-${today()}.png`), i * 400));
+  view.captureShots(SHOTS).forEach((s, i) => setTimeout(() => download(s.url, `ohmyhome-3d-${layoutTag()}${s.name}-${today()}.png`), i * 400));
   status('3D 그림 세 장(위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히)을 저장합니다. 브라우저가 여러 파일 받기를 물으면 허용해 주세요.');
 });
-$('btn-capture-2d').addEventListener('click', () => download(editor.capture(), `ohmyhome-2d-${today()}.png`));
+$('btn-capture-2d').addEventListener('click', () => download(editor.capture(), `ohmyhome-2d-${layoutTag()}${today()}.png`));
 
 function download(url, name) {
   const a = document.createElement('a');
@@ -1277,13 +1341,14 @@ window.addEventListener('keydown', (e) => {
 
 /* ---------- 연결 ---------- */
 on('plan', () => {
-  renderScaleInfo(); renderPlanInfo(); renderPlaced(); refreshOrRender();
+  renderScaleInfo(); renderPlanInfo(); renderPlaced(); renderLayouts(); refreshOrRender();
   // 되돌리기·새 도면·불러오기 뒤에도 입력칸이 상태를 따라가게 (입력 중인 칸은 건드리지 않는다)
   for (const [id, v] of [['wall-height', state.plan.wallHeight], ['floor-num', state.plan.floor]]) {
     if ($(id) !== document.activeElement) $(id).value = v;
   }
 });
-on('furniture', () => { renderPlaced(); refreshOrRender(); });
+on('furniture', () => { renderPlaced(); renderLayouts(); refreshOrRender(); });
+on('layouts', renderLayouts);
 on('selection', () => {
   renderPlaced();
   renderProps();
@@ -1306,6 +1371,7 @@ renderLibrary();
 renderScaleInfo();
 renderPlanInfo();
 renderPlaced();
+renderLayouts();
 if (restored) {
   status(fromServer
     ? '지난번 작업을 불러왔습니다. (프로젝트 폴더의 ohmyhome-project.json에 자동 저장 — localhost·IP 어느 주소로 열어도 같습니다)'

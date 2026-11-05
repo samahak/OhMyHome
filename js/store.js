@@ -2,6 +2,7 @@
 //   'plan'      도면(이미지·축척·벽·방·벽 높이)이 바뀜
 //   'furniture' 배치된 가구가 바뀜
 //   'library'   사진으로 만든 내 가구 목록이 바뀜
+//   'layouts'   배치 안(1안·2안…) 목록·지금 안이 바뀜
 //   'selection' 선택이 바뀜
 
 const STORAGE_KEY = 'ohmyhome.project.v1';
@@ -23,8 +24,12 @@ export function freshState() {
       wallHeight: 2300,
       floor: 10,            // 몇 층인지 — 둘러보기에서 창밖 땅 높이
     },
-    furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto }
+    furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto } — 지금 보고 있는 안의 가구
     library: [],            // { id, type, name, w, d, h, color, image(dataURL), usePhoto }
+    // 배치 안: 안마다 가구 배치를 따로 둔다(도면·내 가구는 함께 쓴다). 지금 안의 가구는 state.furniture에 있고,
+    // 그 안의 furniture 칸은 비워 둔다 — 안을 바꿀 때 서로 옮겨 담는다
+    layouts: [{ id: 'L1', name: '1안', furniture: [] }],
+    layoutId: 'L1',
   };
 }
 
@@ -55,14 +60,17 @@ function snapshot() {
     image: state.plan.image,
     plan: JSON.stringify({ ...state.plan, image: null }),
     furniture: JSON.stringify(state.furniture),
+    layouts: JSON.stringify({ list: state.layouts, id: state.layoutId }),
   };
 }
 function restore(s) {
   Object.assign(state.plan, JSON.parse(s.plan), { image: s.image });
   state.furniture = JSON.parse(s.furniture);
+  const l = JSON.parse(s.layouts);
+  state.layouts = l.list; state.layoutId = l.id;
   if (ui.selection?.ids) ui.selection = furnitureSelection(ui.selection.ids);
   if (ui.selection && !findSelected()) ui.selection = null;
-  emit('plan', 'furniture', 'selection');
+  emit('plan', 'furniture', 'layouts', 'selection');
 }
 export function checkpoint() {
   past.push(snapshot());
@@ -122,7 +130,12 @@ export function beginFurnitureDrag(ids, p) {
   return { start: p, orig, started: false };
 }
 export function dragFurnitureTo(drag, p) {
-  if (!drag.started) { checkpoint(); drag.started = true; }
+  if (!drag.orig.length) return;
+  if (!drag.started) {
+    if (furnitureLocked()) { drag.orig = []; return; }   // 보호 중인 안: 눌러서 고르기만 된다
+    checkpoint();
+    drag.started = true;
+  }
   const snap = (v) => Math.round(v / 10) * 10;
   const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
   const one = drag.orig.length === 1;
@@ -194,7 +207,8 @@ export function setScale(mmPerPx) {
   p.doorsRemoved = p.doorsRemoved.map(sc);
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
   if (p.entrance) p.entrance = { ...p.entrance, a: sc(p.entrance.a), b: sc(p.entrance.b), t: p.entrance.t * k };
-  state.furniture.forEach((f) => { f.x *= k; f.y *= k; });
+  // 다른 안의 가구도 함께 (보호 중인 안도 — 가구가 도면 위 자리를 지키는 것이지 배치를 바꾸는 것이 아니다)
+  for (const fs of [state.furniture, ...state.layouts.map((l) => l.furniture)]) fs.forEach((f) => { f.x *= k; f.y *= k; });
   emit('plan', 'furniture');
 }
 
@@ -209,6 +223,84 @@ export function applyScaleRef(a, b, mm) {
   p.scaleRef = { a, b, mm };
   setScale(mm / px);
   return true;
+}
+
+/* ---------- 배치 안 ---------- */
+// 안을 바꾸거나 더하는 쪽에서 checkpoint()를 먼저 부른다 (되돌리면 그 전 안과 배치로 돌아온다)
+const copyOf = (fs) => JSON.parse(JSON.stringify(fs));
+export const currentLayout = () => state.layouts.find((l) => l.id === state.layoutId) || state.layouts[0];
+/** 안 id → 그 안의 가구 (지금 안은 state.furniture) */
+export function layoutFurniture(id) {
+  return id === state.layoutId ? state.furniture : state.layouts.find((l) => l.id === id)?.furniture || [];
+}
+function nextLayoutName() {
+  const n = Math.max(0, ...state.layouts.map((l) => +(/^(\d+)안$/.exec(l.name)?.[1] || 0)));
+  return `${n + 1}안`;
+}
+let onLocked = null;
+/** 보호 중인 안의 가구를 바꾸려 할 때 부를 함수 (main.js가 상태줄에 알린다) */
+export function setLockedHandler(fn) { onLocked = fn; }
+/** 지금 안이 보호 중이면 알리고 true — 가구를 바꾸는 곳마다 먼저 부른다 (안 바꾸기·이름·복사는 된다) */
+export function furnitureLocked() {
+  const l = currentLayout();
+  if (!l.locked) return false;
+  onLocked?.(l);
+  return true;
+}
+/** 안 보호를 켜고 끈다 (부르는 쪽이 checkpoint — 되돌리기 기록과 보호 상태가 어긋나지 않게) */
+export function setLayoutLocked(id, on) {
+  const l = state.layouts.find((x) => x.id === id);
+  if (!l) return;
+  if (on) l.locked = true; else delete l.locked;
+  emit('layouts');
+}
+/** 지금 안을 그대로 복사한 새 안을 만들고 그 안으로 넘어간다 (보호는 따라가지 않는다 — 고쳐 보려고 만드는 안이다) */
+export function addLayout() {
+  const l = { id: uid('L'), name: nextLayoutName(), furniture: [] };
+  const fs = copyOf(state.furniture).map((f) => ({ ...f, id: uid('f') }));
+  currentLayout().furniture = state.furniture;
+  state.layouts.push(l);
+  state.layoutId = l.id;
+  state.furniture = fs;
+  ui.selection = null;
+  emit('furniture', 'layouts', 'selection');
+  return l;
+}
+export function switchLayout(id) {
+  const to = state.layouts.find((l) => l.id === id);
+  if (!to || id === state.layoutId) return false;
+  currentLayout().furniture = state.furniture;
+  state.furniture = to.furniture;
+  to.furniture = [];
+  state.layoutId = id;
+  ui.selection = null;
+  emit('furniture', 'layouts', 'selection');
+  return true;
+}
+export function renameLayout(id, name) {
+  const l = state.layouts.find((x) => x.id === id);
+  if (!l || !name) return;
+  l.name = name;
+  emit('layouts');
+}
+/** 안을 지운다 (하나뿐이면 지우지 않는다). 지금 안이면 옆 안으로 넘어간다 */
+export function deleteLayout(id) {
+  if (state.layouts.length < 2) return false;
+  const i = state.layouts.findIndex((l) => l.id === id);
+  if (i < 0 || state.layouts[i].locked) return false;
+  if (id === state.layoutId) switchLayout(state.layouts[i + 1]?.id || state.layouts[i - 1].id);
+  state.layouts.splice(state.layouts.findIndex((l) => l.id === id), 1);
+  emit('layouts');
+  return true;
+}
+/** 저장·불러온 데이터의 안 목록을 상태로 (안이 없던 예전 파일은 '1안' 하나) */
+function applyLayouts(data) {
+  const list = Array.isArray(data.layouts) && data.layouts.length ? copyOf(data.layouts) : [{ id: 'L1', name: '1안', furniture: [] }];
+  const cur = list.find((l) => l.id === data.layoutId) || list[0];
+  state.layouts = list;
+  state.layoutId = cur.id;
+  // 지금 안의 가구는 furniture 칸(예전 파일과 같은 자리)에서 읽는다
+  cur.furniture = [];
 }
 
 /* ---------- 저장 ---------- */
@@ -257,6 +349,9 @@ export function saveNow() {
 // 탭을 닫거나 다른 앱으로 갈 때 기다리던 저장을 바로 한다
 addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveNow(); } });
 export function serialize() {
+  // furniture는 지금 안의 가구(예전 앱도 그대로 연다), layouts는 모든 안 (지금 안은 furniture를 채워 넣는다)
+  const layouts = state.layouts.map((l) => (l.id === state.layoutId ? { ...l, furniture: state.furniture } : l));
+  return { app: 'OhMyHome', version: 1, plan: state.plan, furniture: state.furniture, library: state.library, layouts, layoutId: state.layoutId };
 }
 export function loadProject(data) {
   if (!data || !data.plan) throw new Error('OhMyHome 프로젝트 파일이 아닙니다.');
@@ -265,8 +360,9 @@ export function loadProject(data) {
   Object.assign(state.plan, base.plan, data.plan);
   state.furniture = (data.furniture || []).map((f) => ({ elev: 0, rot: 0, ...f }));
   state.library = data.library || [];
+  applyLayouts(data);
   ui.selection = null;
-  emit('plan', 'furniture', 'library', 'selection');
+  emit('plan', 'furniture', 'library', 'layouts', 'selection');
 }
 /** 저장된 작업을 연다: from(프로젝트 폴더에서 읽은 것)이 있으면 그것, 없으면 브라우저 저장소 */
 export function loadSaved(from = null) {
@@ -280,6 +376,7 @@ export function loadSaved(from = null) {
     Object.assign(state.plan, base.plan, data.plan);
     state.furniture = data.furniture || [];
     state.library = data.library || [];
+    applyLayouts(data);
     return data;   // 불러온 원본 — 문 목록이 없던 예전 저장본인지 main.js가 본다
   } catch {
     return false;
@@ -290,6 +387,7 @@ export function resetProject() {
   const base = freshState();
   Object.assign(state.plan, base.plan);
   state.furniture = [];
+  applyLayouts({});
   ui.selection = null;
-  emit('plan', 'furniture', 'selection');
+  emit('plan', 'furniture', 'layouts', 'selection');
 }
