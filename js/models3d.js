@@ -158,6 +158,65 @@ function shoeCabinet(g, W, D, H, c) {
   }
 }
 
+/**
+ * 전자레인지 장(렌지대): 아래부터 수납문 · 전자레인지 칸(전자레인지가 들어 있다) · 밥솥 칸(열린 선반) · 위 수납문.
+ * 칸 높이는 H에 맞춰 줄이되 전자레인지 칸은 0.32m 안팎을 지킨다.
+ */
+function microwaveCabinet(g, W, D, H, c) {
+  const body = mat(c, { roughness: 0.55 }), inner = mat(shade(c, 0.88)), t = 0.018, f = D / 2;
+  const lowH = Math.min(0.85, H * 0.45), mwH = Math.min(0.34, H * 0.2), riceH = Math.min(0.32, H * 0.17);
+  const y1 = lowH, y2 = y1 + mwH, y3 = y2 + riceH, upH = Math.max(0, H - y3);
+  for (const s of [-1, 1]) box(g, t, H, D, s * (W / 2 - t / 2), H / 2, 0, body);                 // 옆판
+  box(g, W - 2 * t, H, 0.008, 0, H / 2, -f + 0.004, inner);                                      // 뒤판
+  box(g, W - 2 * t, lowH, D - 0.01, 0, lowH / 2, 0.005, body);                                    // 아래 수납
+  for (const y of [y1, y2, y3]) box(g, W - 2 * t, t, D, 0, y + t / 2, 0, body);                  // 칸 바닥
+  if (upH > 0.05) box(g, W - 2 * t, upH, D - 0.01, 0, y3 + upH / 2, 0.005, body);                // 위 수납
+  const groove = GROOVE(), metal = METAL();
+  const doors = (y0, h) => {
+    const n = W > 0.75 ? 2 : 1;
+    for (let i = 1; i < n; i++) box(g, 0.006, h, 0.004, -W / 2 + (W / n) * i, y0 + h / 2, f + 0.002, groove);
+    for (let i = 0; i < n; i++) box(g, 0.015, Math.min(0.12, h * 0.3), 0.02, -W / 2 + (W / n) * i + (W / n) - 0.04, y0 + (y0 < 0.5 ? h - 0.09 : 0.09), f + 0.012, metal);
+  };
+  doors(0, lowH);
+  if (upH > 0.05) doors(y3, upH);
+  // 전자레인지 (칸 안에 쏙)
+  const mw = Math.min(W - 2 * t - 0.03, 0.5), mh = Math.min(mwH - 0.05, 0.29), md = Math.min(D - 0.06, 0.38), my = y1 + t + mh / 2 + 0.005, mz = f - md / 2 - 0.02;
+  box(g, mw, mh, md, 0, my, mz, mat('#d9dbde', { roughness: 0.4, metalness: 0.3 }));
+  box(g, mw * 0.68, mh * 0.8, 0.006, -mw * 0.14, my, mz + md / 2 + 0.003, mat('#1b1e22', { roughness: 0.15, metalness: 0.2 }));  // 유리 문
+  box(g, mw * 0.24, mh * 0.8, 0.006, mw * 0.36, my, mz + md / 2 + 0.003, mat('#2b2f35', { roughness: 0.4 }));                       // 조작판
+  box(g, mw * 0.12, 0.02, 0.004, mw * 0.36, my + mh * 0.22, mz + md / 2 + 0.007, mat('#7fd1a8', { emissive: '#4fbf8a', emissiveIntensity: 0.6 }));  // 표시창
+  // 밥솥 칸 간접등
+  box(g, (W - 2 * t) * 0.9, 0.01, 0.01, 0, y3 - 0.006, f - 0.03, mat('#fff1d0', { emissive: '#ffe3b3', emissiveIntensity: 0.7 }));
+}
+
+/**
+ * 커튼: 위에 레일, 양옆으로 걷어 둔 주름 커튼 두 폭(겉 커튼, 색 c), 그 뒤 가운데에 반투명 속커튼(쉬폰).
+ * 주름은 얇은 판을 지그재그로 꺾어 이어 붙인다. 앞면(+z)이 방 쪽, 뒤(-z)가 창 쪽.
+ */
+function curtain(g, W, D, H, c) {
+  const railH = 0.04, top = H - railH, z0 = -D / 2;
+  box(g, W, railH, Math.min(D, 0.06), 0, H - railH / 2, z0 + Math.min(D, 0.06) / 2 + 0.01, mat('#e9e6e0', { roughness: 0.5 }));   // 레일
+  const fabric = mat(c, { roughness: 0.95, side: THREE.DoubleSide });
+  const depth = Math.min(D * 0.55, 0.07), zMid = z0 + Math.min(D, 0.06) + depth / 2 + 0.01, hang = top - 0.01;
+  /** x0~x1 폭에 주름진 천 한 폭 */
+  const panel = (x0, x1, material, z = zMid, amp = depth / 2) => {
+    const n = Math.max(2, Math.round((x1 - x0) / 0.07)), p = (x1 - x0) / n;
+    for (let i = 0; i < n; i++) {
+      const len = Math.hypot(p, amp * 2) + 0.004;   // 이웃 판과 끝이 맞물리게 조금 길게
+      const m = box(g, len, hang, 0.006, x0 + p * (i + 0.5), 0.01 + hang / 2, z, material);
+      m.rotation.y = Math.atan2(amp * 2, p) * (i % 2 ? 1 : -1);   // 번갈아 꺾어 지그재그 주름
+    }
+  };
+  const side = Math.min(W * 0.22, 0.6);
+  panel(-W / 2, -W / 2 + side, fabric);
+  panel(W / 2 - side, W / 2, fabric);
+  // 속커튼: 가운데를 덮는 반투명 천 (그림자는 지지 않게)
+  const sheer = mat('#ffffff', { roughness: 1, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+  const before = g.children.length;
+  panel(-W / 2 + side * 0.6, W / 2 - side * 0.6, sheer, zMid - depth * 0.6, depth * 0.25);
+  for (const m of g.children.slice(before)) m.castShadow = false;
+}
+
 function drawer(g, W, D, H, c) {
   box(g, W, H, D, 0, H / 2, 0, mat(c));
   const n = Math.max(2, Math.round(H / 0.22));
@@ -746,7 +805,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
