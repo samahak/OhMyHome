@@ -182,6 +182,8 @@ function chairUnderDesk(chair, desk) {
 const OVERLAP_OK = new Set([['desk', 'shelf']].map((p) => p.sort().join('|')));
 /** 어떤 가구와도 겹쳐 놓아도 되는 종류 (커튼은 소파·침대·책상 등 창 앞 가구 뒤로 늘어진다) */
 const OVERLAP_ANY = new Set(['curtain']);
+/** 벽과 겹쳐 놓아도 되는 종류 (커튼은 창틀·벽 안쪽에 걸쳐 단다) */
+const WALL_OK = new Set(['curtain']);
 const overlapOk = (a, b) => OVERLAP_ANY.has(a.type) || OVERLAP_ANY.has(b.type) || OVERLAP_OK.has([a.type, b.type].sort().join('|'));
 
 /** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
@@ -191,7 +193,7 @@ export function findCollisions(furniture, walls) {
   const wc = walls.map((w) => wallCorners(w, 1));
   const overlap = (A, B) => A.some((a) => B.some((b) => convexOverlap(a, b)));   // 조각(ㄱ자는 둘) 중 하나라도 겹치면
   furniture.forEach((f, i) => {
-    for (const w of wc) {
+    if (!WALL_OK.has(f.type)) for (const w of wc) {
       if (overlap(fc[i], [w])) { bad.add(f.id); break; }
     }
     for (let j = i + 1; j < furniture.length; j++) {
