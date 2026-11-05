@@ -153,18 +153,7 @@ export function roomCenters(g, start, { minClear = 450, sameRoom = 3200, minGap 
       if (freeCell(g, ni, nj) && !reach[nk]) { reach[nk] = 1; queue.push(nk); }
     }
   }
-  // 막힌 칸까지의 거리 (두 번 훑는 근사 거리 변환, 칸 단위)
-  const dist = new Float32Array(N);
-  for (let k = 0; k < N; k++) dist[k] = g.blocked[k] ? 0 : 1e9;
-  const relax = (k, ni, nj, c) => { if (inside(g, ni, nj)) dist[k] = Math.min(dist[k], dist[nj * nx + ni] + c); };
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-    const k = j * nx + i;
-    relax(k, i - 1, j, 1); relax(k, i, j - 1, 1); relax(k, i - 1, j - 1, Math.SQRT2); relax(k, i + 1, j - 1, Math.SQRT2);
-  }
-  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
-    const k = j * nx + i;
-    relax(k, i + 1, j, 1); relax(k, i, j + 1, 1); relax(k, i + 1, j + 1, Math.SQRT2); relax(k, i - 1, j + 1, Math.SQRT2);
-  }
+  const dist = clearance(g);
   const cand = [];
   for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
     const k = j * nx + i;
@@ -185,6 +174,46 @@ export function roomCenters(g, start, { minClear = 450, sameRoom = 3200, minGap 
     if (picked.length >= max) break;
   }
   return orderByWalk(g, s, picked).map((p) => ({ x: p.x, y: p.y }));
+}
+
+/** 막힌 칸까지의 거리 (두 번 훑는 근사 거리 변환, 칸 단위) */
+export function clearance(g) {
+  const { nx, ny } = g, N = nx * ny;
+  const dist = new Float32Array(N);
+  for (let k = 0; k < N; k++) dist[k] = g.blocked[k] ? 0 : 1e9;
+  const relax = (k, ni, nj, c) => { if (inside(g, ni, nj)) dist[k] = Math.min(dist[k], dist[nj * nx + ni] + c); };
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i;
+    relax(k, i - 1, j, 1); relax(k, i, j - 1, 1); relax(k, i - 1, j - 1, Math.SQRT2); relax(k, i + 1, j - 1, Math.SQRT2);
+  }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
+    const k = j * nx + i;
+    relax(k, i + 1, j, 1); relax(k, i, j + 1, 1); relax(k, i + 1, j + 1, Math.SQRT2); relax(k, i - 1, j + 1, Math.SQRT2);
+  }
+  return dist;
+}
+
+/**
+ * 빈 칸을 이어진 덩어리(구역)로 나눈다 (4방향). 문을 벽으로 막은 지도에 쓰면 방마다 한 구역이 된다.
+ * 반환 { label: Int32Array(칸마다 구역 번호, 막힌 칸 -1), sizes: [구역마다 칸 수] }
+ */
+export function zonesOf(g) {
+  const { nx, ny } = g, N = nx * ny;
+  const label = new Int32Array(N).fill(-1), sizes = [];
+  for (let k0 = 0; k0 < N; k0++) {
+    if (g.blocked[k0] || label[k0] >= 0) continue;
+    const z = sizes.length, queue = [k0];
+    label[k0] = z;
+    for (let q = 0; q < queue.length; q++) {
+      const k = queue[q], i = k % nx, j = Math.floor(k / nx);
+      for (const [di, dj] of NB.slice(0, 4)) {
+        const ni = i + di, nj = j + dj, nk = nj * nx + ni;
+        if (freeCell(g, ni, nj) && label[nk] < 0) { label[nk] = z; queue.push(nk); }
+      }
+    }
+    sizes.push(queue.length);
+  }
+  return { label, sizes };
 }
 
 /**
@@ -224,7 +253,7 @@ export function orderByWalk(g, start, pts) {
 }
 
 /** from에서 각 칸까지 걸어서 몇 칸인지 (4방향, 못 가면 Infinity) */
-function walkSteps(g, from) {
+export function walkSteps(g, from) {
   const { nx } = g;
   const steps = new Float32Array(nx * g.ny).fill(Infinity);
   const [si, sj] = cellOf(g, from);
