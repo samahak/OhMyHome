@@ -53,7 +53,7 @@ function endDrawTool() { if (editor.tool !== 'select') editor.setTool('select');
 view.renderer.domElement.addEventListener('pointerdown', (e) => { if (e.button === 0 && view.pickFurniture(e)) endDrawTool(); });
 
 document.querySelectorAll('.tool-btn').forEach((b) => b.addEventListener('click', () => {
-  if (b.dataset.tool === 'pick' && !state.plan.image) { status('먼저 도면 이미지를 여세요.'); return; }
+  if (b.dataset.tool === 'pick' && !state.plan.image) { status('먼저 도면을 불러오세요.'); return; }
   // 켜진 도구 버튼을 다시 누르면 끄고 선택 도구로 돌아간다
   editor.setTool(b.dataset.tool === editor.tool ? 'select' : b.dataset.tool);
 }));
@@ -104,39 +104,10 @@ $('wall-height').addEventListener('change', (e) => {
   emit('plan');
 });
 
-/* ---------- 도면 불러오기 ---------- */
-function readDataURL(file) {
-  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
-}
+/* ---------- 도면 ---------- */
 function loadImg(src) {
   return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 }
-
-$('file-plan').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  try {
-    let src = await readDataURL(file);
-    let im = await loadImg(src);
-    // 저장 공간을 아끼려고 큰 도면은 줄인다 (벽 인식에는 충분한 크기)
-    const k = Math.min(1, 2400 / Math.max(im.width, im.height));
-    if (k < 1 || file.size > 1.5e6) {
-      const c = document.createElement('canvas');
-      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-      const g = c.getContext('2d');
-      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
-      g.drawImage(im, 0, 0, c.width, c.height);
-      src = c.toDataURL('image/jpeg', 0.92);
-      im = await loadImg(src);
-    }
-    setPlanImage({ src, width: im.width, height: im.height }, UNSCALED_WIDTH_MM / im.width, false);
-    editor.setTool('scale');
-    status('도면을 열었습니다. 먼저 기준 치수를 맞추세요: 도면의 치수선 하나(예: 거실 3.8m) 양 끝을 찍고 길이를 넣으면 됩니다.');
-  } catch {
-    alert('이미지를 읽지 못했습니다. PNG나 JPG 파일인지 확인해 주세요.');
-  }
-});
 
 function setPlanImage(image, mmPerPx, scaleSet) {
   const p = state.plan;
@@ -165,7 +136,7 @@ $('btn-sample').addEventListener('click', async () => {
 $('btn-plan-width').addEventListener('click', () => {
   const p = state.plan;
   const v = G.parseLengthMM($('plan-width-mm').value);
-  if (!p.image) { status('먼저 도면 이미지를 여세요.'); return; }
+  if (!p.image) { status('먼저 도면을 불러오세요.'); return; }
   if (!(v > 0)) { status('도면 전체 가로 길이를 넣어 주세요. (예: 17.5m 또는 17500)'); return; }
   checkpoint();
   // 이미지 윗변 전체를 기준선으로 삼는다
@@ -339,7 +310,7 @@ async function pickWallColor(mm) {
 
 async function runDetect() {
   const p = state.plan;
-  if (!p.image) { status('먼저 도면 이미지를 여세요.'); return; }
+  if (!p.image) { status('먼저 도면을 불러오세요.'); return; }
   if (detectMode === 'color' && !detectColor) { editor.setTool('pick'); return; }
   status('벽을 찾는 중…');
   const full = await planImageData();
@@ -1283,7 +1254,7 @@ $('file-project').addEventListener('change', async (e) => {
     $('floor-num').value = state.plan.floor;
     editor.fit();
     view.resetCamera('persp');
-    status('프로젝트를 불러왔습니다.');
+    status('도면을 불러왔습니다.');
     doorsForOldProject(data);
   } catch (err) {
     alert(`불러오지 못했습니다: ${err.message}`);
@@ -1381,7 +1352,7 @@ if (restored) {
   // 브라우저 저장소에만 있던 작업이면 바로 프로젝트 폴더에도 써 둔다 (다른 주소에서도 보이게)
   if (!fromServer && savesToServer()) saveNow();
 }
-else status('📐 도면 이미지를 열거나 ‘샘플 도면으로 해 보기’를 눌러 시작하세요.');
+else status('📂 ‘도면 불러오기(json)’로 저장한 도면을 열거나 ‘샘플 도면으로 해 보기’를 눌러 시작하세요.');
 
 // 개발·점검용
 window.__ohmyhome = { state, editor, view, runDetect };
