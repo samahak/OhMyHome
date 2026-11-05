@@ -75,7 +75,7 @@
       <li><span class="no">2</span>실행하기</li>
       <li><span class="no">3</span>화면 둘러보기</li>
       <li><span class="no">4</span>샘플 도면으로 바로 해 보기</li>
-      <li><span class="no">5</span>내 도면 넣기</li>
+      <li><span class="no">5</span>도면 열고 다듬기</li>
       <li><span class="no">6</span>가구 놓기</li>
       <li><span class="no">7</span>3D로 보기</li>
       <li><span class="no">8</span>둘러보기 (1인칭 걷기)</li>
@@ -99,7 +99,7 @@
     <tr><td><code>run_ohmyhome.sh</code> / <code>run_ohmyhome.bat</code></td><td>실행 파일 (macOS·Linux / Windows)</td></tr>
     <tr><td><code>serve.py</code></td><td>실행 파일이 띄우는 서버 — 작업을 같은 폴더의 <code>ohmyhome-project.json</code>에 저장합니다</td></tr>
     <tr><td><code>index.html</code>, <code>css/</code>, <code>js/</code></td><td>프로그램 본체</td></tr>
-    <tr><td><code>sample/*.ohmyhome.json</code></td><td>바로 열어 볼 수 있는 예시 도면 (55㎡ A-1형 · A-2형)</td></tr>
+    <tr><td><code>sample/*.ohmyhome.json</code></td><td>바로 열어 볼 수 있는 예시 도면 (55㎡ A-1 · A-2 · B-1 · B-2 · C · D형)</td></tr>
     <tr><td><code>OhMyHome_Guide.pdf</code></td><td>이 문서</td></tr>
   </table>
 </section>
@@ -163,10 +163,10 @@ run_ohmyhome.bat</pre>
   </figure>
   <table>
     <tr><th style="width:24%">영역</th><th>하는 일</th></tr>
-    <tr><td>왼쪽 <span class="btn">① 도면</span></td><td>도면 이미지 열기, 기준 치수(축척) 맞추기, 벽 자동 인식, 벽·방·창 그리기 도구, 벽 높이·층수</td></tr>
+    <tr><td>왼쪽 <span class="btn">① 도면</span></td><td>도면 불러오기(json), 기준 치수(축척) 맞추기, 벽 자동 인식, 벽·방·창 그리기 도구, 벽 높이·층수</td></tr>
     <tr><td>왼쪽 <span class="btn">② 가구</span></td><td>샘플 가구 목록, 사진으로 가구 추가, 놓은 가구 목록</td></tr>
     <tr><td>가운데 위 막대</td><td><span class="btn">2D 도면</span> <span class="btn">나란히</span> <span class="btn">3D</span> 보기 전환, <span class="btn">🚶 둘러보기</span>, 3D 시점(위에서·비스듬히), 벽 투명도, 벽 낮게</td></tr>
-    <tr><td>맨 위 오른쪽</td><td>되돌리기·다시 하기, 새 프로젝트, 불러오기, 저장(.json), 2D 캡처, 3D 캡처</td></tr>
+    <tr><td>맨 위 오른쪽</td><td>되돌리기·다시 하기, 새 프로젝트, 저장(.json), 2D 캡처, 3D 캡처</td></tr>
     <tr><td>오른쪽 속성 패널</td><td>가구·벽·방·창을 누르면 나타나 크기·위치·회전 등을 고칩니다</td></tr>
     <tr><td>맨 아래 상태줄</td><td>지금 할 일과 결과를 알려 줍니다</td></tr>
   </table>
@@ -176,17 +176,17 @@ run_ohmyhome.bat</pre>
   <h2><span class="no">4</span>샘플 도면으로 바로 해 보기</h2>
   <p>처음이라면 들어 있는 예시 도면으로 기능을 먼저 둘러보세요. 벽·창·욕실/주방 설비·현관문까지 모두 입력되어 있습니다.</p>
   <ol class="steps">
-    <li>맨 위 <span class="btn">불러오기</span>를 누릅니다.</li>
-    <li>배포 폴더의 <code>sample/55A2_plan.ohmyhome.json</code>(또는 좌우가 반전된 <code>55A1_plan.ohmyhome.json</code>)을 고릅니다.</li>
+    <li>왼쪽 <span class="btn">① 도면</span> 탭의 <span class="btn">📂 도면 불러오기(json)</span>를 누릅니다.</li>
+    <li>배포 폴더 <code>sample/</code>에서 보고 싶은 형의 파일(<code>55A2_plan.ohmyhome.json</code> · <code>55A1</code> · <code>55B1</code> · <code>55B2</code> · <code>55C</code> · <code>55D</code>)을 고릅니다.</li>
     <li><span class="btn">나란히</span>로 2D와 3D를 함께 보거나, <span class="btn">🚶 둘러보기</span>를 눌러 바로 걸어 들어가 봅니다.</li>
   </ol>
   <div class="note"><b>참고</b>왼쪽 <span class="btn">샘플 도면으로 해 보기</span>는 벽 자동 인식을 시험하는 간단한 연습용 도면을 띄웁니다.</div>
 </section>
 
 <section>
-  <h2><span class="no">5</span>내 도면 넣기</h2>
-  <h3>① 도면 이미지 열기</h3>
-  <p>왼쪽 <span class="btn">도면 이미지 열기</span>로 평면도 그림(PNG·JPG)을 넣습니다. PDF 도면은 화면을 캡처해서 이미지로 넣으면 됩니다. 분양 안내 사진처럼 비스듬히 찍은 사진보다는 위에서 본 평면도가 정확합니다.</p>
+  <h2><span class="no">5</span>도면 열고 다듬기</h2>
+  <h3>① 도면 불러오기</h3>
+  <p>왼쪽 <span class="btn">📂 도면 불러오기(json)</span>로 도면 파일(.json)을 엽니다. 예시 도면 파일이나, <span class="btn">저장(.json)</span>으로 받아 둔 파일, 다른 사람이 보내 준 파일을 열 수 있습니다. 평면도 그림(PNG·JPG)을 새로 넣는 기능은 없습니다. 아래 ②·③은 연 도면의 크기나 벽을 고칠 때 씁니다.</p>
 
   <h3>② 기준 치수 맞추기 (가장 중요)</h3>
   <p>그림만으로는 실제 크기를 알 수 없으므로, 도면에 적힌 치수 하나로 전체 크기를 맞춥니다.</p>
@@ -238,7 +238,7 @@ run_ohmyhome.bat</pre>
     <li>오른쪽 속성 패널에서 가로·깊이·높이, 회전, 바닥에서 띄움(벽걸이 TV·월패드 등 — 월패드는 1.3m 띄워 놓이니 🧲 벽에 붙이기로 벽에 답니다), 색을 고칩니다.</li>
   </ol>
   <ul>
-    <li><b>TV</b>는 인치(55·65·75…), <b>소파</b>는 인원(2~6인), <b>식탁</b>은 인원(2·4·6·8인)을 고르면 크기가 맞춰집니다.</li>
+    <li><b>전자레인지 장</b>은 아래 수납 · 전자레인지 칸 · 밥솥 칸 · 위 수납이 있는 키큰 렌지대(600×450×1,800)입니다. <b>커튼</b>은 창 앞 벽에 <span class="btn">🧲 벽에 붙이기</span>로 답니다(양옆 주름 커튼 + 가운데 속커튼, 색은 겉 커튼 천 색). <b>TV</b>는 인치(55·65·75…), <b>소파</b>는 인원(2~6인), <b>식탁</b>은 인원(2·4·6·8인)을 고르면 크기가 맞춰집니다.</li>
     <li>왼쪽 <b>배치된 가구</b> 목록은 종류별(침대·소파·의자…)로 묶여 보입니다.</li>
     <li><b>식물</b>은 놓은 뒤 속성 패널의 <b>식물 종류</b>(몬스테라·여인초·올리브나무·고무나무·아레카야자·산세베리아·금전수·스킨답서스)를 고르면 3D 모양과 크기가 바뀝니다. 색상은 화분 색입니다. 스킨답서스를 선반 위(바닥에서 띄움)에 두면 덩굴이 아래로 늘어집니다.</li>
     <li>속성 패널에 <b>모델명</b>과 <b>가격</b>을 넣으면 배치된 가구 목록 위에 <b>전체 합계</b>, 종류 제목 옆에 소계가 나옵니다. 가격은 1,290,000 · 1290000원 · 129만 · 129만 9천처럼 넣을 수 있습니다.</li>
@@ -266,8 +266,8 @@ run_ohmyhome.bat</pre>
     <tr><td>벽 투명도</td><td>벽을 반투명하게 해서 안쪽을 봅니다</td></tr>
     <tr><td>벽 낮게</td><td>벽을 허리 높이(1m)로 잘라 단면도처럼 봅니다</td></tr>
     <tr><td>바닥에 도면</td><td>3D 바닥에 도면 그림을 깔지 정합니다</td></tr>
-    <tr><td><span class="btn">2D 캡처</span></td><td>2D 도면 전체를 가로 PNG 그림(3840×2160)으로 받습니다</td></tr>
-    <tr><td><span class="btn">3D 캡처</span></td><td>집을 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히 본 가로 PNG 그림 세 장(1920×1080)을 받습니다. 브라우저가 여러 파일 받기를 물으면 허용하세요. 둘러보기 중에는 지금 화면 한 장입니다</td></tr>
+    <tr><td><span class="btn">2D 캡처</span></td><td>PDF 한 파일로 받습니다 — 도면 전체 1쪽 + 제목·설명·바깥 치수를 뺀 집 부분만 크게 1쪽</td></tr>
+    <tr><td><span class="btn">3D 캡처</span></td><td>PDF 한 파일로 받습니다 — 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히를 바닥 도면 그림과 함께 3쪽 + 도면 그림을 뺀 집만 3쪽. 둘러보기 중에는 지금 화면 1쪽입니다</td></tr>
   </table>
 </section>
 
@@ -303,7 +303,7 @@ run_ohmyhome.bat</pre>
     <li>작업은 <b>프로그램 폴더의 <code>ohmyhome-project.json</code></b>에 자동 저장됩니다. 실행 파일로 띄운 서버가 저장해 주므로, localhost나 내 PC IP 주소, 같은 와이파이의 휴대폰 등 <b>어느 주소로 열어도 같은 작업</b>이 보입니다. 다른 기기에서 고쳤으면 새로 고침하세요. 브라우저에도 예비로 함께 저장합니다.</li>
     <li><b>배치 안</b>: <span class="btn">② 가구</span> 탭 맨 위에서 가구 배치를 1안 · 2안 · 3안…으로 여러 개 둘 수 있습니다. <span class="btn">＋ 지금 안 복사해서 추가</span>는 보고 있는 안을 그대로 복사해 새 안을 만들고, 안을 누르면 그 배치로 바뀝니다. 안마다 가구 수와 합계가 보이고, <span class="btn">이름 바꾸기</span> · <span class="btn">이 안 삭제</span>도 됩니다. 도면과 문은 모든 안이 함께 씁니다.<br>마음에 드는 안은 <span class="btn">🔓 보호하기</span>를 눌러 잠가 두세요. 안 이름 옆에 🔒이 붙고, 그 안의 가구는 옮기거나 고치거나 지울 수 없습니다(가구를 눌러 정보를 보는 것은 됩니다). 다시 누르면 풀립니다. 보호 중인 안은 지울 수 없고, 복사해 만든 새 안은 자유롭게 고칠 수 있습니다.</li>
     <li><span class="btn">저장(.json)</span>을 누르면 도면 그림·벽·가구·사진까지 파일 하나로 받습니다. 다른 PC로 옮기거나 보관할 때 쓰세요.</li>
-    <li><span class="btn">불러오기</span>로 그 파일을 다시 엽니다.</li>
+    <li>왼쪽 <span class="btn">📂 도면 불러오기(json)</span>로 그 파일을 다시 엽니다.</li>
     <li><span class="btn">새 프로젝트</span>는 도면과 놓은 가구를 지웁니다(사진으로 만든 내 가구 목록은 남습니다). 실수했다면 <span class="btn">되돌리기</span>로 돌아갑니다.</li>
   </ul>
   <div class="warn"><b>주의</b>실행 파일 없이 다른 방법으로 열면 브라우저에만 저장되고, 이때는 localhost와 IP 주소처럼 주소마다 저장 공간이 따로입니다. 두 기기에서 동시에 고치면 나중에 저장한 쪽이 남습니다. 중요한 작업은 <b>저장(.json)</b>으로 파일을 받아 두세요.</div>

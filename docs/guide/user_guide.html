@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>OhMyHome 웹 사용 가이드</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm; @bottom-center { content: counter(page); font: 9pt sans-serif; color: #8a93a0; } }
+  @page :first { @bottom-center { content: none; } }
+  :root { --ink: #1d2430; --sub: #5b6573; --line: #dde2e8; --accent: #2f6fed; --soft: #eef3fe; --warn: #fff6e6; --warn-line: #f0c36d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: 10.5pt/1.65 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; background: #fff; }
+  h1, h2, h3 { line-height: 1.3; margin: 0; }
+  h2 { font-size: 17pt; margin: 0 0 10pt; padding-bottom: 6pt; border-bottom: 2px solid var(--ink); break-after: avoid; }
+  h2 .no { color: var(--accent); margin-right: 6pt; }
+  h3 { font-size: 12pt; margin: 16pt 0 6pt; break-after: avoid; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 18pt; }
+  li { margin: 2pt 0; }
+  section { break-before: page; }
+  section.flow { break-before: auto; margin-top: 22pt; }
+  code, kbd { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 9.2pt; }
+  kbd { display: inline-block; padding: 0 5pt; border: 1px solid #c5ccd5; border-bottom-width: 2px; border-radius: 4px; background: #f7f8fa; line-height: 1.5; }
+  .btn { display: inline-block; padding: 0 6pt; border: 1px solid #c9d2de; border-radius: 5px; background: #f7f9fc; font-size: 9.5pt; white-space: nowrap; }
+  pre { margin: 3pt 0 7pt; padding: 6pt 10pt; background: #1f2633; color: #e8edf3; border-radius: 6px; font: 9.3pt/1.55 'SF Mono', Menlo, Consolas, monospace; white-space: pre-wrap; break-inside: avoid; }
+  pre .c { color: #8fa1b8; }
+  figure { margin: 8pt 0 12pt; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; }
+  figure.small img { width: 80%; margin: 0 auto; }
+  figure.small figcaption { text-align: center; }
+  figcaption { font-size: 9pt; color: var(--sub); margin-top: 4pt; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 9.8pt; break-inside: avoid; }
+  th, td { border-bottom: 1px solid var(--line); padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #f4f6f9; font-weight: 600; }
+  .note, .warn { padding: 8pt 11pt; border-radius: 6px; margin: 6pt 0 10pt; break-inside: avoid; }
+  .note { background: var(--soft); border-left: 3px solid var(--accent); }
+  .warn { background: var(--warn); border-left: 3px solid var(--warn-line); }
+  .note b:first-child, .warn b:first-child { margin-right: 4pt; }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps > li { counter-increment: s; position: relative; padding-left: 26pt; margin: 6pt 0; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: 1pt; width: 17pt; height: 17pt; border-radius: 50%; background: var(--accent); color: #fff; font-size: 9pt; font-weight: 700; text-align: center; line-height: 17pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }
+  .two > div { break-inside: avoid; }
+
+  /* 표지 */
+  .cover { height: 255mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover .top { padding-top: 40mm; }
+  .cover .brand { font-size: 12pt; color: var(--accent); font-weight: 700; letter-spacing: .5pt; }
+  .cover h1 { font-size: 34pt; margin: 6pt 0 10pt; }
+  .cover .lead { font-size: 13pt; color: var(--sub); max-width: 130mm; }
+  .cover img { width: 100%; border-radius: 8px; border: 1px solid var(--line); margin-top: 16mm; }
+  .cover .meta { font-size: 9.5pt; color: var(--sub); border-top: 1px solid var(--line); padding-top: 8pt; }
+  .toc { margin-top: 0; }
+  .toc ol { list-style: none; padding: 0; columns: 2; column-gap: 14mm; }
+  .toc li { padding: 3pt 0; border-bottom: 1px dotted var(--line); break-inside: avoid; }
+  .toc .no { color: var(--accent); font-weight: 700; margin-right: 6pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="top">
+    <div class="brand">OhMyHome</div>
+    <h1>웹 사용 가이드</h1>
+    <p class="lead">도면 이미지를 넣으면 크기를 재어 3D로 세우고, 가구를 놓아 보고, 현관부터 방까지 걸어서 둘러볼 수 있는 웹 서비스입니다. 설치 없이 브라우저에서 바로 씁니다.</p>
+    <img src="img/04-3d.jpg" alt="3D로 세운 55㎡ 샘플 도면">
+  </div>
+  <div class="meta">접속 주소 <b>https://samahak.github.io/OhMyHome/</b> · 도면과 가구 정보는 서버로 보내지 않고 내 브라우저에만 저장됩니다.</div>
+</div>
+
+<section>
+  <h2>차례</h2>
+  <div class="toc">
+    <ol>
+      <li><span class="no">1</span>시작하기</li>
+      <li><span class="no">2</span>화면 둘러보기</li>
+      <li><span class="no">3</span>샘플로 바로 해 보기</li>
+      <li><span class="no">4</span>도면 열고 다듬기</li>
+      <li><span class="no">5</span>가구 놓기</li>
+      <li><span class="no">6</span>3D로 보기</li>
+      <li><span class="no">7</span>둘러보기 (1인칭 걷기)</li>
+      <li><span class="no">8</span>저장하고 옮기기</li>
+      <li><span class="no">9</span>단축키</li>
+      <li><span class="no">10</span>문제가 생겼을 때</li>
+    </ol>
+  </div>
+
+  <h2 style="margin-top:22pt"><span class="no">1</span>시작하기</h2>
+  <ol class="steps">
+    <li>브라우저 주소창에 <b>https://samahak.github.io/OhMyHome/</b>을 입력합니다.</li>
+    <li>화면이 뜨면 바로 쓸 수 있습니다. 회원 가입이나 로그인은 없습니다.</li>
+    <li>처음이라면 3장의 샘플로 기능을 먼저 둘러보고, 4장부터 도면 파일을 열어 보세요.</li>
+  </ol>
+  <table>
+    <tr><th style="width:28%">필요한 것</th><th>내용</th></tr>
+    <tr><td>웹 브라우저</td><td>Chrome · Edge · Safari 최신 버전.</td></tr>
+    <tr><td>PC 권장</td><td>도면을 그리고 가구를 옮기는 작업은 마우스와 키보드가 있는 PC가 편합니다. 휴대폰·태블릿에서는 보기 위주로 쓰세요.</td></tr>
+    <tr><td>인터넷 연결</td><td>화면과 3D 그래픽을 인터넷에서 받아 옵니다.</td></tr>
+  </table>
+  <div class="note"><b>개인정보</b>넣은 도면 그림·가구 사진·배치는 <b>내 브라우저 안에만</b> 저장되고, 어느 서버로도 보내지지 않습니다. 그래서 다른 사람이 내 작업을 볼 수 없고, 반대로 다른 PC나 브라우저에서는 내 작업이 보이지 않습니다(8장 참고).</div>
+</section>
+
+<section>
+  <h2><span class="no">2</span>화면 둘러보기</h2>
+  <figure class="small">
+    <img src="img/01-main.jpg" alt="OhMyHome 첫 화면">
+    <figcaption>샘플 도면을 연 화면 — 왼쪽 패널, 가운데 2D 도면과 3D 화면</figcaption>
+  </figure>
+  <table>
+    <tr><th style="width:24%">영역</th><th>하는 일</th></tr>
+    <tr><td>왼쪽 <span class="btn">① 도면</span></td><td>도면 불러오기(json), 기준 치수(축척) 맞추기, 벽 자동 인식, 벽·방·창 그리기 도구, 벽 높이·층수</td></tr>
+    <tr><td>왼쪽 <span class="btn">② 가구</span></td><td>배치 안, 샘플 가구 목록, 사진으로 가구 추가, 놓은 가구 목록</td></tr>
+    <tr><td>가운데 위 막대</td><td><span class="btn">2D 도면</span> <span class="btn">나란히</span> <span class="btn">3D</span> 보기 전환, <span class="btn">🚶 둘러보기</span>, 3D 시점(위에서·비스듬히), 벽 투명도, 벽 낮게</td></tr>
+    <tr><td>맨 위 오른쪽</td><td>되돌리기·다시 하기, 새 프로젝트, 저장(.json), 2D 캡처, 3D 캡처</td></tr>
+    <tr><td>오른쪽 속성 패널</td><td>가구·벽·방·창·문을 누르면 나타나 크기·위치·회전 등을 고칩니다</td></tr>
+    <tr><td>맨 아래 상태줄</td><td>지금 할 일과 결과를 알려 줍니다</td></tr>
+  </table>
+</section>
+
+<section class="flow">
+  <h2><span class="no">3</span>샘플로 바로 해 보기</h2>
+  <ol class="steps">
+    <li>왼쪽 <span class="btn">① 도면</span> 탭에서 <span class="btn">샘플 도면으로 해 보기</span>를 누릅니다.</li>
+    <li>연습용 도면이 뜨면 <span class="btn">벽 인식 실행</span>을 눌러 벽이 세워지는 것을 봅니다.</li>
+    <li><span class="btn">② 가구</span> 탭에서 가구를 몇 개 놓고, <span class="btn">나란히</span>로 2D와 3D를 함께 보거나 <span class="btn">🚶 둘러보기</span>로 걸어 들어가 봅니다.</li>
+  </ol>
+  <div class="note"><b>참고</b>실제 아파트(55㎡) 예시 도면 파일(.json)을 받았다면 왼쪽 <span class="btn">📂 도면 불러오기(json)</span>로 그 파일을 열어 보세요. 벽·창·문·욕실/주방 설비가 모두 들어 있습니다.</div>
+</section>
+
+<section>
+  <h2><span class="no">4</span>도면 열고 다듬기</h2>
+  <h3>① 도면 불러오기</h3>
+  <p>왼쪽 <span class="btn">📂 도면 불러오기(json)</span>로 도면 파일(.json)을 엽니다. 예시 도면 파일이나, <span class="btn">저장(.json)</span>으로 받아 둔 파일, 다른 사람이 보내 준 파일을 열 수 있습니다. 평면도 그림(PNG·JPG)을 새로 넣는 기능은 없습니다. 아래 ②·③은 연 도면의 크기나 벽을 고칠 때 씁니다.</p>
+
+  <h3>② 기준 치수 맞추기 (가장 중요)</h3>
+  <p>그림만으로는 실제 크기를 알 수 없으므로, 도면에 적힌 치수 하나로 전체 크기를 맞춥니다.</p>
+  <ol class="steps">
+    <li><span class="btn">📏 치수 확인·맞추기 — 방 안을 클릭</span>을 누르고, 치수가 적힌 방(예: 거실) 안을 한 번 누릅니다.</li>
+    <li>벽과 벽 사이의 가로·세로가 <b>지금 몇 mm로 보이는지</b> 창이 뜹니다.</li>
+    <li>도면에 적힌 실제 치수로 고치고 <kbd>Enter</kbd>(또는 <span class="btn">맞추기</span>)를 누르면 도면 전체 크기가 그에 맞게 바뀝니다.</li>
+  </ol>
+  <figure>
+    <img src="img/02-measure.jpg" alt="치수 확인 창">
+    <figcaption>거실을 누르면 가로·세로 크기가 뜹니다. 값을 고치면 전체가 다시 맞춰집니다.</figcaption>
+  </figure>
+  <p>길이는 <b>3.8m</b>, <b>3.8</b>, <b>3800</b>, <b>3,800</b>, <b>380cm</b> 어느 형식으로 넣어도 됩니다(단위 없이 50보다 작으면 m로 읽습니다). 나중에 왼쪽 ‘기준 치수’ 칸의 값만 고쳐 다시 맞출 수도 있습니다.</p>
+
+  <h3>③ 벽 세우기</h3>
+  <ul>
+    <li><span class="btn">벽 인식 실행</span>: 도면의 굵은 벽을 자동으로 찾습니다. 색이 들어간 도면은 <span class="btn">벽 색 찍기</span>를 누른 뒤 벽을 한 번 누르세요.</li>
+    <li>글자나 치수선이 벽으로 잡히면 ‘작은 조각 무시’를 키우고, 얇은 벽이 빠지면 ‘최소 벽 두께’를 낮춰 다시 실행합니다.</li>
+    <li>빠진 벽은 <span class="btn">🧱 벽 그리기</span>로 클릭하며 이어 그리고(더블클릭·<kbd>Esc</kbd>로 끝), 잘못 잡힌 벽은 <span class="btn">🧽 지우기</span>로 누릅니다.</li>
+  </ul>
+
+  <h3>④ 방 영역과 이름</h3>
+  <p><span class="btn">⬛ 방 영역</span>으로 방 꼭짓점을 찍으면 면적(㎡·평)과 가로×세로가 나옵니다. 방 이름을 붙여 두면 둘러보기가 더 똑똑해집니다.</p>
+  <table>
+    <tr><th style="width:30%">방 이름에 들어간 말</th><th>둘러보기에서 자동으로 해 주는 것</th></tr>
+    <tr><td>욕실 · 화장실</td><td>변기·세면대(가장 큰 욕실에는 욕조까지)를 놓습니다</td></tr>
+    <tr><td>주방 · 부엌</td><td>싱크대(개수대·인덕션·상부장·후드)를 놓습니다</td></tr>
+    <tr><td>거실</td><td>우물형 천장(간접조명). 이름이 없으면 도면 아래쪽에서 가로가 가장 넓은 공간을 거실로 봅니다</td></tr>
+  </table>
+
+  <h3>⑤ 창문</h3>
+  <p>도면에서 벽 위에 연하게 그려진 창 자리와 바깥벽이 끊긴 곳은 자동으로 창이 됩니다. 직접 내려면 <span class="btn">🪟 창문</span> 도구로 벽을 누르세요. 창을 누르면 폭, 바닥에서 창 아래까지 높이, 창 높이를 고칠 수 있습니다(허리창 / 바닥까지 큰 창).</p>
+
+  <h3>⑥ 문</h3>
+  <p>벽 인식을 하면 도면에 여닫이 문 기호(문짝 선 + 여닫는 호)나 미서기 문 기호(벽 사이에 엇갈린 두 선)가 그려진 틈마다 문이 달립니다. 나중에 다시 찾으려면 <span class="btn">🚪 문 기호 찾아 문 달기</span>를 누르세요. 직접 달려면 <span class="btn">🚪 문</span> 도구로 벽이 끊긴 틈을 누르세요(누른 쪽으로 열립니다).</p>
+  <ul>
+    <li>문을 누르면 <span class="btn">⇋ 경첩 반대로</span> · <span class="btn">⇅ 여는 쪽 반대로</span>로 고칠 수 있습니다.</li>
+    <li>문 모양은 <span class="btn">여닫이</span> · <span class="btn">미닫이</span> · <span class="btn">미서기</span> · <span class="btn">중문</span>으로 바꿉니다. 미닫이는 벽 면을 따라 밀려 열리고, 폭이 1.3m를 넘으면 두 짝이 양쪽으로 열립니다. 미서기는 벽 두께 안의 두 짝 중 한 짝을 옆으로 밀어 엽니다.</li>
+    <li><span class="btn">🚪 문</span> 도구로 새로 다는 문은 마지막에 고른 모양이 됩니다. 벽 면 밖에 붙는 미닫이 문 기호는 자동으로 찾지 않으니 직접 달아 주세요.</li>
+  </ul>
+  <p><span class="btn">현관 중문</span>을 누르면 현관문 안쪽, 현관과 집 안 사이의 틈에 <b>유리 3연동 중문</b>을 답니다. 문 위는 천장까지 고정 유리입니다. 현관 방 영역(이름 ‘현관’)을 그려 두면 그 가장자리에서 자리를 찾습니다. 현관문 자리를 먼저 정해야 합니다(🚶 둘러보기를 한 번 하면 정해집니다). 자리가 어긋나면 2D에서 중문을 끌거나 속성의 <b>현관문에서 (mm)</b>를 고치세요. 양옆 벽을 따라 앞뒤로만 움직이고, 폭은 양옆 벽에 맞춰집니다.</p>
+</section>
+
+<section>
+  <h2><span class="no">5</span>가구 놓기</h2>
+  <figure>
+    <img src="img/03-furniture.jpg" alt="가구 탭과 속성 패널">
+    <figcaption>왼쪽 ② 가구 탭에서 가구를 고르고, 오른쪽 속성 패널에서 크기·인원·회전을 고칩니다.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>왼쪽 <span class="btn">② 가구</span> 탭에서 가구를 누르면 도면 가운데 빈자리에 놓입니다.</li>
+    <li>2D나 3D 화면에서 가구를 <b>끌어서</b> 옮깁니다.</li>
+    <li><kbd>Shift</kbd>+클릭으로 가구를 <b>여러 개</b> 고르면 함께 옮기고·돌리고·복제·삭제할 수 있습니다. 2D에서는 빈 곳을 <kbd>Shift</kbd>+끌어 사각형 안의 가구를 한꺼번에 고릅니다.</li>
+    <li>오른쪽 속성 패널에서 가로·깊이·높이, 회전, 바닥에서 띄움(벽걸이 TV·월패드 등), 색을 고칩니다. 월패드는 1.3m 띄워 놓이니 <span class="btn">🧲 벽에 붙이기</span>로 벽에 답니다.</li>
+  </ol>
+  <ul>
+    <li><b>전자레인지 장</b>은 아래 수납 · 전자레인지 칸 · 밥솥 칸 · 위 수납이 있는 키큰 렌지대(600×450×1,800)입니다. <b>커튼</b>은 창 앞 벽에 <span class="btn">🧲 벽에 붙이기</span>로 답니다(양옆 주름 커튼 + 가운데 속커튼, 색은 겉 커튼 천 색). <b>TV</b>는 인치(55·65·75…), <b>소파</b>는 인원(2~6인), <b>식탁</b>은 인원(2·4·6·8인)을 고르면 크기가 맞춰집니다.</li>
+    <li><b>식물</b>은 속성 패널의 <b>식물 종류</b>(몬스테라·여인초·올리브나무·고무나무·아레카야자·산세베리아·금전수·스킨답서스)를 고르면 3D 모양과 크기가 바뀝니다. 스킨답서스를 선반 위에 두면 덩굴이 아래로 늘어집니다.</li>
+    <li><b>ㄱ자 주방 싱크대</b>는 가로·세로 길이와 상판 깊이를 고치고, <span class="btn">⇋ 좌우 반전</span>으로 꺾인 쪽을 바꿉니다.</li>
+    <li><span class="btn">🧲 벽에 붙이기</span>: 가장 가까운 벽에 가구를 붙입니다. 2D에서 <b>두꺼운 선이 가구의 앞면</b>입니다.</li>
+    <li>벽이나 다른 가구와 겹치면 <b style="color:#d9363e">빨갛게</b> 표시됩니다. 의자는 책상·식탁·화장대 밑으로 들어가도 되고, 책상과 책장은 겹쳐 놓아도 됩니다.</li>
+  </ul>
+
+  <h3>가격과 엑셀</h3>
+  <ul>
+    <li>속성 패널에 <b>모델명</b>과 <b>가격</b>을 넣으면 배치된 가구 목록 위에 <b>전체 합계</b>, 종류 제목 옆에 소계가 나옵니다. 가격은 1,290,000 · 1290000원 · 129만 · 129만 9천처럼 넣을 수 있습니다.</li>
+    <li>집에 딸려 오는 가구(빌트인·옵션)는 <b>기본 포함 가구</b>에 체크하면 합계에서 빠집니다.</li>
+    <li><b>현관 중문</b>도 비용에 들어갑니다. 중문을 눌러 모델명·가격을 넣으세요. 다른 문도 가격을 넣으면 같이 들어갑니다.</li>
+    <li><span class="btn">📊 엑셀로 내보내기</span>를 누르면 번호·종류·이름·모델명·가격·크기가 담긴 엑셀 파일을 받습니다. 옆의 <b>모든 가구</b>를 켜면 가격이 없는 가구와 기본 포함 가구까지 함께 담습니다.</li>
+  </ul>
+
+  <h3>배치 안 (1안 · 2안 …)</h3>
+  <ul>
+    <li><span class="btn">② 가구</span> 탭 맨 위에서 같은 도면에 가구 배치를 여러 안으로 둘 수 있습니다. <span class="btn">＋ 지금 안 복사해서 추가</span>는 보고 있는 안을 복사해 새 안을 만들고, 안을 누르면 그 배치로 바뀝니다.</li>
+    <li>안마다 가구 수와 합계가 보이고, <span class="btn">이름 바꾸기</span> · <span class="btn">이 안 삭제</span>도 됩니다. 도면과 문은 모든 안이 함께 씁니다.</li>
+    <li>마음에 드는 안은 <span class="btn">🔓 보호하기</span>로 잠가 두세요. 그 안의 가구는 옮기거나 고치거나 지울 수 없고, 다시 누르면 풀립니다.</li>
+  </ul>
+
+  <h3>사진으로 가구 추가</h3>
+  <p><span class="btn">📷 가구 사진 넣고 크기 재기</span>에 가구 정면 사진을 넣으면 가구 영역을 자동으로 찾습니다. <b>아는 치수 하나</b>(예: 가로 900mm)를 넣거나 사진 속 기준 물체에 선을 그으면 나머지 크기를 계산하고, 비슷한 샘플 모양을 골라 줍니다. 사진으로 잰 크기는 어림값이므로 제품 사양이 있으면 그 값을 넣는 것이 가장 정확합니다.</p>
+</section>
+
+<section>
+  <h2><span class="no">6</span>3D로 보기</h2>
+  <figure>
+    <img src="img/04-3d.jpg" alt="3D 화면">
+    <figcaption>3D 화면 — 드래그로 회전, 오른쪽 드래그로 이동, 휠로 확대·축소</figcaption>
+  </figure>
+  <table>
+    <tr><th style="width:26%">버튼</th><th>하는 일</th></tr>
+    <tr><td><span class="btn">2D 도면</span> <span class="btn">나란히</span> <span class="btn">3D</span></td><td>화면 구성 전환</td></tr>
+    <tr><td><span class="btn">위에서</span> <span class="btn">비스듬히</span></td><td>3D 시점을 처음 위치로</td></tr>
+    <tr><td>벽 투명도</td><td>벽을 반투명하게 해서 안쪽을 봅니다</td></tr>
+    <tr><td>벽 낮게</td><td>벽을 허리 높이(1m)로 잘라 단면도처럼 봅니다</td></tr>
+    <tr><td>바닥에 도면</td><td>3D 바닥에 도면 그림을 깔지 정합니다</td></tr>
+    <tr><td><span class="btn">2D 캡처</span></td><td>PDF 한 파일로 받습니다 — 도면 전체 1쪽 + 제목·설명·바깥 치수를 뺀 집 부분만 크게 1쪽</td></tr>
+    <tr><td><span class="btn">3D 캡처</span></td><td>PDF 한 파일로 받습니다 — 위에서 · 왼쪽 비스듬히 · 오른쪽 비스듬히를 바닥 도면 그림과 함께 3쪽 + 도면 그림을 뺀 집만 3쪽. 둘러보기 중에는 지금 화면 1쪽입니다</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="no">7</span>둘러보기 (1인칭 걷기)</h2>
+  <p><span class="btn">🚶 둘러보기</span>를 누르면 현관 앞에서 문을 열고 들어가 현관을 한 번 둘러보고, 방문 너머 방은 모두 들어가서, 거실·주방은 한 번씩 차례로 돌아봅니다. 집 안에서는 가구가 잘 보이도록 시선이 조금 아래를 향합니다. 방 이름이 없으면 침대가 있으면 침실, 변기가 있으면 욕실처럼 가구로 짐작합니다.</p>
+  <p>처음 한 번은 2D 도면에서 <b>현관문 자리(벽이 끊긴 곳)</b>를 눌러 알려 주세요. 다시 정하려면 둘러보기 안내판의 <span class="btn">현관 다시 지정</span>을 누릅니다. 집 안에 들어오면 문짝은 테두리 선만 보여서 문 너머 방 안이 다 보입니다.</p>
+  <div class="two">
+    <figure><img src="img/06-entrance.jpg" alt="현관문을 열고 들어가는 장면"><figcaption>현관문을 열고 들어갑니다 (신발장·LED 방등)</figcaption></figure>
+    <figure><img src="img/05-tour.jpg" alt="거실 창밖 풍경"><figcaption>거실 창밖 — 정한 층 높이에서 도로·빌라·아파트·산이 보입니다</figcaption></figure>
+  </div>
+  <h3>조작</h3>
+  <table>
+    <tr><th style="width:34%">키 · 동작</th><th>하는 일</th></tr>
+    <tr><td>화면 끌기</td><td>고개 돌리기</td></tr>
+    <tr><td><kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd></td><td>앞뒤로 걷기 (문에 가까이 가면 문 안으로 안내됩니다)</td></tr>
+    <tr><td><kbd>A</kbd> <kbd>D</kbd></td><td>옆걸음</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>제자리에서 돌기</td></tr>
+    <tr><td><kbd>Space</kbd></td><td>자동 안내 멈춤 / 계속</td></tr>
+    <tr><td><kbd>N</kbd></td><td>다음 곳으로</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>나가기</td></tr>
+  </table>
+  <h3>더 실감 나게</h3>
+  <ul>
+    <li><b>층수</b>: ① 도면 탭 ‘그리기 도구’의 <b>층수</b>를 정하면 그 높이에서 창밖이 보입니다(기본 10층).</li>
+    <li>현관 신발장, 욕실·주방 설비, 창, 천장 조명(거실 우물형 천장, 다른 방 LED 방등)은 자동으로 들어갑니다. 자동으로 놓인 가구도 옮기거나 지울 수 있고, 되돌리기로 한 번에 뺄 수 있습니다. 보호 중인 배치 안에는 설비를 넣지 않습니다.</li>
+    <li>도면 아래쪽을 거실 창이 있는 앞쪽으로 보고, 그쪽에 도로를 둡니다.</li>
+  </ul>
+</section>
+
+<section id="save">
+  <h2><span class="no">8</span>저장하고 옮기기</h2>
+  <ul>
+    <li>작업은 <b>지금 쓰는 브라우저에 자동 저장</b>됩니다. 창을 닫았다가 같은 PC, 같은 브라우저로 다시 들어오면 이어서 할 수 있습니다.</li>
+    <li><span class="btn">저장(.json)</span>을 누르면 도면 그림·벽·가구·사진·배치 안까지 <b>파일 하나</b>로 받습니다.</li>
+    <li>왼쪽 <span class="btn">📂 도면 불러오기(json)</span>로 그 파일을 다시 엽니다. 다른 PC나 다른 브라우저에서 이어 하거나, 가족에게 파일을 보내 같은 배치를 보여 줄 때 씁니다.</li>
+    <li><span class="btn">새 프로젝트</span>는 도면과 놓은 가구를 지웁니다(사진으로 만든 내 가구 목록은 남습니다). 실수했다면 <span class="btn">되돌리기</span>로 돌아갑니다.</li>
+  </ul>
+  <div class="warn"><b>주의</b>브라우저 저장은 아래 경우에 사라지거나 보이지 않습니다. 중요한 작업은 <b>저장(.json)</b>으로 파일을 받아 두세요.
+    <ul style="margin:4pt 0 0">
+      <li>브라우저의 <b>인터넷 사용 기록·쿠키(사이트 데이터) 삭제</b>를 했을 때</li>
+      <li><b>시크릿(InPrivate) 창</b>에서 작업하고 창을 닫았을 때</li>
+      <li>다른 PC, 다른 브라우저(예: Chrome ↔ Edge), 휴대폰에서 열었을 때 — 저장 위치가 서로 달라서입니다</li>
+    </ul>
+  </div>
+  <p>도면 그림과 가구 사진이 많으면 브라우저 저장 공간(약 5MB)이 모자랄 수 있습니다. 상태줄에 ‘저장 공간이 부족’하다는 안내가 뜨면 바로 <span class="btn">저장(.json)</span>으로 파일을 받아 두세요.</p>
+
+  <h2 style="margin-top:22pt"><span class="no">9</span>단축키</h2>
+  <table>
+    <tr><th style="width:36%">키</th><th>동작</th></tr>
+    <tr><td><kbd>V</kbd> <kbd>W</kbd> <kbd>A</kbd> <kbd>M</kbd> <kbd>N</kbd> <kbd>D</kbd> <kbd>X</kbd></td><td>선택 · 벽 · 방 · 길이 재기 · 창문 · 문 · 지우기 도구</td></tr>
+    <tr><td><kbd>R</kbd> / <kbd>Shift</kbd>+<kbd>R</kbd></td><td>선택한 가구 90° 회전</td></tr>
+    <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>15° 회전</td></tr>
+    <tr><td>방향키 (<kbd>Shift</kbd>)</td><td>10mm (100mm) 이동</td></tr>
+    <tr><td><kbd>Delete</kbd></td><td>선택한 것 삭제</td></tr>
+    <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>Z</kbd> · <kbd>Ctrl/⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>되돌리기 · 다시 하기</td></tr>
+    <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>D</kbd></td><td>복제</td></tr>
+    <tr><td><kbd>Shift</kbd>+클릭 · 빈 곳 <kbd>Shift</kbd>+끌기</td><td>가구 여러 개 고르기 (사각형)</td></tr>
+    <tr><td><kbd>Ctrl/⌘</kbd>+<kbd>A</kbd></td><td>가구 전체 선택</td></tr>
+    <tr><td><kbd>F</kbd></td><td>2D 도면 전체 보기</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>그리던 것 취소 → 그리기 도구 끄기 → 선택 해제 (켜진 도구 버튼을 다시 눌러도 꺼집니다)</td></tr>
+  </table>
+  <p>2D 화면: 휠로 확대·축소, 빈 곳을 끌거나 <kbd>Space</kbd>+드래그로 화면 이동.</p>
+</section>
+
+<section>
+  <h2><span class="no">10</span>문제가 생겼을 때</h2>
+  <table>
+    <tr><th style="width:34%">증상</th><th>해결</th></tr>
+    <tr><td>화면이 하얗게 나오거나 3D 화면만 비어 있음</td><td>인터넷 연결을 확인하고 새로 고침하세요. 오래된 브라우저라면 최신 Chrome · Edge · Safari로 여세요.</td></tr>
+    <tr><td>지난번 작업이 안 보임</td><td>작업한 그 PC, 그 브라우저로 열었는지 확인하세요. 다른 기기에서 이어 하려면 <span class="btn">저장(.json)</span>으로 받은 파일을 <span class="btn">📂 도면 불러오기(json)</span>로 여세요.</td></tr>
+    <tr><td>‘저장 공간이 부족’ 안내가 뜸</td><td>브라우저 저장 공간이 찼습니다. <span class="btn">저장(.json)</span>으로 파일을 받아 두세요. 쓰지 않는 사진 가구를 지우면 공간이 늘어납니다.</td></tr>
+    <tr><td>서비스가 바뀐 뒤 화면이 이상함</td><td>강제 새로고침하세요: Windows <kbd>Ctrl</kbd>+<kbd>F5</kbd>, macOS <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.</td></tr>
+    <tr><td>크기가 도면 치수와 다름</td><td>4장의 ‘기준 치수 맞추기’를 다시 하세요. 설명용 그림처럼 그림 비율이 실제와 다른 도면은 한 방을 맞추면 다른 방이 어긋날 수 있습니다.</td></tr>
+    <tr><td>둘러보기가 방에 못 들어감</td><td>문 자리에 벽이나 창이 막혀 있는지 2D에서 확인하고 <span class="btn">🧽 지우기</span>로 틈을 내 주세요.</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
