@@ -18,7 +18,11 @@ const WALK = 1400;         // 직접 걸을 때 mm/s
 const TURN = 1.6;          // 방향키로 돌 때 rad/s
 const LOOK_SEC = 12;       // 한 곳에서 한 바퀴 둘러보는 시간 s (걷는 속도와 따로. 천천히 시작·끝나서 가장 빠를 때 약 1 rad/s)
 const DOOR_SEC = 1.8;
+const PITCH_OUT = -0.04;   // 현관 밖에서 시선 (거의 정면 — 현관문이 보이게)
+const PITCH_WALK = -0.14;  // 집 안에서 걸을 때 시선 (약 8° 아래)
+const PITCH_LOOK = -0.24;  // 들른 곳에서 둘러볼 때 시선 (약 14° 아래 — 바닥에 놓인 가구가 화면 가운데쯤 오게)
 const DOOR_H = DOOR.h * M;  // 문 높이 m
+const ENTRY_T = 0.08;      // 현관문 문짝 두께 m (방화문이라 방문보다 두껍게)
 const COFFER_INSET = 450;  // 우물천장: 벽에서 안쪽으로 들어온 폭 mm
 const COFFER_DEPTH = 0.15; // 우물천장: 가운데가 올라간 높이 m
 const COFFER_ROOMS = /거실/;      // 우물천장은 거실만(이 이름의 방, 없으면 아래쪽에서 가로가 가장 넓은 공간). 다른 방은 네모난 LED 방등
@@ -55,7 +59,7 @@ export class Tour {
 
     this.pos = { ...this.outside };
     this.yaw = Math.atan2(-e.out.y, -e.out.x);
-    this.pitch = -0.04;
+    this.pitch = PITCH_OUT;
     this.steps = [
       { type: 'wait', t: 0.9, text: '현관 앞에 섰습니다' },
       { type: 'door', t: DOOR_SEC, text: '현관문을 엽니다' },
@@ -307,15 +311,15 @@ export class Tour {
     this.pivot.position.set(hinge.x * M, 0, hinge.y * M);
     this.pivot.rotation.y = ang;
     const leaf = new THREE.Mesh(
-      new THREE.BoxGeometry(len * M - 0.02, DOOR_H, 0.045),
+      new THREE.BoxGeometry(len * M - 0.02, DOOR_H, ENTRY_T),
       new THREE.MeshStandardMaterial({ color: '#6f6255', roughness: 0.6 }),
     );
     leaf.position.set((len * M) / 2, DOOR_H / 2, 0);
     leaf.castShadow = true;
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.8, roughness: 0.3 }));
-    knob.position.set(len * M - 0.08, 1.0, 0.04);
+    knob.position.set(len * M - 0.08, 1.0, ENTRY_T / 2 + 0.02);   // 손잡이는 문짝 면에서 조금 튀어나오게
     const knob2 = knob.clone();
-    knob2.position.z = -0.04;
+    knob2.position.z = -knob.position.z;
     this.pivot.add(leaf, knob, knob2);
     // 안쪽으로 열리도록 돌릴 방향을 고른다
     const inward = { x: -e.out.x, y: -e.out.y };
@@ -500,7 +504,7 @@ export class Tour {
       if (s.start === undefined) s.start = this.yaw;
       const k = Math.min(1, s.elapsed / s.t);
       this.yaw = s.start + Math.PI * 2 * ease(k);
-      this.pitch += (-0.06 - this.pitch) * Math.min(1, dt * 2);
+      this.pitch += (PITCH_LOOK - this.pitch) * Math.min(1, dt * 2);
       if (k >= 1) this.nextStep();
     }
   }
@@ -521,7 +525,8 @@ export class Tour {
       move -= step;
       if (step >= d) s.seg++;
     }
-    this.pitch += (-0.04 - this.pitch) * Math.min(1, dt * 2);
+    const tilt = this.ghosted ? PITCH_WALK : PITCH_OUT;   // 집 안(현관문 줄 30cm 안쪽)에 들어서면 조금 아래를 본다
+    this.pitch += (tilt - this.pitch) * Math.min(1, dt * 2);
     if (s.seg >= s.pts.length) this.nextStep();
   }
 
