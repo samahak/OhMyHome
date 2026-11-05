@@ -220,7 +220,7 @@ export class Tour {
   /** 방 이름이 없을 때 그 방 가구로 짐작한 이름 */
   guessRoom(fs) {
     const t = new Set(fs.map((f) => f.type));
-    if (['toilet', 'bathtub', 'basin', 'bath_shelf'].some((x) => t.has(x))) return '욕실';
+    if (['toilet', 'bathtub', 'shower', 'basin', 'bath_shelf'].some((x) => t.has(x))) return '욕실';
     if (t.has('bed')) return '침실';
     if ([...t].some((x) => /^(kitchen|microwave)/.test(x))) return '주방';
     if (t.has('wardrobe') || t.has('drawer') || t.has('vanity')) return '드레스룸';

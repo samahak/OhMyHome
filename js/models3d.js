@@ -621,6 +621,52 @@ function bathtub(g, W, D, H, c) {
   box(g, 0.025, 0.025, 0.12, -W / 2 + 0.18, H + 0.11, -D / 2 + 0.09, metal);
 }
 
+/**
+ * 샤워부스: 낮은 받침 + 앞·양옆 유리(색은 틀 색) + 앞문 손잡이 + 뒤 벽(-z) 쪽 샤워 수전.
+ * 코너에 두면 벽에 붙은 옆 유리는 벽 앞에 겹쳐 보일 뿐이라 따로 고르지 않는다.
+ */
+function shower(g, W, D, H, c) {
+  const trayH = 0.05, frame = mat(c, { metalness: 0.6, roughness: 0.3 }), f = 0.03;
+  box(g, W, trayH, D, 0, trayH / 2, 0, PORCELAIN('#f4f5f4'));                                     // 받침
+  box(g, W * 0.12, 0.004, W * 0.12, 0, trayH + 0.002, 0, METAL());                                // 배수구
+  const glass = mat('#dcebf2', { roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25, depthWrite: false });
+  const gh = H - trayH - f, gy = trayH + gh / 2;
+  const before = g.children.length;
+  box(g, W - 2 * f, gh, 0.008, 0, gy, D / 2 - f / 2, glass);                                     // 앞 유리
+  for (const s of [-1, 1]) box(g, 0.008, gh, D - 2 * f, s * (W / 2 - f / 2), gy, 0, glass);       // 옆 유리
+  for (const m of g.children.slice(before)) m.castShadow = false;
+  // 틀: 네 모서리 기둥 + 위 테두리
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, f, H - trayH, f, sx * (W / 2 - f / 2), trayH + (H - trayH) / 2, sz * (D / 2 - f / 2), frame);
+  for (const sz of [-1, 1]) box(g, W, f, f, 0, H - f / 2, sz * (D / 2 - f / 2), frame);
+  for (const sx of [-1, 1]) box(g, f, f, D, sx * (W / 2 - f / 2), H - f / 2, 0, frame);
+  // 앞문: 가운데 세로 틀(문 경계) + 손잡이
+  box(g, 0.012, gh, 0.012, W * 0.05, gy, D / 2 - f / 2, frame);
+  box(g, 0.02, 0.3, 0.03, W * 0.05 - 0.06, trayH + 1.0, D / 2 + 0.015, METAL());
+  // 샤워 수전: 뒤 벽 쪽 세로 봉 + 해바라기 헤드 + 손잡이
+  const metal = METAL(), bz = -D / 2 + f + 0.03, top = Math.min(H - 0.1, 2.0);
+  box(g, 0.025, top - 0.9, 0.025, 0, 0.9 + (top - 0.9) / 2, bz, metal);
+  box(g, 0.025, 0.025, 0.2, 0, top, bz + 0.1, metal);
+  ovalY(g, 0.11, 0.11, 0.015, 0, top - 0.02, bz + 0.2, metal);
+  box(g, 0.14, 0.05, 0.05, 0, 1.0, bz + 0.01, metal);
+}
+
+/** 선반장: 아래 문 두 짝(또는 한 짝) 수납장 + 위 트인 선반 칸 */
+function shelfCabinet(g, W, D, H, c) {
+  const m = mat(c), t = 0.018, groove = GROOVE(), metal = METAL();
+  const baseH = Math.min(H * 0.42, 0.85);
+  for (const s of [-1, 1]) box(g, t, H, D, s * (W / 2 - t / 2), H / 2, 0, m);                     // 옆판
+  box(g, W, H, 0.008, 0, H / 2, -D / 2 + 0.004, mat(shade(c, 0.9)));                             // 뒤판
+  box(g, W - 2 * t, baseH, D - 0.01, 0, baseH / 2, 0.001, m);                              // 아래 수납장 몸통
+  const doors = W > 0.55 ? 2 : 1, dw = (W - 2 * t) / doors;
+  for (let i = 1; i < doors; i++) box(g, 0.005, baseH - 0.03, 0.004, -W / 2 + t + dw * i, baseH / 2, D / 2 + 0.002, groove);
+  for (let i = 0; i < doors; i++) {
+    const x = -W / 2 + t + dw * i + (doors === 2 ? (i ? 0.04 : dw - 0.04) : dw - 0.05);
+    box(g, 0.015, Math.min(0.14, baseH * 0.3), 0.02, x, baseH - 0.12, D / 2 + 0.012, metal);
+  }
+  const n = Math.max(1, Math.round((H - baseH) / 0.33)), step = (H - baseH) / n;
+  for (let i = 1; i <= n; i++) box(g, W - 2 * t, t, D - 0.01, 0, Math.min(H - t / 2, baseH + step * i), 0.001, m);   // 선반 + 윗판
+}
+
 /** 주방 싱크대: 하부장 + 상판(개수대·쿡탑) + H가 1.4m를 넘으면 상부장 */
 function kitchenCounter(g, W, D, H, c) {
   counterRun(g, W, D, H, c);
@@ -805,7 +851,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
