@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { state } from './store.js';
 import * as G from './geometry.js';
-import { buildGrid, isFree, nearestFree, findPath, roomCenters, orderByWalk } from './walkGrid.js';
+import { buildGrid, isFree, nearestFree, findPath, roomCenters, orderByWalk, clearance, zonesOf, walkSteps, cellOf, centerOf } from './walkGrid.js';
 import { innerBox } from './fixtures.js';
 import { buildScenery } from './scenery.js';
 import { DOOR } from './catalog.js';
@@ -51,21 +51,7 @@ export class Tour {
     this.outside = { x: this.mid.x + e.out.x * 1400, y: this.mid.y + e.out.y * 1400 };
     this.inside = nearestFree(this.grid, { x: this.mid.x - e.out.x * 900, y: this.mid.y - e.out.y * 900 })
       || { x: this.mid.x - e.out.x * 900, y: this.mid.y - e.out.y * 900 };
-    // '같은 방' 판단은 가구를 빼고 벽만 본다 (침대가 방 가운데를 가로막아도 한 방이다)
-    const sight = buildGrid(closed, []);
-    const seen = new Set();
-    const places = roomCenters(this.grid, this.inside, { sightGrid: sight })
-      .map((p, i) => ({ ...p, name: this.placeName(p, i) }))
-      .filter((p) => !seen.has(p.name) && seen.add(p.name));   // 이름이 같은 방은 한 번만
-    // 이름 붙은 방은 꼭 들른다 — 욕실처럼 설비로 좁아져 '방 한가운데'가 안 잡히는 방도 변기·세면대를 보여 준다
-    for (const r of plan.rooms) {
-      if (seen.has(r.name) || /복도|현관/.test(r.name) || G.polygonArea(r.pts) < 1.5e6) continue;
-      const p = this.roomSpot(r);
-      if (p && findPath(this.grid, this.inside, p)) { places.push({ ...p, name: r.name }); seen.add(r.name); }
-    }
-    this.places = orderByWalk(this.grid, this.inside, places);
-    this.living = this.findLiving();
-    if (this.living?.place && /^공간 \d+$/.test(this.living.place.name)) this.living.place.name = '거실';
+    this.planPlaces(closed);
 
     this.pos = { ...this.outside };
     this.yaw = Math.atan2(-e.out.y, -e.out.x);
@@ -74,6 +60,7 @@ export class Tour {
       { type: 'wait', t: 0.9, text: '현관 앞에 섰습니다' },
       { type: 'door', t: DOOR_SEC, text: '현관문을 엽니다' },
       { type: 'go', via: [this.mid], to: this.inside, text: '들어갑니다' },
+      { type: 'look', t: LOOK_SEC, text: '현관 둘러보는 중' },
       ...this.places.flatMap((p, i) => [
         { type: 'go', to: p, text: `${p.name}(으)로 갑니다`, place: i },
         { type: 'look', t: LOOK_SEC, text: `${p.name} 둘러보는 중`, place: i },
@@ -121,6 +108,123 @@ export class Tour {
     v.controls.enabled = true;
     v.controls.update();
     this.onExit?.();
+  }
+
+  /**
+   * 들를 곳(this.places)과 거실(this.living)을 정한다.
+   * 방문(중문 포함)을 모두 닫은 벽 지도에서 이어진 빈 칸을 구역으로 나눈다 — 가장 넓은 구역이 거실·주방·복도가 트인 공간이고,
+   * 나머지(방문 너머)는 방이다. 방은 모두 들르고, 트인 공간에서는 거실과 주방을 한 번씩 들른다. 현관은 들어가자마자 둘러본다.
+   * 방문이 하나도 없으면 구역이 안 나뉘므로 예전처럼 빈 칸 봉우리(roomCenters)로 고른다.
+   */
+  planPlaces(closed) {
+    const plan = state.plan, g = this.grid, cell = g.cell;
+    const roomDoors = plan.doors.filter((d) => G.dist(d.a, d.b) > 0);
+    const zg = buildGrid(closed.concat(roomDoors.map((d) => ({ a: d.a, b: d.b, t: d.t, cap: false }))), []);
+    const { label, sizes } = zonesOf(zg);
+    const zoneAt = (p) => { const q = isFree(zg, p) ? p : nearestFree(zg, p, 5); if (!q) return -1; const [i, j] = cellOf(zg, q); return label[j * zg.nx + i]; };
+    const steps = walkSteps(g, this.inside), clr = clearance(g);
+    // 구역마다 걸어서 닿는 칸과 무게중심
+    const zones = sizes.map((n, z) => ({ z, area: n * cell * cell, cells: [], sx: 0, sy: 0 }));
+    for (let k = 0; k < label.length; k++) {
+      const z = label[k];
+      if (z < 0) continue;
+      const c = centerOf(zg, k % zg.nx, Math.floor(k / zg.nx));
+      zones[z].sx += c.x; zones[z].sy += c.y;
+    }
+    for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
+      const k = j * g.nx + i;
+      if (!isFinite(steps[k])) continue;
+      const c = centerOf(g, i, j), z = zoneAt(c);
+      if (z >= 0) zones[z].cells.push({ ...c, clr: clr[k] });
+    }
+    /** 구역 안에서 target에 가장 가까운, 몸 둘레가 넉넉한(가구·벽에서 30cm 더) 칸. 그런 칸이 없으면 가장 넉넉한 칸 */
+    const spotIn = (zone, target) => {
+      const roomy = zone.cells.filter((c) => c.clr >= 3);
+      const pool = roomy.length ? roomy : zone.cells;
+      let best = null, bd = Infinity;
+      for (const c of pool) {
+        const d = roomy.length ? Math.hypot(c.x - target.x, c.y - target.y) : -c.clr;
+        if (d < bd) { bd = d; best = c; }
+      }
+      return best && { x: best.x, y: best.y };
+    };
+    const centroid = (zone) => { const n = sizes[zone.z]; return { x: zone.sx / n, y: zone.sy / n }; };
+    const fzone = state.furniture.map((f) => ({ f, z: zoneAt(f) }));
+    const main = zones.reduce((a, b) => (b.area > a.area ? b : a), zones[0]);
+    const entr = zoneAt(this.inside);
+
+    const places = [];
+    const has = (re) => places.some((p) => re.test(p.name));
+    const add = (p, name, zone) => { if (p && !places.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 600)) places.push({ ...p, name, zone }); };
+    // 방문 너머 구역 = 방 (몸이 설 만한 넓이가 있는 곳만 — 붙박이 창고·실외기실은 뺀다)
+    if (roomDoors.length) {
+      for (const zone of zones) {
+        if (zone === main || zone.z === entr || zone.area < 1e6 || !zone.cells.length) continue;
+        const p = spotIn(zone, centroid(zone));
+        const named = p && plan.rooms.find((r) => G.pointInPoly(p, r.pts));
+        if (named && /복도|현관/.test(named.name)) continue;
+        add(p, named?.name || this.guessRoom(fzone.filter((x) => x.z === zone.z).map((x) => x.f)), zone.z);
+      }
+    }
+    // 이름 붙은 방은 꼭 들른다 — 욕실처럼 설비로 좁아져 '방 한가운데'가 안 잡히는 방도 변기·세면대를 보여 준다
+    for (const r of plan.rooms) {
+      if (places.some((p) => p.name === r.name) || /복도|현관/.test(r.name) || G.polygonArea(r.pts) < 1.5e6) continue;
+      const p = this.roomSpot(r);
+      if (p && findPath(g, this.inside, p)) add(p, r.name, zoneAt(p));
+    }
+    // 트인 공간: 거실 한 번 · 주방 한 번
+    this.places = places;
+    this.living = this.findLiving();
+    if (!has(/거실/) && this.living) {
+      const lb = this.living.box || innerBox(this.living.room, plan.walls);
+      if (lb) {
+        const zone = zones[zoneAt({ x: (lb.minX + lb.maxX) / 2, y: (lb.minY + lb.maxY) / 2 })] || main;
+        add(spotIn(zone, { x: (lb.minX + lb.maxX) / 2, y: (lb.minY + lb.maxY) / 2 }), '거실', zone.z);
+      }
+    }
+    if (!has(/주방|부엌/)) {
+      const k = fzone.find((x) => /^kitchen/.test(x.f.type) && x.z === main.z) || fzone.find((x) => /^fridge/.test(x.f.type) && x.z === main.z);
+      if (k) {
+        // 싱크대 앞 80cm쯤 (ㄱ자는 꺾인 안쪽이 바로 서는 자리라 가운데)
+        const f = k.f, a = f.rot * G.DEG, off = f.type === 'kitchen_l' ? 0 : f.d / 2 + 800;
+        add(spotIn(main, { x: f.x - Math.sin(a) * off, y: f.y + Math.cos(a) * off }), '주방', main.z);
+      }
+    }
+    // 방문이 없는 도면(방이 안 나뉨)이거나 거실·주방을 못 찾았으면 빈 칸 봉우리로 채운다
+    // ('같은 방' 판단은 가구를 빼고 벽만 본다 — 침대가 방 가운데를 가로막아도 한 방이다)
+    const peaks = roomCenters(g, this.inside, { sightGrid: buildGrid(closed, []) });
+    const wantMain = roomDoors.length ? 2 : Infinity;
+    for (const p of peaks) {
+      const z = zoneAt(p);
+      if (places.filter((q) => q.zone === main.z).length >= wantMain) break;
+      if (z !== main.z && roomDoors.length) continue;
+      if (places.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 2500)) continue;
+      add(p, this.placeName(p, places.length), z);
+    }
+    // 같은 이름이 여럿이면 번호를 붙인다 (침실 1 · 침실 2)
+    this.places = orderByWalk(g, this.inside, places);
+    const count = {}, seen = {};
+    for (const p of this.places) count[p.name] = (count[p.name] || 0) + 1;
+    for (const p of this.places) if (count[p.name] > 1) p.name = `${p.name} ${(seen[p.name] = (seen[p.name] || 0) + 1)}`;
+    if (this.living?.box) {
+      const b = this.living.box, inBox = (q) => q.x > b.minX && q.x < b.maxX && q.y > b.minY && q.y < b.maxY;
+      this.living.place = this.places.find((p) => p.name === '거실') || this.places.find(inBox);
+      if (this.living.place && /^공간 \d+$/.test(this.living.place.name)) this.living.place.name = '거실';
+    }
+  }
+
+  /** 방 이름이 없을 때 그 방 가구로 짐작한 이름 */
+  guessRoom(fs) {
+    const t = new Set(fs.map((f) => f.type));
+    if (['toilet', 'bathtub', 'basin', 'bath_shelf'].some((x) => t.has(x))) return '욕실';
+    if (t.has('bed')) return '침실';
+    if ([...t].some((x) => /^kitchen/.test(x))) return '주방';
+    if (t.has('wardrobe') || t.has('drawer') || t.has('vanity')) return '드레스룸';
+    if (['washer', 'top_washer', 'wash_tower'].some((x) => t.has(x))) return '다용도실';
+    if (t.has('aircon_outdoor')) return '실외기실';
+    if ([...t].some((x) => /^(kimchi|fridge)/.test(x))) return '펜트리';
+    if (t.has('desk')) return '서재';
+    return '방';
   }
 
   /** 방 안에서 설 자리: 방 가운데에 가장 가까운 빈 칸 (방이 꽉 찼으면 문 앞쯤) */
