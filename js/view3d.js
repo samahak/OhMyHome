@@ -521,16 +521,20 @@ export class View3D {
    * 3D를 가로 그림(W×H px) 여러 장으로. 화면 칸이 세로로 길어도 가로로 찍는다.
    * shot.dir가 있으면 그 방향에서 집이 꽉 차게 잡아 찍고(shotCamera), 없으면 지금 카메라로 찍는다
    * (아직 돌리지 않았으면 가로에 맞춰 다시 잡고 조금 다가간다). 화면 크기·카메라는 그대로 돌려 놓는다.
-   * @returns [{ name, url }]
+   * shot.W·shot.H가 있으면 그 장만 그 크기로 찍는다. floorImage: false면 바닥의 도면 그림(제목·설명·치수)을 잠시 끄고 찍는다.
+   * @returns [{ name, url, width, height }]
    */
-  captureShots(shots, W = 1920, H = 1080) {
+  captureShots(shots, W = 1920, H = 1080, { type = 'image/png', quality = 0.92, floorImage } = {}) {
     const r = this.renderer, cam = this.camera;
     const size = r.getSize(new THREE.Vector2()), ratio = r.getPixelRatio();
     const saved = { aspect: cam.aspect, pos: cam.position.clone(), target: this.controls.target.clone(), far: cam.far, mode: this.camMode, moved: this.userMoved };
+    const floorSwap = floorImage !== undefined && floorImage !== this.floorImage && !this.tour;
+    if (floorSwap) { this.floorImage = floorImage; this.buildPlan(); }
     r.setPixelRatio(1);
-    r.setSize(W, H, false);   // false: 화면의 캔버스 CSS 크기는 건드리지 않는다
-    cam.aspect = W / H;
     const out = shots.map((shot) => {
+      const w = shot.W || W, h = shot.H || H;
+      r.setSize(w, h, false);   // false: 화면의 캔버스 CSS 크기는 건드리지 않는다
+      cam.aspect = w / h;
       if (shot.dir && !this.tour) {
         const s = this.shotCamera(shot.dir, cam.aspect);
         cam.position.copy(s.pos);
@@ -544,8 +548,9 @@ export class View3D {
       }
       cam.updateProjectionMatrix();
       r.render(this.scene, cam);
-      return { name: shot.name, url: r.domElement.toDataURL('image/png') };
+      return { name: shot.name, url: r.domElement.toDataURL(type, quality), width: w, height: h };
     });
+    if (floorSwap) { this.floorImage = !floorImage; this.buildPlan(); }
     r.setPixelRatio(ratio);
     r.setSize(size.x, size.y, false);
     cam.aspect = saved.aspect;
