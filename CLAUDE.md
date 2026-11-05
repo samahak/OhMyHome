@@ -55,11 +55,10 @@ js/main.js             화면 조립 — 왼쪽 패널, 속성 패널, 상단 �
 js/store.js            상태 하나 + 이벤트 + 되돌리기 + 자동 저장(serve.py의 ohmyhome-project.json + localStorage) + 배치 안
 js/geometry.js         평면 기하 — 꼭짓점, 겹침(SAT), 벽에 붙이기, 면적·무게중심   (DOM 없음)
 js/wallDetect.js       도면 이미지 → 벽 사각형                                    (DOM 없음)
-js/catalog.js          샘플 가구 목록·기본 크기·모양(SHAPES)·사진 비율로 모양 추천 (DOM 없음)
+js/catalog.js          샘플 가구 목록·기본 크기·모양(SHAPES) (DOM 없음)
 js/plan2d.js           2D 도면 편집기 (캔버스, 도구별 마우스 입력)
 js/view3d.js           3D 보기 + 가구 끌기 (three.js, OrbitControls, CSS2DRenderer)
 js/models3d.js         샘플 가구 3D 모양 (박스·원기둥 조합)
-js/furniturePhoto.js   가구 사진 → 크기 측정 대화상자
 js/tour.js             둘러보기 — 현관문 열기 · 1인칭 카메라 · 자동 동선 · 직접 걷기 · 화면 안내판
 js/walkGrid.js         둘러보기용 걸을 수 있는 칸 지도 · A* 길 찾기 · 들를 곳 고르기             (DOM 없음)
 js/fixtures.js         현관·욕실·주방 설비 자동 배치 (신발장·변기·세면대·욕조·주방 싱크대)          (DOM 없음)
@@ -96,7 +95,8 @@ state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePho
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
   builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
   문도 name·model·price·builtin을 가질 수 있다(속성 패널). 현관 중문은 늘, 다른 문은 price가 있을 때만 비용 항목이다(`costDoors()`)
-state.library   사진으로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
+state.library   예전 '가구 사진으로 크기 재기'로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
+                사진 기능은 사용자 요청으로 없앴다(더하는 길 없음). 예전 프로젝트를 열면 '내 가구' 칸에 보이고 놓을 수 있다
 state.layouts   배치 안 [{ id, name, furniture, locked? }], state.layoutId — 지금 안의 가구는 state.furniture에 있고 그 안의 furniture 칸은 비워 둔다
   locked        보호 중인 안이면 true(없으면 키가 없다) — 그 안의 가구를 바꾸지 못하고 안도 지우지 못한다
 ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   (저장하지 않는다)
@@ -164,13 +164,6 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 침식·팽창은 가로·세로로 나눈 누적합 창 연산이다. **두 연산의 창 오프셋(lo/hi)은 서로 뒤집혀 있어야** 제자리로 돌아온다.
 - 다시 인식하면 `auto: true` 벽만 바꾸고, 직접 그린 벽은 남긴다.
 - 사선 벽은 찾지 못한다(사용자가 직접 그린다).
-
-### 가구 사진 측정 (`furniturePhoto.js`)
-
-테두리 픽셀의 중앙값을 배경색으로 보고, 배경과 다른 픽셀이 몰린 가로·세로 구간을 가구 영역으로 잡는다.
-실제 크기는 사진만으로 알 수 없으므로 기준이 필요하다. **아는 치수 하나**를 넣으면 영역 비율로 나머지를 구하고,
-**기준 물체 선**을 그으면 mm/px를 구해 가로·높이를 함께 잰다. 깊이는 고른 모양의 `defaultsFor(type).d`로 채운다.
-사진은 영역만 잘라 긴 변 512px JPEG로 `library[].image`에 넣는다.
 
 ### 둘러보기 (`tour.js`, `walkGrid.js`)
 
@@ -285,7 +278,6 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   다시 만들고, 위치·회전만 바뀌면 transform만 고친다. 선택 외곽선과 겹침 빨간 외곽선은 모양에 붙어 있어서 key에 들어간다.
 - 새 샘플 모양을 더하려면 `catalog.js`의 `SHAPES`(+ 필요하면 `CATALOG`)와 `models3d.js`의 `BUILDERS`에 함께 넣는다.
   모양 함수는 m 단위 `(group, W, D, H, color)`를 받고, 바닥 가운데를 원점으로 앞면을 +z로 그린다.
-  `SHAPES[type].photoFront`는 사진 대화상자에서 '앞면에 사진 입히기'의 기본값이다.
 - **숫자 하나로 크기를 정하는 가구**(TV 인치, 소파 인원, 식탁 인원)는 `catalog.SIZE_PRESETS` 한 표로 다룬다. 가구 항목에
   `f[key]`(`inch`, `seats`)를 남기고 `size(v)`로 크기를 바꾼다. 속성 패널의 입력칸·빠른 선택 버튼도 이 표를 보고 그린다.
   `affects`에 든 칸(가로 등)을 직접 고치면 `f[key]`를 지우고, 화면에는 `guess(f)`로 짐작한 값을 보여 준다.
@@ -338,12 +330,13 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
-  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장)에 더한다.
+  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼)에 더한다.
+  벽과의 겹침은 그대로 잰다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
-- 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 사진 대화상자가 열려 있으면 무시한다.
+- 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이면 무시한다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
-  먹지 않는다. 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.
+  먹지 않는다. (예전 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.)
 
 ## 컨벤션
 
