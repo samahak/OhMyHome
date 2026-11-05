@@ -2,7 +2,7 @@
 import {
   state, ui, on, emit, checkpoint, undo, redo, select, uid, removeItem, findSelected,
   selectFurniture, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, removeFurniture,
-  applyScaleRef, serialize, loadProject, loadSaved, resetProject, setSaveErrorHandler,
+  applyScaleRef, serialize, loadProject, loadSaved, loadFromServer, savesToServer, saveNow, resetProject, setSaveErrorHandler,
 } from './store.js';
 import * as G from './geometry.js';
 import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
@@ -23,8 +23,12 @@ const UNSCALED_WIDTH_MM = 12000; // 축척을 모를 때 도면 가로를 이만
 
 function status(text) { $('status').textContent = text; }
 
-const restored = loadSaved();
-setSaveErrorHandler(() => status('⚠ 브라우저 저장 공간이 부족해 자동 저장하지 못했습니다. 상단 ‘저장(.json)’으로 파일에 보관하세요.'));
+// serve.py로 열었으면 프로젝트 폴더의 ohmyhome-project.json을 먼저 연다 (localhost·IP 어느 주소든 같은 작업)
+const fromServer = await loadFromServer();
+const restored = loadSaved(fromServer);
+setSaveErrorHandler((e, where) => status(where === 'server'
+  ? `⚠ 프로젝트 폴더(ohmyhome-project.json)에 저장하지 못했습니다 (${e.message}). 로컬 서버가 켜져 있는지 확인하고, 상단 ‘저장(.json)’으로도 보관하세요.`
+  : '⚠ 브라우저 저장 공간이 부족해 자동 저장하지 못했습니다. 상단 ‘저장(.json)’으로 파일에 보관하세요.'));
 
 /* ---------- 2D / 3D ---------- */
 const editor = new PlanEditor($('plan-canvas'), {
@@ -1302,7 +1306,14 @@ renderLibrary();
 renderScaleInfo();
 renderPlanInfo();
 renderPlaced();
-if (restored) { status('지난번 작업을 불러왔습니다. (브라우저에 자동 저장됩니다)'); doorsForOldProject(restored); }
+if (restored) {
+  status(fromServer
+    ? '지난번 작업을 불러왔습니다. (프로젝트 폴더의 ohmyhome-project.json에 자동 저장 — localhost·IP 어느 주소로 열어도 같습니다)'
+    : `지난번 작업을 불러왔습니다. (${savesToServer() ? '이제 프로젝트 폴더의 ohmyhome-project.json에도' : '브라우저에'} 자동 저장됩니다)`);
+  doorsForOldProject(restored);
+  // 브라우저 저장소에만 있던 작업이면 바로 프로젝트 폴더에도 써 둔다 (다른 주소에서도 보이게)
+  if (!fromServer && savesToServer()) saveNow();
+}
 else status('📐 도면 이미지를 열거나 ‘샘플 도면으로 해 보기’를 눌러 시작하세요.');
 
 // 개발·점검용

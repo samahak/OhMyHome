@@ -212,23 +212,51 @@ export function applyScaleRef(a, b, mm) {
 }
 
 /* ---------- 저장 ---------- */
+// 브라우저 저장소(localStorage, 주소마다 따로)에 늘 저장하고, serve.py로 열었으면 프로젝트 폴더의 ohmyhome-project.json에도 저장한다
+// (/api/project — localhost·IP 어느 주소로 열어도 같은 작업). 시작할 때는 그 파일을 먼저 읽는다.
+const SERVER_URL = 'api/project';
+let serverOk = false;           // serve.py가 저장을 받아 주는지 (응답 머리글 X-OhMyHome로 알아본다)
 let saveTimer = null;
 let onSaveError = null;
+let saveChain = Promise.resolve();
 export function setSaveErrorHandler(fn) { onSaveError = fn; }
+export const savesToServer = () => serverOk;
+
+/** 프로젝트 폴더에 저장된 작업 (없거나 serve.py가 아니면 null) */
+export async function loadFromServer() {
+  try {
+    const r = await fetch(SERVER_URL, { cache: 'no-store' });
+    serverOk = r.ok && r.headers.get('X-OhMyHome') === '1';
+    if (!serverOk) return null;
+    const data = await r.json();
+    return data?.plan ? data : null;
+  } catch {
+    serverOk = false;
+    return null;
+  }
+}
 
 function scheduleSave() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 600);
+  saveTimer = setTimeout(() => { saveTimer = null; saveNow(); }, 600);
 }
 export function saveNow() {
+  const json = JSON.stringify(serialize());
+  let localErr = null;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
+    localStorage.setItem(STORAGE_KEY, json);
   } catch (e) {
-    onSaveError?.(e);
+    localErr = e;
   }
+  if (!serverOk) { if (localErr) onSaveError?.(localErr, 'local'); return; }
+  // 차례대로 보낸다 (늦게 끝난 예전 요청이 새 내용을 덮지 않게)
+  saveChain = saveChain.then(() => fetch(SERVER_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: json })
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+    .catch((e) => onSaveError?.(e, 'server')));
 }
+// 탭을 닫거나 다른 앱으로 갈 때 기다리던 저장을 바로 한다
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveNow(); } });
 export function serialize() {
-  return { app: 'OhMyHome', version: 1, plan: state.plan, furniture: state.furniture, library: state.library };
 }
 export function loadProject(data) {
   if (!data || !data.plan) throw new Error('OhMyHome 프로젝트 파일이 아닙니다.');
@@ -240,11 +268,14 @@ export function loadProject(data) {
   ui.selection = null;
   emit('plan', 'furniture', 'library', 'selection');
 }
-export function loadSaved() {
+/** 저장된 작업을 연다: from(프로젝트 폴더에서 읽은 것)이 있으면 그것, 없으면 브라우저 저장소 */
+export function loadSaved(from = null) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const data = JSON.parse(raw);
+    const raw = from ? null : localStorage.getItem(STORAGE_KEY);
+    if (!from && !raw) return false;
+    const data = from || JSON.parse(raw);
+    // 폴더의 작업을 열었으면 이 주소의 브라우저 저장소(예비본)도 같게 맞춘다 — 예전 내용이 남아 있다가 되살아나지 않게
+    if (from) try { localStorage.setItem(STORAGE_KEY, JSON.stringify(from)); } catch { /* 저장 공간 부족: 폴더 파일이 있으니 넘어간다 */ }
     const base = freshState();
     Object.assign(state.plan, base.plan, data.plan);
     state.furniture = data.furniture || [];
