@@ -1,41 +1,40 @@
 // 샘플 가구 — 크기는 mm (가로 W × 깊이 D × 높이 H). 시판 제품의 흔한 크기를 기본값으로 둔다.
-// shape는 models3d.js의 3D 모양 이름이고, 사진 가구도 이 중 하나를 골라 그 모양으로 그린다.
-// photoFront: 사진을 앞면에 입혀도 자연스러운(앞면이 평평한) 모양인지
+// shape는 models3d.js의 3D 모양 이름이다. 예전에 사진으로 만든 '내 가구'(library)도 이 중 하나의 모양으로 그린다.
 
 export const SHAPES = {
-  fridge_side: { label: '양문형 냉장고', photoFront: true },
-  fridge_top: { label: '일반 냉장고', photoFront: true },
-  kimchi: { label: '뚜껑형 김치냉장고', photoFront: true },
-  kimchi_stand: { label: '스탠드형 김치냉장고', photoFront: true },
-  washer: { label: '드럼 세탁기/건조기', photoFront: true },
-  top_washer: { label: '통돌이 세탁기', photoFront: true },
-  wash_tower: { label: '타워형 세탁건조기', photoFront: true },
-  wardrobe: { label: '붙박이장/옷장', photoFront: true },
-  shoe_cabinet: { label: '신발장', photoFront: true },
-  microwave_cabinet: { label: '전자레인지 장', photoFront: true },
-  curtain: { label: '커튼', photoFront: false },
-  drawer: { label: '서랍장', photoFront: true },
-  vanity: { label: '화장대', photoFront: false },
-  shelf: { label: '책장', photoFront: true },
-  wood_shelf: { label: '나무 선반', photoFront: false },
-  plant: { label: '식물', photoFront: false },
-  tvstand: { label: '거실장', photoFront: true },
-  tv: { label: 'TV', photoFront: true },
-  wallpad: { label: '월패드', photoFront: true },
-  aircon: { label: '스탠드 에어컨', photoFront: true },
-  aircon_outdoor: { label: '에어컨 실외기', photoFront: true },
-  bed: { label: '침대', photoFront: false },
-  sofa: { label: '소파', photoFront: false },
-  table: { label: '식탁/테이블', photoFront: false },
-  desk: { label: '책상', photoFront: false },
-  chair: { label: '의자', photoFront: false },
-  toilet: { label: '변기', photoFront: false },
-  basin: { label: '세면대', photoFront: false },
-  bathtub: { label: '욕조', photoFront: false },
-  bath_shelf: { label: '철제 선반', photoFront: false },
-  kitchen_counter: { label: '주방 싱크대', photoFront: false },
-  kitchen_l: { label: 'ㄱ자 주방 싱크대', photoFront: false, dims: { w: '가로 길이 (뒤쪽)', d: '세로 길이 (꺾인 쪽)' } },
-  box: { label: '상자(기본)', photoFront: true },
+  fridge_side: { label: '양문형 냉장고' },
+  fridge_top: { label: '일반 냉장고' },
+  kimchi: { label: '뚜껑형 김치냉장고' },
+  kimchi_stand: { label: '스탠드형 김치냉장고' },
+  washer: { label: '드럼 세탁기/건조기' },
+  top_washer: { label: '통돌이 세탁기' },
+  wash_tower: { label: '타워형 세탁건조기' },
+  wardrobe: { label: '붙박이장/옷장' },
+  shoe_cabinet: { label: '신발장' },
+  microwave_cabinet: { label: '전자레인지 장' },
+  curtain: { label: '커튼' },
+  drawer: { label: '서랍장' },
+  vanity: { label: '화장대' },
+  shelf: { label: '책장' },
+  wood_shelf: { label: '나무 선반' },
+  plant: { label: '식물' },
+  tvstand: { label: '거실장' },
+  tv: { label: 'TV' },
+  wallpad: { label: '월패드' },
+  aircon: { label: '스탠드 에어컨' },
+  aircon_outdoor: { label: '에어컨 실외기' },
+  bed: { label: '침대' },
+  sofa: { label: '소파' },
+  table: { label: '식탁/테이블' },
+  desk: { label: '책상' },
+  chair: { label: '의자' },
+  toilet: { label: '변기' },
+  basin: { label: '세면대' },
+  bathtub: { label: '욕조' },
+  bath_shelf: { label: '철제 선반' },
+  kitchen_counter: { label: '주방 싱크대' },
+  kitchen_l: { label: 'ㄱ자 주방 싱크대', dims: { w: '가로 길이 (뒤쪽)', d: '세로 길이 (꺾인 쪽)' } },
+  box: { label: '상자(기본)' },
 };
 
 /** TV 화면 크기(인치, 16:9 대각선) → 겉 크기(mm). 베젤은 가로 12mm · 세로 22mm로 어림한다. */
@@ -172,21 +171,3 @@ export function iconFor(type) {
   return defaultsFor(type).icon;
 }
 
-/**
- * 정면 사진의 높이/가로 비율로 어떤 모양일지 짐작한다. 어디까지나 제안이다.
- * widthMm이 있으면 크기도 함께 본다.
- */
-export function suggestShape(ratio, widthMm) {
-  if (!isFinite(ratio) || ratio <= 0) return 'box';
-  if (ratio >= 3) return 'aircon';
-  if (ratio >= 1.6) {
-    if (widthMm && widthMm >= 1000) return 'wardrobe';
-    if (widthMm && widthMm >= 850) return 'fridge_side';
-    return widthMm ? 'fridge_top' : 'fridge_side';
-  }
-  if (ratio >= 1.2) return 'washer';
-  if (ratio >= 0.85) return widthMm && widthMm > 1000 ? 'wardrobe' : 'drawer';
-  if (ratio >= 0.5) return widthMm && widthMm > 1600 ? 'sofa' : 'kimchi';
-  if (ratio >= 0.3) return 'tvstand';
-  return 'bed';
-}
