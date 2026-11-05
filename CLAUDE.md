@@ -16,8 +16,11 @@ HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 �
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
 
-# 사용 가이드 PDF — docs/guide/guide.html(+ img/ 화면 캡처)을 Chrome으로 인쇄해 docs/OhMyHome_Guide.pdf를 만든다.
-# 화면·기능이 바뀌면 guide.html을 고치고 다시 만들어 함께 커밋한다(빌드 스크립트는 이 PDF가 없으면 멈춘다)
+# 사용 가이드 PDF — docs/guide/*.html(+ img/ 화면 캡처)을 Chrome으로 인쇄해 두 PDF를 만든다.
+#   guide.html      → docs/OhMyHome_Guide.pdf       배포 zip용(설치·실행 포함). 빌드 스크립트는 이 PDF가 없으면 멈춘다
+#   user_guide.html → docs/OhMyHome_User_Guide.pdf  웹(GitHub Pages) 사용자용. 파일 이름·명령·서버 등 소스 이야기는 넣지 않고,
+#                     저장은 브라우저 저장 + 저장(.json)/도면 불러오기(json)로만 설명한다
+# 화면·기능이 바뀌면 두 html을 함께 고치고 다시 만들어 커밋한다
 docs/guide/make_pdf.sh
 
 # 문법 검사 (Node 22+는 import 문을 보고 ES 모듈로 알아서 읽는다)
@@ -65,8 +68,9 @@ js/doors.js            문 자동 찾기 — 벽 틈 중 도면 이미지에 여
 js/scenery.js          둘러보기 창밖 풍경 — 층수 높이의 땅, 우리 동, 도로·차·가로수, 빌라, 아파트, 숲, 먼 산, 하늘
 js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
+js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4(가로·세로)에 꽉 차게 (2D·3D 캡처)          (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
-sample/                실제 세대 예시 — 55㎡ A-2형 · A-1형(좌우 반전)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
+sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
 ```
 
 ### 좌표와 단위
@@ -225,7 +229,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 자동 문은 벽 인식·'문 기호 찾아 문 달기'·둘러보기 시작 때 다시 찾는다(`autoDoors`, 창과 같은 방식: `auto: false`는 그대로).
   문 목록이 없는 예전 프로젝트·저장본을 열면 한 번 찾아 단다(`doorsForOldProject`, 그래서 `loadSaved()`는 불러온 원본을 돌려준다).
 - 자동 문을 지우면 그 가운데를 `plan.doorsRemoved`에 남기고(`store.removeItem`), 다시 찾을 때 300mm 안의 문은 달지 않는다.
-  🚪 문 도구로 그 자리에 직접 달면 목록에서 빠진다. 새 도면 이미지를 열면 비운다. `setScale()`도 함께 옮긴다.
+  🚪 문 도구로 그 자리에 직접 달면 목록에서 빠진다. 새 도면 이미지를 넣으면(`setPlanImage`) 비운다. `setScale()`도 함께 옮긴다.
 - 경첩·여는 쪽을 손으로 바꾸면 `auto: false`가 된다. 경첩을 반대로 하면 a↔b를 바꾸고 swing도 뒤집는다(법선이 뒤집히므로).
 - 3D: 문 위 벽(`catalog.DOOR.h` ~ 천장, `wallPiece`) + 문틀 + 90° 열린 문짝(`models3d.buildDoorFrame/buildDoorLeaf`).
   둘러보기 중 현관 자리의 문은 그리지 않는다(`tour.js`가 여닫는 현관문을 따로 만든다). 문짝은 길 찾기 장애물에 넣지 않는다.
@@ -301,9 +305,13 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
 - 박스·구·원기둥 지오메트리는 `sharedGeo()`로 하나씩 공유하고 `scale`로 키운다. `disposeObject()`는 공유 지오메트리를 버리지 않는다.
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.
-- `view.captureShots(SHOTS)`·`editor.capture()`는 화면 크기와 상관없이 가로 그림(3D 1920×1080, 2D 3840×2160)을 따로 그린 뒤
-  렌더러 크기·카메라(2D는 view·그리던 선)를 되돌린다. 3D 캡처 버튼은 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 내려받고,
-  각 장은 `shotCamera()`가 벽·가구 범위를 꽉 차게 잡는다. 둘러보기 중에는 `capture()` 한 장(1인칭 그대로).
+- `view.captureShots(shots, W, H, { type, floorImage })`·`editor.capture(W, H, scale, { house, type })`는 화면 크기와 상관없이 그림을 따로 그린 뒤
+  렌더러 크기·카메라(2D는 view·그리던 선)를 되돌린다. 캡처 버튼은 **PDF 한 파일**(`pdf.makePdf`, JPEG 쪽, A4 비율 1980×1400/1400×1980)로 받는다:
+  2D는 도면 전체 + `house`(=`houseBounds()` 벽·방·가구만 꽉 차게 — 도면 그림의 제목·설명·바깥 치수가 빠진다) 두 쪽,
+  3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
+  벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
+- **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)가 `loadProject()`를 부른다. 평면도 그림(PNG·JPG)을 여는 버튼과
+  상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - 왼쪽 '② 가구' 탭을 누르면 `endDrawTool()`로 선택·이동 도구가 된다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
 - 방 이름표는 `CSS2DObject`다. 그룹에서 빼면(`clear()`) three.js가 DOM 요소도 함께 지운다.
@@ -345,6 +353,6 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 길이는 상태에서 언제나 mm 정수(또는 실수)로 다룬다. m는 3D 변환과 화면 표시에서만 쓴다.
   화면에 mm를 보일 때는 `fmtMM()`(천 단위 쉼표)을 쓰고, 면적은 ㎡와 평(÷ 3.3058)을 함께 보인다.
 - 가구 기본 크기는 `catalog.js`에만 둔다. 화면이나 3D 코드에 하드코딩하지 말 것.
-- `geometry.js` · `wallDetect.js` · `catalog.js` · `xlsx.js`에는 DOM·three.js 의존을 넣지 않는다(Node에서 시험할 수 있게).
+- `geometry.js` · `wallDetect.js` · `catalog.js` · `xlsx.js` · `pdf.js`에는 DOM·three.js 의존을 넣지 않는다(Node에서 시험할 수 있게).
 - 도면·사진은 사용자 PC에만 저장한다: 브라우저 localStorage와, 사용자가 띄운 로컬 serve.py가 쓰는 프로젝트 폴더의
   `ohmyhome-project.json`(.gitignore). 바깥 서버로 보내는 코드는 없으며, 그렇게 두어야 한다.
