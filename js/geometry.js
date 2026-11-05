@@ -180,7 +180,9 @@ function chairUnderDesk(chair, desk) {
 
 /** 서로 겹쳐 놓아도 되는 가구 종류 짝 (책상 위·옆으로 책장을 겹쳐 세우는 책상 책장 등) */
 const OVERLAP_OK = new Set([['desk', 'shelf']].map((p) => p.sort().join('|')));
-const overlapOk = (a, b) => OVERLAP_OK.has([a.type, b.type].sort().join('|'));
+/** 어떤 가구와도 겹쳐 놓아도 되는 종류 (커튼은 소파·침대·책상 등 창 앞 가구 뒤로 늘어진다) */
+const OVERLAP_ANY = new Set(['curtain']);
+const overlapOk = (a, b) => OVERLAP_ANY.has(a.type) || OVERLAP_ANY.has(b.type) || OVERLAP_OK.has([a.type, b.type].sort().join('|'));
 
 /** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
 export function findCollisions(furniture, walls) {
