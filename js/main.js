@@ -1233,20 +1233,52 @@ $('btn-export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(serialize())], { type: 'application/json' });
   download(URL.createObjectURL(blob), `ohmyhome-${today()}.json`);
 });
+/** 프로젝트 json(파일·샘플)을 연다 */
+function openProject(data, msg = '도면을 불러왔습니다.') {
+  loadProject(data);
+  $('wall-height').value = state.plan.wallHeight;
+  $('floor-num').value = state.plan.floor;
+  editor.fit();
+  view.resetCamera('persp');
+  status(msg);
+  doorsForOldProject(data);
+}
 $('file-project').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
   try {
-    const data = JSON.parse(await file.text());
-    loadProject(data);
-    $('wall-height').value = state.plan.wallHeight;
-    $('floor-num').value = state.plan.floor;
-    editor.fit();
-    view.resetCamera('persp');
-    status('도면을 불러왔습니다.');
-    doorsForOldProject(data);
+    openProject(JSON.parse(await file.text()));
   } catch (err) {
+    alert(`불러오지 못했습니다: ${err.message}`);
+  }
+});
+// 자이더파크 불러오기 — sample 폴더의 도면을 팝업에서 골라 연다.
+// 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. sample에 json을 더하면 여기에도 더한다
+const XI_PARK_SAMPLES = [
+  { file: '55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
+  { file: '55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
+  { file: '55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
+  { file: '55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
+  { file: '55C_plan.ohmyhome.json', name: '55㎡ C형' },
+  { file: '55D_plan.ohmyhome.json', name: '55㎡ D형' },
+];
+$('sample-list').innerHTML = XI_PARK_SAMPLES.map((s, i) => `<label><input type="radio" name="xi-sample" value="${i}"${i ? '' : ' checked'}>`
+  + `<span>${s.name}</span><small>${s.file}</small></label>`).join('');
+$('btn-xi-park').addEventListener('click', () => $('sample-dialog').showModal());
+$('sample-list').addEventListener('dblclick', (e) => { if (e.target.closest('label')) $('btn-sample-load').click(); });
+$('sample-dialog').addEventListener('close', async () => {
+  const dlg = $('sample-dialog');
+  if (dlg.returnValue !== 'load') return;
+  dlg.returnValue = '';
+  const s = XI_PARK_SAMPLES[+dlg.querySelector('input[name="xi-sample"]:checked').value];
+  status(`${s.name} 도면을 여는 중…`);
+  try {
+    const res = await fetch(`sample/${s.file}`, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`sample/${s.file}을 찾지 못했습니다 (${res.status})`);
+    openProject(await res.json(), `자이더파크 ${s.name} 도면을 불러왔습니다.`);
+  } catch (err) {
+    status('');
     alert(`불러오지 못했습니다: ${err.message}`);
   }
 });
@@ -1315,7 +1347,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 
 /* ---------- 단축키 ---------- */
 window.addEventListener('keydown', (e) => {
-  if (view.tour || isTyping()) return;   // 둘러보기 중 키는 tour.js가 받는다
+  if (view.tour || isTyping() || document.querySelector('dialog[open]')) return;   // 둘러보기 중 키는 tour.js가 받는다, 팝업 중에도 쉰다
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
@@ -1394,3 +1426,12 @@ else status('📂 ‘도면 불러오기(json)’로 저장한 도면을 열거�
 
 // 개발·점검용
 window.__ohmyhome = { state, editor, view, runDetect };
+
+/* ---------- 공지사항 — 처음 접속할 때. '다시 보지 않기'면 이 브라우저에서는 다시 띄우지 않는다 ---------- */
+const NOTICE_KEY = 'ohmyhome.notice.hidden';
+function noticeHidden() { try { return localStorage.getItem(NOTICE_KEY) === '1'; } catch { return false; } }
+$('notice-dialog').addEventListener('close', () => {
+  if ($('notice-dialog').returnValue !== 'hide') return;
+  try { localStorage.setItem(NOTICE_KEY, '1'); } catch { /* 저장소를 못 쓰면 다음에도 뜬다 */ }
+});
+if (!noticeHidden()) $('notice-dialog').showModal();

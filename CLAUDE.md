@@ -11,7 +11,7 @@ run_ohmyhome.bat            # Windows
 python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
-# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·LICENSE만.
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·LICENSE만.
 #   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
@@ -40,6 +40,8 @@ CDN(`three@0.160.0`)에서 받으므로 실행에 인터넷이 필요하다. ES 
 - 페이지는 점검용으로 `window.__ohmyhome = { state, editor, view, runDetect }`를 내놓는다.
 - `window.prompt` / `confirm`(축척 길이·방 이름·새 도면)은 CDP의 `Page.javascriptDialogOpening` →
   `Page.handleJavaScriptDialog({ accept, promptText })`로 처리한다.
+- 처음 접속하면 공지사항(`#notice-dialog`, 모달)이 뜬다 — 시험할 때는 그 `닫기` 버튼을 누르거나 localStorage에
+  `ohmyhome.notice.hidden = '1'`을 넣고 새로 고친다. 팝업(`dialog[open]`)이 열려 있으면 `main.js` 단축키는 쉰다.
 - 깨끗한 상태에서 시작하려면 `localStorage.clear()` 후 새로 고친다(자동 저장 키 `ohmyhome.project.v1`). serve.py로 띄웠으면
   프로젝트 폴더의 `ohmyhome-project.json`도 지운다 — **이 폴더에서 시험하면 사용자 작업 파일을 덮어쓰므로**, 서버 저장을 시험할 때는
   작업 트리를 임시 폴더에 복사해 다른 포트로 띄운다.
@@ -302,7 +304,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   2D는 도면 전체 + `house`(=`houseBounds()` 벽·방·가구만 꽉 차게 — 도면 그림의 제목·설명·바깥 치수가 빠진다) 두 쪽,
   3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
   벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
-- **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)가 `loadProject()`를 부른다. 평면도 그림(PNG·JPG)을 여는 버튼과
+- **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `🏢 자이더파크 불러오기`(`#btn-xi-park` → `#sample-dialog`에서
+  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`
+  (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 더한다. 평면도 그림(PNG·JPG)을 여는 버튼과
   상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - **도면만 바꾸기**(`#btn-plan-only` → `confirm` 경고 한 번 → `#file-plan-only`): 같은 집 도면이 조금 고쳐졌을 때 쓴다. `store.replacePlan(data)`가
   `plan`만 바꾸고(층수 `floor`는 지금 값 유지) 가구·배치 안(기본 포함 가구도)·내 가구는 mm 좌표 그대로 둔다. 되돌리기 한 번에 돌아온다.
@@ -337,7 +341,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   그 밖의 벽과의 겹침은 그대로 잰다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
-- 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이면 무시한다.
+- 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 팝업(`dialog[open]`)이 열려 있으면 무시한다.
+- **공지사항**(`#notice-dialog`): 처음 접속할 때 `showModal()`. 프로그램 설명 + `docs/OhMyHome_User_Guide.pdf` 내려받기 링크(그래서 배포 zip에도
+  `docs/`에 담는다). 아래 `다시 보지 않기`(value `hide`)면 localStorage `ohmyhome.notice.hidden`에 `1`을 남겨 다시 띄우지 않고, `닫기`·Esc는 이번만 닫는다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
   먹지 않는다. (예전 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.)
 
