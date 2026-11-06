@@ -40,6 +40,7 @@
       <section class="tab-body" id="tab-plan">
         <div class="card">
           <h3>도면 불러오기</h3>
+          <button id="btn-xi-park" class="block" title="sample 폴더에 들어 있는 자이더파크 55㎡ 세대 도면 가운데 하나를 엽니다">🏢 자이더파크 불러오기</button>
           <label class="btn primary block">📂 도면 불러오기(json)<input id="file-project" type="file" accept=".json,application/json" hidden></label>
           <button id="btn-plan-only" class="block" title="배치한 가구는 그대로 두고 벽·방·창·문·도면 그림만 고른 json 파일의 것으로 바꿉니다 (같은 집 도면이 조금 고쳐졌을 때)">🔁 도면만 바꾸기(json)</button>
           <input id="file-plan-only" type="file" accept=".json,application/json" hidden>
@@ -193,6 +194,40 @@
     <aside class="props" id="props" hidden></aside>
   </div>
 
+
+  <!-- 공지사항: 처음 접속할 때 띄운다. '다시 보지 않기'를 누르면 이 브라우저에서는 다시 띄우지 않는다 -->
+  <dialog id="notice-dialog" class="notice-dialog">
+    <form method="dialog">
+      <h3>📢 공지사항 — OhMyHome을 소개합니다</h3>
+      <p>OhMyHome은 평면도 위에 우리 집 가구를 놓아 보는 웹 프로그램입니다. 설치 없이 브라우저에서 바로 씁니다.</p>
+      <ul>
+        <li><b>도면 불러오기</b> — ‘🏢 자이더파크 불러오기’로 예시 세대 도면을 바로 열거나, 저장해 둔 도면(json)을 엽니다.</li>
+        <li><b>가구 배치</b> — ② 가구 탭에서 가구를 골라 2D 도면과 3D 화면에서 끌어 놓고, 크기·색·가격을 적습니다.</li>
+        <li><b>둘러보기</b> — 현관문을 열고 들어가 방마다 걸어서 둘러봅니다.</li>
+        <li><b>비교와 정리</b> — 배치 안을 여러 개 만들어 비교하고, 가구 목록은 엑셀로, 화면은 PDF로 받습니다.</li>
+      </ul>
+      <p class="notice-warn"><b>⚠️ 참고용 자료</b> 예시 도면·치수·면적·3D 화면은 가구 배치를 가늠해 보기 위한 참고용입니다. 실제 치수와 다를 수 있으니
+        가구를 사거나 공사하기 전에는 꼭 현장에서 재어 확인하세요. 도면과 가구 정보는 서버로 보내지 않고 내 브라우저에만 저장됩니다.</p>
+      <a class="btn block notice-guide" href="docs/OhMyHome_User_Guide.pdf" download="OhMyHome_User_Guide.pdf">📘 사용 가이드(PDF) 내려받기</a>
+      <div class="notice-actions">
+        <button id="btn-notice-hide" value="hide">다시 보지 않기</button>
+        <button class="primary" value="close" autofocus>닫기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 자이더파크 불러오기: sample 폴더의 도면(json) 고르기 -->
+  <dialog id="sample-dialog" class="sample-dialog">
+    <form method="dialog">
+      <h3>자이더파크 불러오기</h3>
+      <p class="hint">열 도면을 고르세요. 지금 작업은 되돌리기(Ctrl+Z)로 돌아올 수 있습니다.</p>
+      <div id="sample-list" class="sample-list"></div>
+      <div class="sample-actions">
+        <button value="cancel" formnovalidate>취소</button>
+        <button id="btn-sample-load" class="primary" value="load">불러오기</button>
+      </div>
+    </form>
+  </dialog>
 
   <script type="module" src="js/main.js"></script>
 </body>
