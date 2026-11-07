@@ -6,7 +6,7 @@ import {
 } from './store.js';
 import * as G from './geometry.js';
 import { windowDefaults } from './catalog.js';
-import { doorGeometry, slidingPanels, doorStyle, moveDoorAlong, SLIDE } from './doors.js';
+import { doorGeometry, slidingPanels, doorStyle, isHinged, swingLeaves, moveDoorAlong, SLIDE } from './doors.js';
 
 export const ROOM_COLORS = ['#f6c48b', '#9fd3c7', '#b5c7f2', '#f2a9b5', '#c9e29b', '#d7b8f0', '#f5dd8b'];
 const SNAP_PX = 12;
@@ -216,12 +216,11 @@ export class PlanEditor {
     for (let i = state.plan.doors.length - 1; i >= 0; i--) {
       const d = state.plan.doors[i];
       if (G.pointInPoly(p, G.wallCorners({ ...d, cap: false }, -tol))) return d;
-      if (doorStyle(d) !== 'swing') {   // 벽 면 밖에 붙은 문짝까지
+      if (!isHinged(d)) {   // 벽 면 밖에 붙은 문짝까지
         if (G.pointInPoly(p, G.wallCorners({ ...d, t: 2 * slidingPanels(d).reach, cap: false }, -tol))) return d;
         continue;
       }
-      const g = doorGeometry(d);
-      if (G.distToSegment(p, g.hinge, g.tip).dist < tol * 1.5) return d;   // 열린 문짝 선
+      if (swingLeaves(d).some(({ g }) => G.distToSegment(p, g.hinge, g.tip).dist < tol * 1.5)) return d;   // 열린 문짝 선
     }
     return null;
   }
@@ -619,24 +618,26 @@ export class PlanEditor {
     select({ kind: 'door', id: obj.id });
   }
 
-  /** 문: 틈 자리를 비우고 문짝 선 + 여닫는 호 (도면 기호). 미닫이는 벽 면에 붙은 문짝 + 열리는 쪽 화살표 */
+  /** 문: 틈 자리를 비우고 문짝 선 + 여닫는 호 (도면 기호, 양여닫이는 양 끝에서 둘). 미닫이는 벽 면에 붙은 문짝 + 열리는 쪽 화살표 */
   drawDoor(d, selected) {
-    const c = this.ctx, g = doorGeometry(d);
+    const c = this.ctx;
     this.poly(G.wallCorners({ ...d, cap: false }));
     c.fillStyle = '#ffffff';
     c.fill();
     const col = selected ? '#2f6fed' : '#8b5e34';
-    if (doorStyle(d) !== 'swing') { this.drawSlidingDoor(d, col, selected); return; }
+    if (!isHinged(d)) { this.drawSlidingDoor(d, col, selected); return; }
     c.strokeStyle = col;
-    c.lineWidth = selected ? 2.5 : 1.2;
-    c.setLineDash([4, 3]);
-    c.beginPath();
-    for (let deg = 0; deg <= 90; deg += 5) { const s = this.toScr(g.arc(deg)); deg ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); }
-    c.stroke();
-    c.setLineDash([]);
-    c.lineWidth = selected ? 4 : 3;
-    const h = this.toScr(g.hinge), t = this.toScr(g.tip);
-    c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(t.x, t.y); c.stroke();
+    for (const { g } of swingLeaves(d)) {
+      c.lineWidth = selected ? 2.5 : 1.2;
+      c.setLineDash([4, 3]);
+      c.beginPath();
+      for (let deg = 0; deg <= 90; deg += 5) { const s = this.toScr(g.arc(deg)); deg ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); }
+      c.stroke();
+      c.setLineDash([]);
+      c.lineWidth = selected ? 4 : 3;
+      const h = this.toScr(g.hinge), t = this.toScr(g.tip);
+      c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(t.x, t.y); c.stroke();
+    }
   }
 
   /** 미닫이·미서기·중문: 닫힌 자리 문짝(미서기는 벽 두께 안 엇갈린 두 짝, 중문은 레일 셋에 유리 세 짝) + 열리는 쪽 화살표 */
@@ -782,20 +783,24 @@ export class PlanEditor {
       c.ellipse(ct.x, ct.y, (f.w / 2) * this.view.s, (f.d / 2) * this.view.s, f.rot * G.DEG, 0, Math.PI * 2);
     } else this.poly(G.furnitureOutline(f));
     // 식물의 색상은 화분 색이라 2D는 잎 색으로 칠한다
-    c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.type === 'plant' ? '#7fb27a' : f.color || '#cccccc', f.elev > 0 ? 0.55 : 0.85);
+    // 비활성화한 가구: 아주 연한 색 + 점선 테두리(앞면 선도 점선)
+    const off = !!f.disabled;
+    c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.type === 'plant' ? '#7fb27a' : f.color || '#cccccc', off ? 0.18 : f.elev > 0 ? 0.55 : 0.85);
     c.fill();
     c.lineWidth = selected ? 2.5 : 1.2;
-    c.strokeStyle = selected ? '#2f6fed' : bad ? '#d9443b' : 'rgba(30,40,50,.75)';
-    c.setLineDash(f.elev > 0 ? [5, 3] : []);
+    c.strokeStyle = selected ? '#2f6fed' : bad ? '#d9443b' : off ? 'rgba(30,40,50,.4)' : 'rgba(30,40,50,.75)';
+    c.setLineDash(off ? [6, 4] : f.elev > 0 ? [5, 3] : []);
     c.stroke();
     c.setLineDash([]);
     // 앞면 표시 (로컬 +y 변, ㄱ자는 안쪽으로 꺾인 두 변). 식물은 앞뒤가 없다
     if (f.type !== 'plant') {
-      c.strokeStyle = selected ? '#2f6fed' : '#1f2833';
-      c.lineWidth = 3;
+      c.strokeStyle = selected ? '#2f6fed' : off ? 'rgba(31,40,51,.4)' : '#1f2833';
+      c.lineWidth = off ? 2 : 3;
+      c.setLineDash(off ? [6, 4] : []);
       c.beginPath();
       G.furnitureFront(f).forEach((q, i) => { const s = this.toScr(q); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
       c.stroke();
+      c.setLineDash([]);
     }
 
     // 이름은 첫 조각 가운데에 쓴다 (보통 가구는 전체, ㄱ자는 뒤쪽 가로 — 전체 가운데는 비어 있는 안쪽 모서리다)
@@ -808,15 +813,39 @@ export class PlanEditor {
       c.font = `600 ${Math.min(13, Math.max(10, minSide / 4))}px sans-serif`;
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      // 가로×깊이는 선택과 상관없이 늘 쓴다 (두 줄이 들어갈 만큼 클 때)
-      const size = minSide > 30;
-      c.fillText(f.name, ct.x, ct.y - (size ? 7 : 0));
+      // 가로×깊이는 선택과 상관없이 늘 쓴다 (두 줄이 들어갈 만큼 클 때).
+      // 맞춤 제작 가구는 그 아래에 '🛠️ 맞춤' 꼬리표 (세 줄이 안 들어가면 치수 줄 끝에 🛠️만, 치수 줄도 없으면 목록·속성에서만 보인다)
+      const size = minSide > 30, tag = f.custom && minSide > 46;
+      const lift = tag ? 7 : 0;
+      c.fillText(f.name, ct.x, ct.y - (size ? 7 : 0) - lift);
       if (size) {
         c.font = '11px sans-serif';
         c.fillStyle = selected ? '#1f2833' : '#4a5563';
-        c.fillText(`${fmtMM(f.w)}×${fmtMM(f.d)}`, ct.x, ct.y + 8);
+        c.fillText(`${fmtMM(f.w)}×${fmtMM(f.d)}${f.custom && !tag ? ' 🛠️' : ''}`, ct.x, ct.y + 8 - lift);
       }
+      if (tag) this.customTag(ct.x, ct.y + 9 + 7, off);
     }
+  }
+
+  /** 맞춤 제작 꼬리표 — 주황 둥근 칸에 '🛠️ 맞춤' (가운데 x, y) */
+  customTag(x, y, faded) {
+    const c = this.ctx, text = '🛠️ 맞춤';
+    c.save();
+    c.globalAlpha = faded ? 0.5 : 1;
+    c.font = '600 10px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    const w = c.measureText(text).width + 10, h = 15;
+    c.beginPath();
+    c.roundRect(x - w / 2, y - h / 2, w, h, 7);
+    c.fillStyle = '#fff1e0';
+    c.fill();
+    c.lineWidth = 1;
+    c.strokeStyle = '#e8590c';
+    c.stroke();
+    c.fillStyle = '#b4520a';
+    c.fillText(text, x, y + 0.5);
+    c.restore();
   }
 
   /** Shift+끌기 선택 사각형 */

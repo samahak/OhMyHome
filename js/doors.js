@@ -3,7 +3,8 @@
 //   도면 이미지에서 그 틈에 여닫이 문 기호(벽 면에서 수직으로 선 문짝 선 + 4분의 1 호)가 그려져 있으면 문으로 본다.
 //   경첩(틈 양 끝 중 어느 쪽) × 열리는 쪽(틈 양쪽 중 어느 쪽) 네 가지를 모두 그려 보고 이미지와 가장 잘 맞는 것을 고른다.
 // 문 { a, b, t, swing, style? } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b의 왼쪽 법선 n=(-uy, ux) 쪽(1)인지 반대쪽(-1)인지.
-//   style 없음: 여닫이. 'sliding': 미닫이 — 문짝이 swing 쪽 벽 면에 붙어 a 쪽으로 밀려 열린다(틈이 SLIDE.twoOver보다 넓으면 두 짝이 양쪽으로).
+//   style 없음: 여닫이. 'double': 양여닫이 — 양 끝(a·b) 경첩의 두 짝이 가운데에서 만나고, 둘 다 swing 쪽으로 열린다(옷장 문처럼).
+//   'sliding': 미닫이 — 문짝이 swing 쪽 벽 면에 붙어 a 쪽으로 밀려 열린다(틈이 SLIDE.twoOver보다 넓으면 두 짝이 양쪽으로).
 //   'middle': 현관 중문 — 유리 3연동 미닫이. 세 짝이 swing 쪽에 레일 셋으로 겹쳐 a 쪽으로 모이며 열린다.
 //   'bypass': 미서기 — 벽 두께 안에 두 짝이 레일 둘로 엇갈려 있다(a 쪽 짝은 -n, b 쪽 짝은 +n 쪽 레일). b 쪽 짝이 a 쪽으로 밀려 겹친다.
 //   도면에서는 여닫이 기호와 미서기 기호(틈 안에 엇갈린 평행선 둘)를 찾는다. 미닫이는 🚪 문 도구로 달고 속성에서 바꾼다.
@@ -53,8 +54,20 @@ export function doorGeometry(door) {
 
 /** 미닫이 문짝 치수 (mm): 두께, 벽 면에서 띄움, 이 폭을 넘는 틈은 두 짝, 문틀에 걸치는 길이, 중문 짝끼리 겹치는 길이·레일 간격 */
 export const SLIDE = { t: 40, gap: 15, twoOver: 1300, overlap: 30, middleLap: 50, track: 10 };
-export const DOOR_STYLES = { swing: '여닫이', sliding: '미닫이', bypass: '미서기', middle: '중문' };
+export const DOOR_STYLES = { swing: '여닫이', double: '양여닫이', sliding: '미닫이', bypass: '미서기', middle: '중문' };
 export const doorStyle = (d) => (DOOR_STYLES[d?.style] ? d.style : 'swing');
+/** 문짝이 돌아 열리는 문(여닫이·양여닫이)인지 */
+export const isHinged = (d) => doorStyle(d) === 'swing' || doorStyle(d) === 'double';
+
+/**
+ * 여닫이 문짝마다의 { door, g }. door는 그 짝만의 문(a: 경첩 끝, b: 닫힌 문짝 끝), g는 doorGeometry(door).
+ * 양여닫이는 a 끝·b 끝 경첩의 반쪽 짝 둘이다. b 쪽 짝은 a↔b가 뒤집혀 법선도 뒤집히므로 swing을 뒤집어 같은 쪽으로 열리게 한다.
+ */
+export function swingLeaves(door) {
+  if (doorStyle(door) !== 'double') return [{ door, g: doorGeometry(door) }];
+  const mid = { x: (door.a.x + door.b.x) / 2, y: (door.a.y + door.b.y) / 2 };
+  return [{ ...door, b: mid }, { ...door, a: door.b, b: mid, swing: -door.swing }].map((h) => ({ door: h, g: doorGeometry(h) }));
+}
 
 /**
  * 미닫이·중문 문짝 자리 (mm). at(s, o): a에서 틈 방향으로 s, 벽 중심선에서 swing 쪽으로 o만큼 간 점.

@@ -1,6 +1,6 @@
 // 평면 기하 — 모든 좌표는 mm, y는 아래로 증가한다(도면 이미지와 같은 방향).
 // 가구 회전 rot(도)은 화면에서 시계 방향이다. 가구의 앞면은 로컬 +y(= 3D의 +z)다.
-import { lCounterDepth } from './catalog.js';
+import { lCounterDepth, lLegDepth } from './catalog.js';
 
 export const DEG = Math.PI / 180;
 
@@ -34,8 +34,8 @@ export function furnitureCorners(f, shrink = 0) {
 export function furnitureRects(f) {
   const hw = f.w / 2, hd = f.d / 2;
   if (f.type !== 'kitchen_l') return [[-hw, -hd, hw, hd]];
-  const t = Math.min(lCounterDepth(f), f.w, f.d);
-  const [x0, x1] = f.mirror ? [-hw, -hw + t] : [hw - t, hw];
+  const t = Math.min(lCounterDepth(f), f.w, f.d), tl = Math.min(lLegDepth(f), f.w);   // 가로 쪽 깊이 · 꺾인 쪽 깊이
+  const [x0, x1] = f.mirror ? [-hw, -hw + tl] : [hw - tl, hw];
   return [[-hw, -hd, hw, -hd + t], [x0, -hd + t, x1, hd]];
 }
 
@@ -179,7 +179,7 @@ function chairUnderDesk(chair, desk) {
 }
 
 /** 서로 겹쳐 놓아도 되는 가구 종류 짝 (책상 위·옆으로 책장을 겹쳐 세우는 책상 책장 등) */
-const OVERLAP_OK = new Set([['desk', 'shelf']].map((p) => p.sort().join('|')));
+const OVERLAP_OK = new Set([['desk', 'shelf'], ['bath_shelf', 'bath_upper_shelf']].map((p) => p.sort().join('|')));
 /** 어떤 가구와도 겹쳐 놓아도 되는 종류 (커튼은 소파·침대·책상 등 창 앞 가구 뒤로 늘어진다) */
 const OVERLAP_ANY = new Set(['curtain']);
 /** 벽과 겹쳐 놓아도 되는 종류 (커튼은 창틀·벽 안쪽에 걸쳐 단다) */
@@ -193,11 +193,13 @@ export function findCollisions(furniture, walls) {
   const wc = walls.map((w) => wallCorners(w, 1));
   const overlap = (A, B) => A.some((a) => B.some((b) => convexOverlap(a, b)));   // 조각(ㄱ자는 둘) 중 하나라도 겹치면
   furniture.forEach((f, i) => {
+    if (f.disabled) return;   // 비활성화한 가구는 없는 것으로 친다
     if (!WALL_OK.has(f.type)) for (const w of wc) {
       if (overlap(fc[i], [w])) { bad.add(f.id); break; }
     }
     for (let j = i + 1; j < furniture.length; j++) {
       const g = furniture[j];
+      if (g.disabled) continue;
       const vertical = f.elev < g.elev + g.h && g.elev < f.elev + f.h;
       if (!vertical || overlapOk(f, g) || !overlap(fc[i], fc[j])) continue;
       let hit = null;

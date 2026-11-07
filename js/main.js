@@ -6,14 +6,14 @@ import {
   addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makePdf, dataURLBytes } from './pdf.js';
 import { makeXlsx, STYLE } from './xlsx.js';
 import { detectWallRects, rectToWall } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
-import { autoFixtures, hasFixtureRooms } from './fixtures.js';
+import { autoFixtures, hasFixtureRooms, missingPlanSinks } from './fixtures.js';
 import { findWindows } from './windows.js';
 import { findDoors, findMiddleDoorGap, moveDoorAlong, depthFromEntrance, doorStyle, DOOR_STYLES, SLIDE } from './doors.js';
 
@@ -464,14 +464,15 @@ function parseWon(text) {
   return Math.round((+m[1] || 0) * 10000 + (+m[2] || 0) * 1000 + (+m[3] || 0));
 }
 const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
-/** 가격 합계: 기본 포함 가구(builtin, 집에 딸려 오는 것)는 더하지 않는다 */
-const sumPrice = (fs) => fs.reduce((s, f) => s + (f.builtin ? 0 : f.price || 0), 0);
+/** 가격 합계에서 빼는 것: 기본 포함 가구(builtin, 집에 딸려 오는 것)와 비활성화한 가구(disabled, 지금은 안 놓은 것) */
+const excluded = (f) => f.builtin || f.disabled;
+const sumPrice = (fs) => fs.reduce((s, f) => s + (excluded(f) ? 0 : f.price || 0), 0);
 
 /**
  * 비용에 넣는 문: 현관 중문은 늘(사서 다는 것이라), 다른 문은 가격을 넣었을 때만. 가구 항목과 같은 꼴로 바꿔 합계·목록·엑셀에 함께 쓴다.
  * door: true, 크기는 문 폭 × 벽 두께 × 문 높이
  */
-const DOOR_NAMES = { swing: '여닫이문', sliding: '미닫이문', bypass: '미서기문', middle: '현관 중문' };
+const DOOR_NAMES = { swing: '여닫이문', double: '양여닫이문', sliding: '미닫이문', bypass: '미서기문', middle: '현관 중문' };
 function costDoors() {
   return state.plan.doors.filter((d) => doorStyle(d) === 'middle' || d.price != null).map((d) => ({
     id: d.id, door: true, style: doorStyle(d), name: d.name || DOOR_NAMES[doorStyle(d)], model: d.model, price: d.price, builtin: d.builtin,
@@ -482,19 +483,21 @@ const costItems = () => [...state.furniture, ...costDoors()];
 
 /** 합계 아래 안내 문장들: 기본 포함이라 제외한 수 · 가격을 안 넣은 수 */
 function priceNotes(fs) {
-  const builtin = fs.filter((f) => f.builtin).length, noPrice = fs.filter((f) => !f.builtin && f.price == null);
+  const builtin = fs.filter((f) => f.builtin).length, off = fs.filter((f) => f.disabled && !f.builtin).length;
+  const noPrice = fs.filter((f) => !excluded(f) && f.price == null);
   const what = noPrice.some((f) => f.door) ? (noPrice.every((f) => f.door) ? '문' : '가구·문') : '가구';
+  const out = [builtin && `기본 가구 ${builtin}개`, off && `비활성 가구 ${off}개`].filter(Boolean).join(' · ');
   return [
-    builtin && `총 ${fs.length}개 중 기본 가구 ${builtin}개는 제외했습니다`,
+    out && `총 ${fs.length}개 중 ${out}는 제외했습니다`,
     noPrice.length && `가격을 넣지 않은 ${what} ${noPrice.length}개는 빼고 더했습니다`,
   ].filter(Boolean);
 }
 
 /** 배치된 가구(+ 비용에 넣는 문) 합계: 기본 포함을 뺀 개수 · 가격 합계 (뺀 것·가격 안 넣은 것 수도 알린다) */
 function renderPlacedTotal() {
-  const fs = costItems(), nf = fs.filter((f) => !f.builtin && !f.door).length, nd = fs.filter((f) => !f.builtin && f.door).length;
+  const fs = costItems(), nf = fs.filter((f) => !excluded(f) && !f.door).length, nd = fs.filter((f) => !excluded(f) && f.door).length;
   $('placed-total').hidden = $('placed-export').hidden = !fs.length;
-  $('placed-total').innerHTML = fs.some((f) => f.price != null || f.builtin)
+  $('placed-total').innerHTML = fs.some((f) => f.price != null || excluded(f))
     ? `가구 ${nf}개${nd ? ` · 문 ${nd}개` : ''} · 합계 <b>${fmtWon(sumPrice(fs))}</b>${priceNotes(fs).map((s) => `<small>${s}</small>`).join('')}`
     : `가구 ${state.furniture.length}개${nd ? ` · 문 ${nd}개` : ''}<small>가구를 골라 모델명·가격을 넣으면 여기에 합계가 나옵니다</small>`;
 }
@@ -505,15 +508,15 @@ function renderPlacedTotal() {
  */
 function furnitureSheet(all) {
   const fs = [...[...state.furniture].sort(byTypeThenName), ...costDoors()];   // 문(중문 등)은 가구 뒤에
-  const paid = fs.filter((f) => !f.builtin && (all || f.price != null)), builtin = all ? fs.filter((f) => f.builtin) : [];
+  const paid = fs.filter((f) => !excluded(f) && (all || f.price != null)), builtin = all ? fs.filter(excluded) : [];
   const H = (v) => ({ v, s: STYLE.header });
   const row = (f, i, muted) => [i + 1, f.door ? DOOR_STYLES[f.style] : SHAPES[f.type]?.label || f.type, f.name, f.model || '',
-    f.price != null ? { v: f.price, s: muted ? STYLE.mutedWon : STYLE.won } : '', f.w, f.d, f.h, f.builtin ? '기본 포함' : '구매']
+    f.price != null ? { v: f.price, s: muted ? STYLE.mutedWon : STYLE.won } : '', f.w, f.d, f.h, f.builtin ? '기본 포함' : f.disabled ? '비활성' : f.custom ? '맞춤 제작' : '구매']
     .map((v) => (muted && typeof v !== 'object' ? { v, s: STYLE.muted } : v));
   const head = 4;   // 제목 · 요약 · 빈 줄 다음 줄이 머리글
   const rows = [
     [{ v: `OhMyHome 가구 목록${state.layouts.length > 1 ? ` — ${currentLayout().name}` : ''}`, s: STYLE.title }],
-    [`${today()} · 가구 ${paid.filter((f) => !f.door).length}개${paid.some((f) => f.door) ? ` · 문 ${paid.filter((f) => f.door).length}개` : ''} · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
+    [`${today()} · 가구 ${paid.filter((f) => !f.door).length}개${paid.some((f) => f.door) ? ` · 문 ${paid.filter((f) => f.door).length}개` : ''} · 합계 ${fmtWon(sumPrice(paid))}${all && builtin.length ? ` · 기본·비활성 가구 ${builtin.length}개는 합계에서 제외` : ''}`],
     [],
     ['번호', '종류', '이름', '모델명', '가격(원)', '가로(mm)', '깊이(mm)', '높이(mm)', '구분'].map(H),
     ...paid.map((f, i) => row(f, i)),
@@ -523,14 +526,14 @@ function furnitureSheet(all) {
     { f: paid.length ? `SUM(E${head + 1}:E${end})` : '0', v: sumPrice(paid), s: STYLE.totalWon },
     ...Array(4).fill({ v: '', s: STYLE.totalLabel })]);
   if (builtin.length) {
-    rows.push([], [{ v: `기본 포함 가구 ${builtin.length}개 (합계에서 제외)`, s: STYLE.section }], ...builtin.map((f, i) => row(f, i, true)));
+    rows.push([], [{ v: `기본 포함·비활성 가구 ${builtin.length}개 (합계에서 제외)`, s: STYLE.section }], ...builtin.map((f, i) => row(f, i, true)));
   }
   return makeXlsx({ name: '가구 목록', cols: [6, 14, 22, 26, 14, 10, 10, 10, 10], rows, freeze: head });
 }
 
 $('btn-xlsx').addEventListener('click', () => {
   const all = $('xlsx-all').checked;
-  if (!all && !costItems().some((f) => !f.builtin && f.price != null)) {
+  if (!all && !costItems().some((f) => !excluded(f) && f.price != null)) {
     status('가격이 계산된 가구가 없습니다. 가구에 가격을 넣거나 ‘모든 가구’를 켜고 다시 눌러 주세요.');
     return;
   }
@@ -542,9 +545,12 @@ $('btn-xlsx').addEventListener('click', () => {
 });
 
 /** 목록·묶음 패널의 가격 표시: 기본 포함 가구는 '기본 포함' 꼬리표, 가격은 지운 줄로 */
-const priceTag = (f) => f.builtin
-  ? `<span class="price builtin">기본 포함${f.price != null ? ` <s>${fmtWon(f.price)}</s>` : ''}</span>`
+const priceTag = (f) => excluded(f)
+  ? `<span class="price builtin">${f.builtin ? '기본 포함' : '비활성'}${f.price != null ? ` <s>${fmtWon(f.price)}</s>` : ''}</span>`
   : f.price != null ? `<span class="price">${fmtWon(f.price)}</span>` : '';
+
+/** 맞춤 제작 가구 꼬리표 (기성품이 아니라 크기·비용이 다를 수 있다) */
+const CUSTOM_TAG = ' <span class="custom-tag" title="맞춤 제작 — 기성품이 아니라 크기·비용이 달라질 수 있습니다">🛠️ 맞춤</span>';
 
 /** 배치된 가구: 종류별로 묶고(제목 + 개수 + 소계), 같은 종류 안에서는 이름순 */
 function renderPlaced() {
@@ -557,10 +563,10 @@ function renderPlaced() {
   }
   $('placed-list').innerHTML = state.furniture.length
     ? [...groups].map(([type, fs]) => `
-      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span>${fs.some((f) => !f.builtin && f.price != null) ? `<span class="sub">${fmtWon(sumPrice(fs))}</span>` : ''}</div>
+      <div class="placed-group">${iconFor(type)} ${esc(SHAPES[type]?.label || type)} <span class="n">${fs.length}</span>${fs.some((f) => !excluded(f) && f.price != null) ? `<span class="sub">${fmtWon(sumPrice(fs))}</span>` : ''}</div>
       ${fs.map((f) => `
-      <button data-id="${f.id}" class="${isFurnitureSelected(f.id) ? 'sel' : ''}">
-        <span>${esc(f.name)}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}${f.model ? `<span class="model">${esc(f.model)}</span>` : ''}</span>
+      <button data-id="${f.id}" class="${isFurnitureSelected(f.id) ? 'sel' : ''}${f.disabled ? ' off' : ''}">
+        <span>${esc(f.name)}${f.custom ? CUSTOM_TAG : ''}${bad.has(f.id) ? ' <span class="bad">⚠</span>' : ''}${f.model ? `<span class="model">${esc(f.model)}</span>` : ''}</span>
         ${priceTag(f) || `<span class="sz">${f.w}×${f.d}×${f.h}</span>`}
       </button>`).join('')}`).join('')
     : '<p class="empty">아직 놓은 가구가 없습니다.</p>';
@@ -591,7 +597,7 @@ function renderLayouts() {
   $('layout-list').innerHTML = state.layouts.map((l) => {
     const fs = layoutFurniture(l.id), all = [...fs, ...doors], priced = all.some((f) => f.price != null);
     return `<button data-layout="${l.id}" class="${l.id === state.layoutId ? 'sel' : ''}">
-      <span>${esc(l.name)}${l.locked ? '<span class="lock" title="보호 중 — 가구를 고칠 수 없습니다">🔒</span>' : ''}</span><span class="sz">가구 ${fs.filter((f) => !f.builtin).length}개${priced ? ` · ${fmtWon(sumPrice(all))}` : ''}</span></button>`;
+      <span>${esc(l.name)}${l.locked ? '<span class="lock" title="보호 중 — 가구를 고칠 수 없습니다">🔒</span>' : ''}</span><span class="sz">가구 ${fs.filter((f) => !excluded(f)).length}개${priced ? ` · ${fmtWon(sumPrice(all))}` : ''}</span></button>`;
   }).join('');
   $('layout-list').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.layout === state.layoutId) return;
@@ -655,12 +661,14 @@ function renderProps() {
       <h3><span>🗂️ 가구 ${sel.ids.length}개</span><button data-act="close" class="icon">✕</button></h3>
       <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽이나 다른 가구와 겹치는 것이 있습니다.</div>
       <ul class="multi-list">${sel.ids.map((id) => state.furniture.find((f) => f.id === id))
-        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)} ${priceTag(f)}</li>`).join('')}</ul>
+        .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}${f.custom ? CUSTOM_TAG : ''} ${priceTag(f)}</li>`).join('')}</ul>
       ${(() => {
         const fs = sel.ids.map((id) => state.furniture.find((f) => f.id === id)), notes = priceNotes(fs);
-        return fs.some((f) => f.price != null || f.builtin) ? `<div class="field"><span>고른 가구 가격 합계</span><b>${fmtWon(sumPrice(fs))}</b></div>${notes.length ? `<p class="hint">${notes.join('.<br>')}.</p>` : ''}` : '';
+        return fs.some((f) => f.price != null || excluded(f)) ? `<div class="field"><span>고른 가구 가격 합계</span><b>${fmtWon(sumPrice(fs))}</b></div>${notes.length ? `<p class="hint">${notes.join('.<br>')}.</p>` : ''}` : '';
       })()}
       <div class="btns"><button data-act="builtin-on" title="집에 딸려 오는 가구로 표시해 가격 합계에서 뺍니다">기본 포함으로</button><button data-act="builtin-off">기본 포함 해제</button></div>
+      <div class="btns"><button data-act="custom-on" title="기성품이 아닌 맞춤 제작으로 표시합니다 (도면 치수 아래 🛠️ 맞춤)">맞춤 제작으로</button><button data-act="custom-off">맞춤 해제</button></div>
+      <div class="btns"><button data-act="off-on" title="점선·연한 색으로 보이고 겹침·합계에서 빠집니다">비활성화</button><button data-act="off-off">다시 활성화</button></div>
       <div class="btns"><button data-act="rot-90">⟲ 90°</button><button data-act="rot90">⟳ 90°</button></div>
       <div class="btns">
         <button data-act="dup">함께 복제</button>
@@ -681,6 +689,8 @@ function renderProps() {
       <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: LG 오브제 M873"></label>
       <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,290,000 · 129만"></label>
       <label class="check" title="집에 딸려 오는 가구(빌트인·옵션)는 가격 합계에서 뺍니다"><input type="checkbox" data-f="builtin"> 기본 포함 가구 (합계에서 빼기)</label>
+      <label class="check" title="지우지 않고 잠시 빼 둡니다 — 점선·연한 색으로 보이고, 겹침 판정·둘러보기 길·가격 합계에서 빠집니다"><input type="checkbox" data-f="disabled"> 비활성화 (점선으로 연하게, 겹침·합계에서 빼기)</label>
+      <label class="check" title="기성품이 아니라 따로 만드는 가구 — 크기가 기성품과 다르고 비용이 더 들 수 있습니다. 도면의 치수 아래에 🛠️ 맞춤이 붙습니다"><input type="checkbox" data-f="custom"> 🛠️ 맞춤 제작 (기성품 아님 — 크기·비용이 다를 수 있음)</label>
       <label class="field"><span>샘플 모양</span><select data-f="type">${Object.entries(SHAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${obj.type === 'plant' ? `
       <label class="field"><span>식물 종류</span><select data-f="plant">${Object.entries(PLANTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
@@ -692,6 +702,7 @@ function renderProps() {
       <label class="field"><span>${dims.d} (mm)</span><input type="number" min="10" step="10" data-f="d"></label>
       ${isL ? `
       <label class="field"><span>상판 깊이 (mm)</span><input type="number" min="${L_COUNTER.minDepth}" max="${L_COUNTER.maxDepth}" step="10" data-f="counterD"></label>
+      <label class="field" title="꺾인 쪽(선반 쪽)만 더 깊을 때 — 비우면 상판 깊이와 같습니다"><span>꺾인 쪽 깊이 (mm)</span><input type="number" min="${L_COUNTER.minDepth}" max="${L_COUNTER.maxDepth}" step="10" data-f="legD"></label>
       <div class="field"><span>꺾인 쪽</span><b data-v="lside"></b></div>
       <div class="btns"><button data-act="mirror">⇋ 좌우 반전</button></div>` : ''}
       <label class="field"><span>높이 H (mm)</span><input type="number" min="10" step="10" data-f="h"></label>
@@ -734,10 +745,12 @@ function renderProps() {
       ${style === 'middle' && state.plan.entrance ? '<label class="field"><span>현관문에서 (mm)</span><input type="number" step="50" data-f="mdepth"></label>' : ''}
       ${style === 'swing'
         ? '<div class="btns"><button data-act="hinge">⇋ 경첩 반대로</button><button data-act="swing">⇅ 여는 쪽 반대로</button></div>'
+        : style === 'double' ? '<div class="btns"><button data-act="swing">⇅ 여는 쪽 반대로</button></div>'
         : `<div class="btns">${style === 'sliding' && G.dist(obj.a, obj.b) > SLIDE.twoOver ? '' : '<button data-act="hinge">⇋ 여는 방향 반대로</button>'}<button data-act="swing">⇅ 붙는 벽 면 반대로</button></div>`}
       <div class="btns"><button data-act="del" class="danger">문 삭제</button></div>
       <p class="hint">${{
         swing: '3D에서는 문 위를 천장까지 벽으로 채우고, 문짝을 도면 기호처럼 90° 열어 둡니다.',
+        double: '양여닫이는 양 끝 경첩에 달린 두 짝이 가운데에서 만나고, 옷장 문처럼 두 짝 모두 같은 쪽으로 열립니다. 3D에서는 두 짝을 90° 열어 둡니다.',
         sliding: `미닫이는 벽 면을 따라 밀려 열립니다. 폭이 ${fmtMM(SLIDE.twoOver)}mm를 넘으면 두 짝이 양쪽으로 열립니다. 3D에서는 문짝을 끝까지 열어 둡니다.`,
         bypass: '미서기는 벽 두께 안에 두 짝이 엇갈려 있어 한 짝을 다른 짝 쪽으로 밀어 엽니다. 3D에서는 한 짝을 밀어 반쯤 열어 둡니다. ‘여는 방향’은 움직이는 짝을, ‘붙는 벽 면’은 앞뒤 레일을 바꿉니다.',
         middle: '현관 중문은 유리 세 짝이 한쪽으로 겹쳐 모이며 열리고(3연동), 문 위는 천장까지 고정 유리입니다. 2D에서 끌거나 ‘현관문에서’ 거리를 고치면 양옆 벽을 따라 앞뒤로 옮겨집니다(폭은 양옆 벽에 맞춥니다).',
@@ -801,6 +814,7 @@ function refreshProps() {
     if (k === 'rot') return Math.round(obj.rot * 100) / 100;
     if (k === 'x' || k === 'y') return Math.round(obj[k]);
     if (k === 'counterD') return lCounterDepth(obj);
+    if (k === 'legD') return lLegDepth(obj);
     if (k === 'mdepth') return Math.round(depthFromEntrance(obj, state.plan.entrance) ?? 0);
     if (k === 'plant') return plantOf(obj);
     if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
@@ -850,6 +864,18 @@ function applyProp(inp) {
     checkpoint();
     if (won === null) delete obj.price; else obj.price = won;
     emit(sel.kind === 'door' ? 'plan' : 'furniture');
+    return;
+  }
+  if (k === 'disabled') {
+    checkpoint();
+    if (v) obj.disabled = true; else delete obj.disabled;
+    emit('furniture');
+    return;
+  }
+  if (k === 'custom') {
+    checkpoint();
+    if (v) obj.custom = true; else delete obj.custom;
+    emit('furniture');
     return;
   }
   if (k === 'builtin') {
@@ -935,8 +961,9 @@ function moveMiddleDoor(door, depth) {
 function clampKitchenL(obj, k, v) {
   const L = L_COUNTER;
   if (k === 'counterD') return Math.max(L.minDepth, Math.min(L.maxDepth, obj.w - L.minArm, obj.d - L.minArm, v));
+  if (k === 'legD') return Math.max(L.minDepth, Math.min(L.maxDepth, obj.w - L.minArm, v));
   if (k === 'w' || k === 'd') {
-    const min = lCounterDepth(obj) + L.minArm;
+    const min = (k === 'w' ? Math.max(lCounterDepth(obj), lLegDepth(obj)) : lCounterDepth(obj)) + L.minArm;
     if (v < min) status(`${k === 'w' ? '가로' : '세로'} 길이는 상판 깊이 + ${L.minArm}mm(${fmtMM(min)}mm) 이상이어야 합니다.`);
     return Math.max(min, v);
   }
@@ -985,6 +1012,24 @@ function propAction(act) {
     emit('furniture');
     renderProps();   // 목록의 '기본 포함' 표시가 바뀐다
     status(act === 'builtin-on' ? `가구 ${fs.length}개를 기본 포함으로 표시해 합계에서 뺐습니다.` : `가구 ${fs.length}개의 기본 포함 표시를 지웠습니다.`);
+    return;
+  }
+  if (act === 'off-on' || act === 'off-off') {
+    const fs = selectedFurniture();
+    checkpoint();
+    for (const f of fs) { if (act === 'off-on') f.disabled = true; else delete f.disabled; }
+    emit('furniture');
+    renderProps();   // 목록의 '비활성' 표시가 바뀐다
+    status(act === 'off-on' ? `가구 ${fs.length}개를 비활성화했습니다(점선으로 연하게, 겹침·합계에서 뺍니다).` : `가구 ${fs.length}개를 다시 활성화했습니다.`);
+    return;
+  }
+  if (act === 'custom-on' || act === 'custom-off') {
+    const fs = selectedFurniture();
+    checkpoint();
+    for (const f of fs) { if (act === 'custom-on') f.custom = true; else delete f.custom; }
+    emit('furniture');
+    renderProps();   // 목록의 '맞춤' 표시가 바뀐다
+    status(act === 'custom-on' ? `가구 ${fs.length}개를 맞춤 제작으로 표시했습니다.` : `가구 ${fs.length}개의 맞춤 표시를 지웠습니다.`);
     return;
   }
   if (act.startsWith('door-style-')) {
@@ -1253,20 +1298,26 @@ $('file-project').addEventListener('change', async (e) => {
     alert(`불러오지 못했습니다: ${err.message}`);
   }
 });
-// 자이더파크 불러오기 — sample 폴더의 도면을 팝업에서 골라 연다.
+// 위례자이더파크 불러오기 — sample 폴더의 도면을 팝업에서 골라 연다.
 // 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. sample에 json을 더하면 여기에도 더한다
 const XI_PARK_SAMPLES = [
   { file: '55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
   { file: '55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
+  // sheet: 그 형의 실측 기록지 PDF(있는 형만) — 고르는 창에 내려받기 링크를 단다
+  { file: '55A2-real_plan.ohmyhome.json', name: '55㎡ A-2형 실측 (A2-real)', sheet: 'measure/55A2_measured.pdf' },
   { file: '55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
   { file: '55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
   { file: '55C_plan.ohmyhome.json', name: '55㎡ C형' },
   { file: '55D_plan.ohmyhome.json', name: '55㎡ D형' },
 ];
 $('sample-list').innerHTML = XI_PARK_SAMPLES.map((s, i) => `<label><input type="radio" name="xi-sample" value="${i}"${i ? '' : ' checked'}>`
-  + `<span>${s.name}</span><small>${s.file}</small></label>`).join('');
+  + `<span>${s.name}</span><small>${s.file}</small>`
+  + (s.sheet ? `<a class="sample-sheet" href="${s.sheet}" download="${s.sheet.split('/').pop()}" title="현장 실측 치수를 적은 기록지(PDF)를 내려받습니다">📄 실측 기록지</a>` : '')
+  + '</label>').join('');
+// 실측 기록지 링크를 눌러도 그 줄이 골라지거나(라벨) 두 번 눌림으로 도면이 열리지 않게
+$('sample-list').addEventListener('click', (e) => { if (e.target.closest('.sample-sheet')) e.stopPropagation(); }, true);
 $('btn-xi-park').addEventListener('click', () => $('sample-dialog').showModal());
-$('sample-list').addEventListener('dblclick', (e) => { if (e.target.closest('label')) $('btn-sample-load').click(); });
+$('sample-list').addEventListener('dblclick', (e) => { if (e.target.closest('label') && !e.target.closest('.sample-sheet')) $('btn-sample-load').click(); });
 $('sample-dialog').addEventListener('close', async () => {
   const dlg = $('sample-dialog');
   if (dlg.returnValue !== 'load') return;
@@ -1276,7 +1327,7 @@ $('sample-dialog').addEventListener('close', async () => {
   try {
     const res = await fetch(`sample/${s.file}`, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`sample/${s.file}을 찾지 못했습니다 (${res.status})`);
-    openProject(await res.json(), `자이더파크 ${s.name} 도면을 불러왔습니다.`);
+    openProject(await res.json(), `위례자이더파크 ${s.name} 도면을 불러왔습니다.`);
   } catch (err) {
     status('');
     alert(`불러오지 못했습니다: ${err.message}`);
@@ -1295,11 +1346,20 @@ $('file-plan-only').addEventListener('change', async (e) => {
   try {
     const data = JSON.parse(await file.text());
     replacePlan(data);
+    // 그 도면의 기본 싱크대(ㄱ자 등)를 싱크대가 없는 안마다 바로 놓는다 (보호 중인 안은 빼고, 되돌리기 한 번에 함께 돌아온다)
+    const sinkIn = [];
+    for (const l of state.layouts) {
+      if (l.locked) continue;
+      const fs = layoutFurniture(l.id), add = missingPlanSinks(state.plan, fs, uid);
+      if (add.length) { fs.push(...add); sinkIn.push(l.name); }
+    }
+    if (sinkIn.length) emit('furniture');
     $('wall-height').value = state.plan.wallHeight;
     editor.fit();
     view.resetCamera('persp');
     const bad = G.findCollisions(state.furniture, state.plan.walls).size;
-    status(`도면만 바꿨습니다. 가구 배치는 그대로입니다.${bad ? ` 벽·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''} 되돌리기(Ctrl+Z)로 예전 도면으로 돌아갈 수 있습니다.`);
+    const sinkMsg = sinkIn.length ? ` 싱크대가 없던 ${state.layouts.length > 1 ? `${sinkIn.join('·')}에` : '배치에'} 이 도면의 기본 싱크대를 놓았습니다.` : '';
+    status(`도면만 바꿨습니다. 가구 배치는 그대로입니다.${sinkMsg}${bad ? ` 벽·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''} 되돌리기(Ctrl+Z)로 예전 도면으로 돌아갈 수 있습니다.`);
     doorsForOldProject(data);
   } catch (err) {
     alert(`도면을 바꾸지 못했습니다: ${err.message}`);
@@ -1428,10 +1488,20 @@ else status('📂 ‘도면 불러오기(json)’로 저장한 도면을 열거�
 window.__ohmyhome = { state, editor, view, runDetect };
 
 /* ---------- 공지사항 — 처음 접속할 때. '다시 보지 않기'면 이 브라우저에서는 다시 띄우지 않는다 ---------- */
-const NOTICE_KEY = 'ohmyhome.notice.hidden';
-function noticeHidden() { try { return localStorage.getItem(NOTICE_KEY) === '1'; } catch { return false; } }
+// 공지 내용이 바뀌면 NOTICE_VER를 올린다 — 예전 공지를 '다시 보지 않기' 한 사람에게도 새 공지는 한 번 뜬다
+const NOTICE_KEY = 'ohmyhome.notice.hidden', NOTICE_VER = '2';
+function noticeHidden() { try { return localStorage.getItem(NOTICE_KEY) === NOTICE_VER; } catch { return false; } }
 $('notice-dialog').addEventListener('close', () => {
-  if ($('notice-dialog').returnValue !== 'hide') return;
-  try { localStorage.setItem(NOTICE_KEY, '1'); } catch { /* 저장소를 못 쓰면 다음에도 뜬다 */ }
+  const v = $('notice-dialog').returnValue;
+  if (v === 'real') {   // 새 소식의 'A2-real 고르러 가기': 위례자이더파크 목록을 A2-real에 맞춰 연다
+    const i = XI_PARK_SAMPLES.findIndex((s) => s.file.startsWith('55A2-real'));
+    const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
+    if (r) r.checked = true;
+    $('sample-dialog').showModal();
+    return;
+  }
+  if (v !== 'hide') return;
+  try { localStorage.setItem(NOTICE_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 다음에도 뜬다 */ }
 });
+$('btn-features').addEventListener('click', () => $('features-dialog').showModal());   // 공지 위에 겹쳐 띄우고, 닫으면 공지로 돌아온다
 if (!noticeHidden()) $('notice-dialog').showModal();

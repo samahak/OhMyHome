@@ -20,12 +20,14 @@ set STAGE=%TEMP%\ohmyhome-build-%RANDOM%
 set DEST=%STAGE%\OhMyHome
 mkdir "%DEST%\sample"
 mkdir "%DEST%\docs"
+mkdir "%DEST%\measure"
 
 for %%f in (index.html serve.py run_ohmyhome.sh run_ohmyhome.bat LICENSE docs\OhMyHome_Guide.pdf) do copy /y %%f "%DEST%\" >nul
 xcopy /e /i /q css "%DEST%\css" >nul
 xcopy /e /i /q js "%DEST%\js" >nul
 copy /y sample\*.json "%DEST%\sample\" >nul
 copy /y docs\OhMyHome_User_Guide.pdf "%DEST%\docs\" >nul
+copy /y measure\55A2_measured.pdf "%DEST%\measure\" >nul
 
 if not exist dist mkdir dist
 if exist "dist\%NAME%.zip" del "dist\%NAME%.zip"

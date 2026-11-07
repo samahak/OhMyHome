@@ -34,6 +34,7 @@ export const SHAPES = {
   bathtub: { label: '욕조' },
   shower: { label: '샤워부스' },
   bath_shelf: { label: '철제 선반' },
+  bath_upper_shelf: { label: '욕실 상부 선반' },
   kitchen_counter: { label: '주방 싱크대' },
   kitchen_l: { label: 'ㄱ자 주방 싱크대', dims: { w: '가로 길이 (뒤쪽)', d: '세로 길이 (꺾인 쪽)' } },
   box: { label: '상자(기본)' },
@@ -95,6 +96,8 @@ export const SIZE_PRESETS = {
  */
 export const L_COUNTER = { depth: 600, minDepth: 400, maxDepth: 900, minArm: 300 };
 export function lCounterDepth(f) { return f.counterD || L_COUNTER.depth; }
+/** 꺾인 쪽(세로) 깊이 — f.legD가 없으면 상판 깊이와 같다(위 조리대 600 · 옆 선반 740처럼 다를 때 쓴다) */
+export function lLegDepth(f) { return f.legD || lCounterDepth(f); }
 
 /**
  * 식물 종류 — 놓은 뒤 속성 패널에서 바꾼다. 가구 항목에는 f.plant(키)로 남고, 크기는 화분 포함 겉 크기(mm).
@@ -163,6 +166,8 @@ export const CATALOG = [
   { type: 'bathtub', name: '욕조', icon: '🛁', w: 1500, d: 750, h: 550, color: '#f7f7f5' },
   { type: 'shower', name: '샤워부스', icon: '🚿', w: 900, d: 900, h: 2000, color: '#c9ccd1' },
   { type: 'bath_shelf', name: '욕실 철제 선반', icon: '🧴', w: 450, d: 300, h: 1400, color: '#c9ccd1' },
+  // 벽에 거는 선반 — 철제 선반(1,400) 위에 함께 놓도록 바닥에서 1,500 띄운다(겹침 판정도 둘은 짝으로 허용: geometry OVERLAP_OK)
+  { type: 'bath_upper_shelf', name: '욕실 상부 선반', icon: '🪥', w: 600, d: 150, h: 400, color: '#f3f2ef', elev: 1500 },
   { type: 'box', name: '상자(직접 입력)', icon: '📦', w: 600, d: 600, h: 600, color: '#c9b38e' },
 ];
 

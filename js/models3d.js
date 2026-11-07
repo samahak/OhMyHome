@@ -1,7 +1,7 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
-import { lCounterDepth, plantOf } from './catalog.js';
+import { lCounterDepth, lLegDepth, plantOf } from './catalog.js';
 
 // 같은 지오메트리를 여러 메시가 scale만 바꿔 함께 쓴다 (disposeObject가 버리지 않는다)
 const geoCache = new Map();
@@ -136,25 +136,18 @@ function wardrobe(g, W, D, H, c) {
   }
 }
 
-/** 신발장: 바닥에서 띄운 하부장 + 가운데 열린 선반(물건 올려 두는 자리) + 상부장 */
+/** 신발장: 가운데 빈 칸 없이 바닥 걸레받이 위로 위아래 통으로 된 문짝들 (문짝마다 위에서 아래까지 한 번에 열린다) */
 function shoeCabinet(g, W, D, H, c) {
-  const body = mat(c, { roughness: 0.55 }), gap = 0.12, nicheY = Math.min(1.0, H * 0.42), nicheH = 0.3;
-  const lowH = nicheY - gap, upY = nicheY + nicheH, upH = H - upY;
-  box(g, W, lowH, D, 0, gap + lowH / 2, 0, body);
-  box(g, W, upH, D, 0, upY + upH / 2, 0, body);
-  box(g, W, 0.025, D, 0, nicheY + 0.0125, 0, mat(shade(c, 0.9)));                                // 선반 바닥
-  box(g, W, nicheH, 0.02, 0, nicheY + nicheH / 2, -D / 2 + 0.01, mat(shade(c, 0.8)));               // 선반 뒤판
-  for (const x of [-W / 2 + 0.01, W / 2 - 0.01]) box(g, 0.02, nicheH, D, x, nicheY + nicheH / 2, 0, body);
-  box(g, W * 0.9, 0.012, 0.012, 0, upY - 0.01, D / 2 - 0.03, mat('#fff1d0', { emissive: '#ffe3b3', emissiveIntensity: 0.8 })); // 선반 간접등
-  const n = Math.max(1, Math.round(W / 0.45)), dw = W / n, groove = GROOVE(), metal = METAL(), f = D / 2;
-  for (let i = 1; i < n; i++) {
-    box(g, 0.006, lowH, 0.004, -W / 2 + dw * i, gap + lowH / 2, f + 0.002, groove);
-    box(g, 0.006, upH, 0.004, -W / 2 + dw * i, upY + upH / 2, f + 0.002, groove);
-  }
+  const f = D / 2, base = 0.06;
+  box(g, W, H, D, 0, H / 2, 0, mat(c, { roughness: 0.55 }));
+  box(g, W * 0.995, base, 0.01, 0, base / 2, f - 0.004, mat(shade(c, 0.75)));                    // 걸레받이
+  const n = Math.max(1, Math.round(W / 0.45)), dw = W / n, groove = GROOVE(), metal = METAL();
+  for (let i = 1; i < n; i++) box(g, 0.006, H - base, 0.004, -W / 2 + dw * i, base + (H - base) / 2, f + 0.002, groove);
+  const hy = Math.min(1.0, H * 0.5), hl = Math.min(0.3, H * 0.15);
   for (let i = 0; i < n; i++) {
-    const hx = -W / 2 + dw * i + (i % 2 === 0 ? dw - 0.035 : 0.035);
-    box(g, 0.015, 0.12, 0.02, hx, gap + lowH - 0.1, f + 0.012, metal);
-    box(g, 0.015, 0.12, 0.02, hx, upY + 0.1, f + 0.012, metal);
+    // 두 짝이 마주 보는 쪽 끝에 세로 손잡이 (한 짝뿐이면 오른쪽 끝)
+    const left = -W / 2 + dw * i, hx = n === 1 || i % 2 === 0 ? left + dw - 0.035 : left + 0.035;
+    box(g, 0.015, hl, 0.02, hx, hy, f + 0.012, metal);
   }
 }
 
@@ -463,6 +456,15 @@ function bathShelf(g, W, D, H, c) {
   }
 }
 
+/** 욕실 상부 선반: 벽에 거는 열린 선반 — 뒤판 + 옆판 + 선반 판 두 장(가운데·아래) + 위판. 원점은 선반 바닥 가운데(elev만큼 띄운다) */
+function bathUpperShelf(g, W, D, H, c) {
+  const body = mat(c, { roughness: 0.35 }), t = 0.018;
+  box(g, W, H, 0.01, 0, H / 2, -D / 2 + 0.005, mat(shade(c, 0.94), { roughness: 0.4 }));        // 뒤판
+  for (const s of [-1, 1]) box(g, t, H, D, s * (W / 2 - t / 2), H / 2, 0, body);                // 옆판
+  for (const y of [t / 2, H / 2, H - t / 2]) box(g, W - 2 * t, t, D - 0.01, 0, y, 0.005, body); // 아래·가운데·위판
+  box(g, W - 2 * t, 0.02, 0.006, 0, t + 0.01, D / 2 - 0.003, mat(shade(c, 0.85)));              // 아래 판 앞 턱
+}
+
 /** 에어컨 실외기: 몸통 + 앞면 왼쪽 둥근 팬 그릴 + 오른쪽 서비스 판 + 받침 다리 */
 function airconOutdoor(g, W, D, H, c) {
   const body = mat(c, { roughness: 0.45 }), foot = 0.04, bh = H - foot;
@@ -675,8 +677,10 @@ function kitchenCounter(g, W, D, H, c) {
 /**
  * 싱크대 한 줄: 하부장 + 상판 + (개수대) + (인덕션) + 상부장(+ 후드). 가운데 원점, 앞면 +z.
  * sink/cook: 놓을지 (cook 기본은 1.2m 넘을 때), flip: 개수대는 왼쪽·인덕션은 오른쪽인 것을 좌우로 바꾼다.
+ * upperExt: 상부장만 한쪽 끝(-1: -x, 1: +x)으로 upperExtBy(m, 없으면 상판 깊이 - 상부장 깊이)만큼 늘린다 — ㄱ자 꺾인 쪽 상부장을 모서리의 가로 쪽 상부장에 붙인다.
+ * sinkAt/cookAt: 개수대·인덕션 가운데 x(m)를 직접 정한다(ㄱ자는 도면 그림 자리). 후드는 인덕션 위로 따라간다.
  */
-function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false } = {}) {
+function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false, upperExt = 0, upperExtBy = null, sinkAt = null, cookAt = null } = {}) {
   const cab = mat(c), baseH = 0.85, top = 0.04, plinth = 0.1;
   box(g, W, plinth, D * 0.9, 0, plinth / 2, -D * 0.05, mat(shade(c, 0.6)));
   box(g, W, baseH - top - plinth, D * 0.96, 0, plinth + (baseH - top - plinth) / 2, -D * 0.02, cab);
@@ -685,7 +689,7 @@ function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false }
   for (let i = 1; i < n; i++) box(g, 0.005, baseH - top - plinth - 0.02, 0.004, -W / 2 + dw * i, plinth + (baseH - top - plinth) / 2, D * 0.46 + 0.002, groove);
   const metal = METAL();
   const k = flip ? -1 : 1;
-  const sinkX = k * (-W / 2 + Math.min(W * 0.3, 0.75)), cookX = sink ? k * (W / 2 - Math.min(W * 0.28, 0.6)) : 0;
+  const sinkX = sinkAt ?? k * (-W / 2 + Math.min(W * 0.3, 0.75)), cookX = cookAt ?? (sink ? k * (W / 2 - Math.min(W * 0.28, 0.6)) : 0);
   if (sink) {
     box(g, Math.min(0.8, W * 0.3), 0.006, D * 0.7, sinkX, baseH + 0.001, 0.02, mat('#9ea6ae', { metalness: 0.8, roughness: 0.25 }));
     box(g, 0.03, 0.25, 0.03, sinkX, baseH + 0.125, -D / 2 + 0.08, metal);
@@ -705,30 +709,39 @@ function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false }
     box(g, iw * 0.7, 0.002, 0.035, cookX, topY + 0.004, id / 2 - 0.04, mat('#2b3138', { emissive: '#3b8fd9', emissiveIntensity: 0.35 }));
   }
   if (H > 1.4) {
-    const y0 = Math.max(1.4, baseH + 0.6), uD = Math.min(0.35, D * 0.6);
-    box(g, W, H - y0, uD, 0, (y0 + H) / 2, -D / 2 + uD / 2, cab);
+    const y0 = Math.max(1.4, baseH + 0.6), uD = Math.min(0.35, D * 0.6), ext = upperExt ? upperExtBy ?? D - uD : 0;
+    box(g, W + ext, H - y0, uD, upperExt * ext / 2, (y0 + H) / 2, -D / 2 + uD / 2, cab);
     for (let i = 1; i < n; i++) box(g, 0.005, H - y0 - 0.02, 0.004, -W / 2 + dw * i, (y0 + H) / 2, -D / 2 + uD + 0.002, groove);
     if (cook) box(g, 0.6, 0.12, uD + 0.05, cookX, y0 - 0.06, -D / 2 + (uD + 0.05) / 2, mat('#b9bec4', { metalness: 0.6, roughness: 0.35 })); // 후드
   }
 }
 
 /**
- * ㄱ자 주방 싱크대: 뒤쪽 가로(W, 개수대) + 옆쪽 꺾인 세로(D, 인덕션·후드). 상판 깊이 T는 f.counterD.
- * 꺾인 쪽은 앞에서 볼 때 오른쪽(+x), f.mirror면 왼쪽. 꺾인 쪽이 짧아 인덕션이 안 들어가면 가로 쪽에 함께 놓는다.
- * 바닥 모양은 geometry.furnitureRects와 같다.
+ * ㄱ자 주방 싱크대: 뒤쪽 가로(W) + 옆쪽 꺾인 세로(D). 상판 깊이 T는 f.counterD.
+ * 꺾인 쪽 깊이 TL은 f.legD(없으면 T) — 위 조리대보다 깊은 옆 선반(냉장고장과 면 맞춤) 등.
+ * 꺾인 쪽은 앞에서 볼 때 오른쪽(+x), f.mirror면 왼쪽. 개수대와 인덕션(+ 후드)은 둘 다 가로 쪽에 놓는다 — 모서리 칸(T)을 뺀 구간 안에서
+ * 왼쪽이 개수대, 그 오른쪽이 인덕션(꺾인 쪽이 어느 쪽이든). 꺾인 쪽은 상판·하부장·상부장만(주방 선반).
+ * 가로 쪽 남은 구간이 1.4m보다 짧으면 인덕션은 꺾인 쪽 끝(0.8m 이상일 때)에 놓는다. 바닥 모양은 geometry.furnitureRects와 같다.
  */
 function kitchenL(g, W, D, H, c, f) {
-  const T = Math.min(lCounterDepth(f) * 0.001, W, D), side = f?.mirror ? -1 : 1, legL = D - T;
-  const legCook = legL >= 0.8;
+  const T = Math.min(lCounterDepth(f) * 0.001, W, D), TL = Math.min(lLegDepth(f) * 0.001, W), side = f?.mirror ? -1 : 1, legL = D - T;
+  const a = side > 0 ? -W / 2 : -W / 2 + TL, span = W - TL;   // 모서리(꺾인 쪽 폭)를 뺀 가로 쪽 구간 [a, a + span]
+  const longCook = span >= 1.4, legCook = !longCook && legL >= 0.8;
   const long = new THREE.Group();
-  counterRun(long, W, T, H, c, { cook: !legCook && W > 1.2, flip: f?.mirror });   // 개수대는 꺾인 쪽에서 먼 끝
+  counterRun(long, W, T, H, c, longCook
+    ? { cook: true, sinkAt: a + Math.min(span * 0.28, 0.75), cookAt: a + span - 0.42 }   // 인덕션 폭 0.59 + 모서리 쪽 여유
+    : { cook: false, sinkAt: a + span / 2 });
   long.position.z = -D / 2 + T / 2;
   g.add(long);
   if (legL <= 0.01) return;
   const leg = new THREE.Group();
-  counterRun(leg, legL, T, H, c, { sink: false, cook: legCook });
+  // 꺾인 쪽은 가로 쪽 상판 앞에서 시작하지만, 상부장은 가로 쪽 상부장(상판보다 얕다) 앞면까지 늘려 모서리에서 붙인다.
+  // 돌린 뒤 로컬 -x(side = 1) / +x(side = -1)가 모서리 쪽이고, 그 반대 끝이 꺾인 쪽 끝이다
+  const cookAt = side * Math.max(0, legL / 2 - Math.min(0.54, legL / 2));
+  const uD = Math.min(0.35, T * 0.6);   // 가로 쪽 상부장 깊이 — 꺾인 쪽 상부장을 그 앞면까지 늘린다
+  counterRun(leg, legL, TL, H, c, { sink: false, cook: legCook, cookAt, upperExt: -side, upperExtBy: T - uD });
   leg.rotation.y = -side * Math.PI / 2;   // 앞면(+z)이 안쪽을 보게
-  leg.position.set(side * (W / 2 - T / 2), 0, T / 2);
+  leg.position.set(side * (W / 2 - TL / 2), 0, T / 2);
   g.add(leg);
 }
 
@@ -851,7 +864,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
 };
 
