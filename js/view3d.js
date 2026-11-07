@@ -97,6 +97,7 @@ export class View3D {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.02;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener('start', () => { this.userMoved = true; });
+    this.controls.addEventListener('change', () => this.invalidate());
 
     this.scene.add(new THREE.HemisphereLight('#ffffff', '#8a96a8', 1.1));
     this.sun = new THREE.DirectionalLight('#ffffff', 1.6);
@@ -120,7 +121,7 @@ export class View3D {
 
     const dom = this.renderer.domElement;
     dom.addEventListener('pointerdown', (e) => this.onDown(e));
-    dom.addEventListener('pointermove', (e) => this.onMove(e));
+    dom.addEventListener('pointermove', (e) => { this.invalidate(); this.onMove(e); });
     dom.addEventListener('pointerup', (e) => this.onUp(e));
 
     new ResizeObserver(() => this.resize()).observe(container);
@@ -128,10 +129,18 @@ export class View3D {
     on('furniture', () => this.syncFurniture());
     on('library', () => { this.textures.clear(); this.syncFurniture(true); });
     on('selection', () => this.syncFurniture());
+    on('layouts', () => this.invalidate());
+    // 화면을 바꿀 수 있는 입력(버튼·슬라이더·체크·키·휠)이 오면 몇 장 더 그린다 — 장면을 직접 바꾸는 곳을 하나하나 다 챙기지 않아도 되게
+    for (const t of ['pointerdown', 'pointerup', 'click', 'input', 'change', 'keydown', 'keyup', 'wheel']) {
+      document.addEventListener(t, () => this.invalidate(), { capture: true, passive: true });
+    }
 
     this.buildPlan();
     this.syncFurniture();
     this.resetCamera('persp');
+    // 그릴 일이 있을 때만 그린다(dirty 프레임 수). 가만히 있을 때도 그림자·1,000번 넘는 그리기를 초당 60번 하면
+    // 노트북이 계속 바빠져 화면 전체가 가끔 버벅인다. 둘러보기 중에는 늘 움직이므로 매 프레임 그린다
+    this.dirty = 3;
     this.renderer.setAnimationLoop(() => this.tick());
   }
 
@@ -145,13 +154,19 @@ export class View3D {
     // 사용자가 아직 카메라를 돌리지 않았으면 새 화면 비율에 맞춰 다시 잡는다 (둘러보기 중에는 카메라를 tour.js가 쥐고 있다 —
     // 여기서 다시 잡으면 먼 풍경용 far가 500m로 돌아가 하늘·산이 잘린다)
     if (!this.userMoved && !this.tour) this.resetCamera(this.camMode);
+    this.invalidate();
   }
+
+  /** 다음 몇 프레임을 다시 그리게 한다 — 장면·카메라·화면 크기가 바뀌면 부른다 */
+  invalidate(frames = 3) { this.dirty = Math.max(this.dirty || 0, frames); }
 
   tick() {
     const dt = this.clock.getDelta();
     if (!this.el.clientWidth) return;
-    if (this.tour) this.tour.update(dt);
-    else this.controls.update();
+    if (this.tour) { this.tour.update(dt); this.invalidate(1); }   // 둘러보기는 늘 움직인다
+    else if (this.controls.update()) this.invalidate(1);           // 돌리고 난 뒤 감속(damping)하는 동안
+    if (this.dirty <= 0) return;
+    this.dirty--;
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   }
@@ -168,6 +183,7 @@ export class View3D {
   }
 
   resetCamera(mode = 'persp') {
+    this.invalidate();
     const { cx, cz, size } = this.bounds();
     // 도면 전체가 화면 폭·높이 안에 들어오는 거리
     const half = Math.tan((this.camera.fov * G.DEG) / 2);
@@ -203,6 +219,7 @@ export class View3D {
         o.castShadow = v >= 0.6;
       }
     });
+    this.invalidate();
   }
 
   /** 벽 토막 하나: o에서 u 방향으로 s0~s1(mm), 높이 y0~y1(mm), 두께 t(mm) */
@@ -230,7 +247,7 @@ export class View3D {
     select(null);
     this.tour = new Tour(this, {
       ...hooks,
-      onExit: () => { this.tour = null; hooks.onExit?.(); },
+      onExit: () => { this.tour = null; this.invalidate(); hooks.onExit?.(); },
     });
     this.tour.start();
   }
@@ -278,6 +295,7 @@ export class View3D {
   }
 
   buildPlan() {
+    this.invalidate();
     disposeObject(this.planGroup);
     this.planGroup.clear();
     const p = state.plan;
@@ -298,7 +316,7 @@ export class View3D {
       fw = p.image.width * p.mmPerPx * M;
       fd = p.image.height * p.mmPerPx * M;
       fx = fw / 2; fz = fd / 2;
-      const tex = new THREE.TextureLoader().load(p.image.src);
+      const tex = new THREE.TextureLoader().load(p.image.src, () => this.invalidate());   // 그림을 다 읽으면 다시 그린다
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
       floorMat.map = tex;
@@ -432,6 +450,7 @@ export class View3D {
   setDoorsGhost(on) {
     this.doorsGhost = on;
     for (const leaf of this.doorLeaves || []) setGhost(leaf, on);
+    this.invalidate();
   }
 
   /**
@@ -470,7 +489,7 @@ export class View3D {
     const lib = state.library.find((l) => l.id === f.libId);
     if (!lib?.image) return null;
     if (!this.textures.has(lib.id)) {
-      const t = new THREE.TextureLoader().load(lib.image);
+      const t = new THREE.TextureLoader().load(lib.image, () => this.invalidate());
       t.colorSpace = THREE.SRGBColorSpace;
       this.textures.set(lib.id, t);
     }
@@ -478,6 +497,7 @@ export class View3D {
   }
 
   syncFurniture(force = false) {
+    this.invalidate();
     const bad = G.findCollisions(state.furniture, state.plan.walls);
     const alive = new Set();
     const selIds = new Set(selectedFurnitureIds());
