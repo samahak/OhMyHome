@@ -96,7 +96,7 @@ state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, 
                 style: 'double'(양여닫이) | 'sliding'(미닫이) | 'bypass'(미서기) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
-  builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
+  builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다. 2D는 바닥 모양 안에 45° 빗금(`editor.hatch`)
   disabled       '비활성화'(지우지 않고 잠시 빼 둔 것)면 true. 2D 점선·연한 색, 3D `setGhost`, 겹침(`findCollisions`)·둘러보기 길(`buildGrid`)·
                  합계·개수(`excluded()`)에서 뺀다. 엑셀 '모든 가구'에서는 기본 가구와 함께 합계 아래에 모은다
   custom         '맞춤 제작'(기성품 아님 — 크기·비용이 다를 수 있음)이면 true. 합계에는 그대로 들고, 2D 치수 아래 `🛠️ 맞춤` 꼬리표(`editor.customTag`),
@@ -289,6 +289,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 
 ### 3D (`view3d.js`, `models3d.js`)
 
+- **그릴 일이 있을 때만 그린다**(`view.invalidate(frames)` → `tick()`이 `dirty` 프레임만 렌더). 가만히 있을 때도 그림자·1,000번 넘는 그리기를 초당 60번 하면
+  노트북이 계속 바빠져 화면이 가끔 버벅였다. `buildPlan`·`syncFurniture`·`resetCamera`·화면 크기·OrbitControls `change`·감속 중(`controls.update()`가 true)·
+  텍스처 읽기 끝·문서의 입력 이벤트(누르기·키·휠·input/change)가 invalidate하고, 둘러보기 중에는 매 프레임 그린다. **장면을 바꾸는 새 코드는 끝에 `invalidate()`를 부른다.**
 - 가구 메시는 `syncFurniture()`가 id별로 들고 있다. **크기·모양·색·사진·선택·겹침 여부를 이어 붙인 `key`가 바뀔 때만**
   다시 만들고, 위치·회전만 바뀌면 transform만 고친다. 선택 외곽선과 겹침 빨간 외곽선은 모양에 붙어 있어서 key에 들어간다.
 - 새 샘플 모양을 더하려면 `catalog.js`의 `SHAPES`(+ 필요하면 `CATALOG`)와 `models3d.js`의 `BUILDERS`에 함께 넣는다.

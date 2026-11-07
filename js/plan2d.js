@@ -777,20 +777,25 @@ export class PlanEditor {
 
   drawFurniture(f, selected, bad) {
     const c = this.ctx;
+    // 바닥 모양 경로 하나로 칠하기·빗금 자르기·테두리를 함께 쓴다
+    const shape = new Path2D();
     if (f.type === 'plant') {   // 식물은 둥글게 그린다 (겹침 판정은 다른 가구처럼 사각형)
       const ct = this.toScr(f);
-      c.beginPath();
-      c.ellipse(ct.x, ct.y, (f.w / 2) * this.view.s, (f.d / 2) * this.view.s, f.rot * G.DEG, 0, Math.PI * 2);
-    } else this.poly(G.furnitureOutline(f));
+      shape.ellipse(ct.x, ct.y, (f.w / 2) * this.view.s, (f.d / 2) * this.view.s, f.rot * G.DEG, 0, Math.PI * 2);
+    } else {
+      G.furnitureOutline(f).forEach((p, i) => { const q = this.toScr(p); i ? shape.lineTo(q.x, q.y) : shape.moveTo(q.x, q.y); });
+      shape.closePath();
+    }
     // 식물의 색상은 화분 색이라 2D는 잎 색으로 칠한다
     // 비활성화한 가구: 아주 연한 색 + 점선 테두리(앞면 선도 점선)
     const off = !!f.disabled;
     c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.type === 'plant' ? '#7fb27a' : f.color || '#cccccc', off ? 0.18 : f.elev > 0 ? 0.55 : 0.85);
-    c.fill();
+    c.fill(shape);
+    if (f.builtin) this.hatch(shape, f, off);
     c.lineWidth = selected ? 2.5 : 1.2;
     c.strokeStyle = selected ? '#2f6fed' : bad ? '#d9443b' : off ? 'rgba(30,40,50,.4)' : 'rgba(30,40,50,.75)';
     c.setLineDash(off ? [6, 4] : f.elev > 0 ? [5, 3] : []);
-    c.stroke();
+    c.stroke(shape);
     c.setLineDash([]);
     // 앞면 표시 (로컬 +y 변, ㄱ자는 안쪽으로 꺾인 두 변). 식물은 앞뒤가 없다
     if (f.type !== 'plant') {
@@ -825,6 +830,24 @@ export class PlanEditor {
       }
       if (tag) this.customTag(ct.x, ct.y + 9 + 7, off);
     }
+  }
+
+  /** 기본 포함 가구 빗금 — 바닥 모양 안을 45° 가는 선으로 채운다 (선 간격은 화면 px로 늘 같다) */
+  hatch(shape, f, faded) {
+    const c = this.ctx, gap = 7;
+    const b = G.boundsOf(G.furnitureCorners(f).map((p) => this.toScr(p)));
+    c.save();
+    c.clip(shape);
+    c.strokeStyle = faded ? 'rgba(40,52,66,.18)' : 'rgba(40,52,66,.38)';
+    c.lineWidth = 1;
+    c.beginPath();
+    // 왼쪽 아래 → 오른쪽 위로 가는 선: x - y가 일정. 상자를 다 덮도록 x0 - (높이)부터 x1까지
+    for (let k = b.minX - b.h; k <= b.maxX; k += gap) {
+      c.moveTo(k, b.maxY);
+      c.lineTo(k + b.h, b.minY);
+    }
+    c.stroke();
+    c.restore();
   }
 
   /** 맞춤 제작 꼬리표 — 주황 둥근 칸에 '🛠️ 맞춤' (가운데 x, y) */
