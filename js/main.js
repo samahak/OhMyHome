@@ -1488,10 +1488,31 @@ else status('📂 ‘도면 불러오기(json)’로 저장한 도면을 열거�
 window.__ohmyhome = { state, editor, view, runDetect };
 
 /* ---------- 공지사항 — 처음 접속할 때. '다시 보지 않기'면 이 브라우저에서는 다시 띄우지 않는다 ---------- */
-// 공지 내용이 바뀌면 NOTICE_VER를 올린다 — 예전 공지를 '다시 보지 않기' 한 사람에게도 새 공지는 한 번 뜬다
-const NOTICE_KEY = 'ohmyhome.notice.hidden', NOTICE_VER = '2';
+// 공지 내용이 바뀌면 NOTICE_VER를 올리고 NOTICE_DATE를 바꾼 날로 고친다 — 예전 공지를 '다시 보지 않기' 한 사람에게도 새 공지는 한 번 뜨고,
+// 상단 '📢 공지사항' 버튼에 그날부터 NOTICE_NEW_DAYS일 동안 NEW가 붙는다 — 이 PC(브라우저)에서 이 공지를 한 번 읽으면(창을 닫으면) 지운다
+const NOTICE_KEY = 'ohmyhome.notice.hidden', NOTICE_READ_KEY = 'ohmyhome.notice.read';
+const NOTICE_VER = '2', NOTICE_DATE = '2026-11-07', NOTICE_NEW_DAYS = 7;
+/** 공지가 바뀐 지 NOTICE_NEW_DAYS일이 안 지났는가 (바뀐 날 0시부터, 이 PC 시각 기준) */
+function noticeIsNew(now = new Date()) {
+  const [y, m, d] = NOTICE_DATE.split('-').map(Number);
+  const from = new Date(y, m - 1, d), until = new Date(y, m - 1, d + NOTICE_NEW_DAYS);
+  return now >= from && now < until;
+}
+/** 이 브라우저에서 지금 공지(NOTICE_VER)를 읽은 적이 있는가 — 공지가 바뀌면 버전이 달라 다시 안 읽은 것이 된다 */
+function noticeRead() { try { return localStorage.getItem(NOTICE_READ_KEY) === NOTICE_VER; } catch { return false; } }
+function updateNoticeBadge() { document.querySelector('#btn-notice .new-badge').hidden = !noticeIsNew() || noticeRead(); }
+updateNoticeBadge();
+$('btn-notice').addEventListener('click', () => {
+  const dlg = $('notice-dialog');
+  if (dlg.open) return;
+  dlg.returnValue = '';   // 지난번 닫을 때의 값('real' 등)이 남지 않게
+  dlg.showModal();
+});
 function noticeHidden() { try { return localStorage.getItem(NOTICE_KEY) === NOTICE_VER; } catch { return false; } }
 $('notice-dialog').addEventListener('close', () => {
+  // 처음 뜬 공지든 버튼으로 연 공지든, 닫으면 읽은 것으로 남기고 NEW를 지운다
+  try { localStorage.setItem(NOTICE_READ_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 NEW가 남는다 */ }
+  updateNoticeBadge();
   const v = $('notice-dialog').returnValue;
   if (v === 'real') {   // 새 소식의 'A2-real 고르러 가기': 위례자이더파크 목록을 A2-real에 맞춰 연다
     const i = XI_PARK_SAMPLES.findIndex((s) => s.file.startsWith('55A2-real'));

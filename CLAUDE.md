@@ -363,7 +363,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 팝업(`dialog[open]`)이 열려 있으면 무시한다.
 - **공지사항**(`#notice-dialog`): 처음 접속할 때 `showModal()`. 프로그램 설명 + `docs/OhMyHome_User_Guide.pdf` 내려받기 링크(그래서 배포 zip에도
   `docs/`에 담는다). 아래 `다시 보지 않기`(value `hide`)면 localStorage `ohmyhome.notice.hidden`에 `NOTICE_VER`를 남겨 다시 띄우지 않고, `닫기`·Esc는 이번만 닫는다.
-  왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올린다(예전 공지를 숨긴 사람에게도 한 번 뜬다).
+  왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올리고(예전 공지를 숨긴 사람에게도 한 번 뜬다)
+  `NOTICE_DATE`(바꾼 날, `YYYY-MM-DD`)도 고친다 — 상단 `📢 공지사항`(`#btn-notice`, 언제든 공지를 다시 연다)에 그날부터 `NOTICE_NEW_DAYS`(7)일 동안 `NEW`(`.new-badge`, 통통 튀고 빨간 고리가 퍼지는 CSS 애니메이션 — 동작 줄이기 설정이면 멈춤)가 붙는다.
+  공지 창을 닫으면(처음 뜬 공지도) localStorage `ohmyhome.notice.read`에 `NOTICE_VER`를 남겨 NEW를 지운다 — 버전이 바뀌면 다시 붙는다(`updateNoticeBadge`).
   새 소식의 `A2-real 고르러 가기`(value `real`)는 위례자이더파크 창을 A2-real에 맞춰 연다.
   그 아래 `✨ 추가 기능 보기`(`#btn-features`, type=button이라 공지를 닫지 않는다)는 `#features-dialog`(그날 더한 기능 설명)를 공지 위에 겹쳐 띄운다.
   기능을 더하면 이 목록도 고친다.
