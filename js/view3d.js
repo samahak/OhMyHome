@@ -9,7 +9,7 @@ import {
   buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSlidingLeaf, buildGlassLeaf, buildTransom, setGhost, disposeObject, MIDDLE_FRAME,
 } from './models3d.js';
 import { DOOR } from './catalog.js';
-import { doorGeometry, slidingPanels, doorStyle, SLIDE } from './doors.js';
+import { doorGeometry, slidingPanels, doorStyle, isHinged, swingLeaves, SLIDE } from './doors.js';
 import * as G from './geometry.js';
 import { ROOM_COLORS, fmtMM } from './plan2d.js';
 import { Tour } from './tour.js';
@@ -22,6 +22,50 @@ export const SHOTS = [
   { name: '오른쪽', dir: [0.6, 0.75, 0.62] },
 ];
 const LOW_WALL_MM = 1000;
+/** 둘러보기에서 바닥을 내리는 곳 (mm): 현관(신발 벗는 곳)과 욕실·화장실. 회색 타일로 깐다 */
+export const SUNKEN = { entry: 120, bath: 60, entryDepth: 1200, tile: 600 };
+
+/**
+ * 바닥을 내리는 구역 [{ pts, drop }] (mm). 이름이 '현관'(현관창고 등은 빼고)·'욕실'·'화장실'인 방 영역.
+ * 현관 방 영역이 없으면 현관문 안쪽으로 문 폭 × SUNKEN.entryDepth를 현관으로 본다.
+ */
+export function sunkenZones(plan) {
+  const zones = [];
+  const isEntry = (n) => /현관/.test(n) && !/창고|중문|팬트리|펜트리/.test(n);
+  for (const r of plan.rooms || []) {
+    if (r.pts.length < 3) continue;
+    if (/욕실|화장실/.test(r.name)) zones.push({ pts: r.pts, drop: SUNKEN.bath, kind: 'bath' });
+    else if (isEntry(r.name)) zones.push({ pts: r.pts, drop: SUNKEN.entry, kind: 'entry' });
+  }
+  const e = plan.entrance;
+  if (e && !zones.some((z) => z.kind === 'entry')) {
+    const ix = -e.out.x, iy = -e.out.y, f = e.t / 2, k = f + SUNKEN.entryDepth;
+    zones.push({ pts: [
+      { x: e.a.x + ix * f, y: e.a.y + iy * f }, { x: e.b.x + ix * f, y: e.b.y + iy * f },
+      { x: e.b.x + ix * k, y: e.b.y + iy * k }, { x: e.a.x + ix * k, y: e.a.y + iy * k },
+    ], drop: SUNKEN.entry, kind: 'entry' });
+  }
+  return zones;
+}
+
+let tileTex = null;
+/** 회색 바닥 타일 (1칸 = 1m, 줄눈 포함) — 바닥 UV가 m 단위라 repeat로 SUNKEN.tile 크기를 맞춘다 */
+function tileTexture() {
+  if (tileTex) return tileTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#b8bbbe'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 400; i++) {   // 돌 무늬 얼룩
+    g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '90,95,100'},${0.04 + Math.random() * 0.05})`;
+    g.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 10, 2 + Math.random() * 10);
+  }
+  g.fillStyle = '#8f9397'; g.fillRect(0, 0, 256, 4); g.fillRect(0, 0, 4, 256);   // 줄눈
+  tileTex = new THREE.CanvasTexture(cv);
+  tileTex.colorSpace = THREE.SRGBColorSpace;
+  tileTex.wrapS = tileTex.wrapT = THREE.RepeatWrapping;
+  tileTex.repeat.set(1000 / SUNKEN.tile, 1000 / SUNKEN.tile);
+  return tileTex;
+}
 
 export class View3D {
   constructor(container) {
@@ -200,6 +244,34 @@ export class View3D {
     this.syncFurniture(true);
   }
 
+  /** 내린 바닥(타일) + 가장자리 단차 옆면 */
+  buildSunken() {
+    const tile = new THREE.MeshStandardMaterial({ map: tileTexture(), roughness: 0.45 });
+    const side = new THREE.MeshStandardMaterial({ color: '#a9adb1', roughness: 0.6, side: THREE.DoubleSide });
+    for (const z of this.sunken) {
+      const sh = new THREE.Shape(z.pts.map((q) => new THREE.Vector2(q.x * M, -q.y * M)));
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), tile);
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = -z.drop * M;
+      m.receiveShadow = true;
+      this.planGroup.add(m);
+      z.pts.forEach((a, i) => {
+        const b = z.pts[(i + 1) % z.pts.length], len = G.dist(a, b);
+        if (len < 1) return;
+        const f = new THREE.Mesh(new THREE.PlaneGeometry(len * M, z.drop * M), side);
+        f.position.set(((a.x + b.x) / 2) * M, (-z.drop / 2) * M, ((a.y + b.y) / 2) * M);
+        f.rotation.y = -Math.atan2(b.y - a.y, b.x - a.x);
+        this.planGroup.add(f);
+      });
+    }
+  }
+
+  /** 둘러보기에서 도면 점 p(mm)의 바닥 높이 (m, 내린 곳이면 음수) */
+  floorAt(p) {
+    for (const z of this.sunken || []) if (G.pointInPoly(p, z.pts)) return -z.drop * M;
+    return 0;
+  }
+
   setFloorImage(v) {
     this.floorImage = v;
     this.buildPlan();
@@ -239,9 +311,20 @@ export class View3D {
       outer.receiveShadow = true;
       this.planGroup.add(outer);
     }
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(fx, 0, fz);
+    // 둘러보기: 현관·욕실은 나무 바닥에 구멍을 내고 그 자리에 회색 타일을 내려 깐다(단차)
+    this.sunken = this.tourMode ? sunkenZones(p) : [];
+    let floor;
+    if (this.sunken.length) {
+      const sh = new THREE.Shape([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => new THREE.Vector2(fx + (sx * fw) / 2, -(fz + (sz * fd) / 2))));
+      for (const z of this.sunken) sh.holes.push(new THREE.Path(z.pts.map((q) => new THREE.Vector2(q.x * M, -q.y * M))));
+      floor = new THREE.Mesh(new THREE.ShapeGeometry(sh), floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      this.buildSunken();
+    } else {
+      floor = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(fx, 0, fz);
+    }
     floor.receiveShadow = true;
     this.planGroup.add(floor);
     if ((!p.image || !this.floorImage) && !this.tourMode) {
@@ -258,11 +341,11 @@ export class View3D {
         new THREE.ShapeGeometry(shape),
         new THREE.MeshStandardMaterial({ color: ROOM_COLORS[i % ROOM_COLORS.length], transparent: true, opacity: 0.4, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }),
       );
+      const c = G.polygonCentroid(r.pts);
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.y = 0.003;
+      mesh.position.y = 0.003 + this.floorAt(c);   // 둘러보기에서 내린 바닥(현관·욕실)이면 그 높이에
       mesh.receiveShadow = true;
       this.planGroup.add(mesh);
-      const c = G.polygonCentroid(r.pts);
       const el = document.createElement('div');
       el.className = 'label3d room';
       el.textContent = `${r.name} ${(G.polygonArea(r.pts) / 1e6).toFixed(1)}㎡`;
@@ -323,13 +406,16 @@ export class View3D {
       frame.position.set(mid.x * M, 0, mid.y * M);
       frame.rotation.y = rot;
       this.planGroup.add(frame);
-      if (style !== 'swing') { this.slidingDoor(d, doorH); continue; }
-      // 문짝: 로컬 +x → 도면 n(문짝이 뻗는 쪽). 로컬 +z는 도면 (-n.y, n.x) = -swing·u 이므로 두께는 틈 안쪽(+u)으로 둔다
-      const leaf = buildDoorLeaf(g.len * M, doorH * M, -d.swing);
-      leaf.position.set((g.hinge.x + g.u.x * 40) * M, 0, (g.hinge.y + g.u.y * 40) * M);
-      leaf.rotation.y = -Math.atan2(g.n.y, g.n.x);
-      this.planGroup.add(leaf);
-      this.doorLeaves.push(leaf);
+      if (!isHinged(d)) { this.slidingDoor(d, doorH); continue; }
+      // 문짝: 로컬 +x → 도면 n(문짝이 뻗는 쪽). 로컬 +z는 도면 (-n.y, n.x) = -swing·u 이므로 두께는 틈 안쪽(+u)으로 둔다.
+      // 양여닫이는 양 끝 경첩에 반쪽 짝 둘 (swingLeaves)
+      for (const { door: h, g: lg } of swingLeaves(d)) {
+        const leaf = buildDoorLeaf(lg.len * M, doorH * M, -h.swing);
+        leaf.position.set((lg.hinge.x + lg.u.x * 40) * M, 0, (lg.hinge.y + lg.u.y * 40) * M);
+        leaf.rotation.y = -Math.atan2(lg.n.y, lg.n.x);
+        this.planGroup.add(leaf);
+        this.doorLeaves.push(leaf);
+      }
     }
     if (this.doorsGhost) this.setDoorsGhost(true);
     this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity);
@@ -398,12 +484,13 @@ export class View3D {
     for (const f of state.furniture) {
       alive.add(f.id);
       const picked = selIds.has(f.id);
-      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.mirror, f.counterD, f.plant, f.type === 'plant' && f.elev, f.color, f.libId, f.usePhoto, picked, bad.has(f.id)].join('|');
+      const key = [f.type, f.w, f.d, f.h, f.seats, f.people, f.mirror, f.counterD, f.legD, f.plant, f.type === 'plant' && f.elev, f.color, f.libId, f.usePhoto, f.disabled, picked, bad.has(f.id)].join('|');
       let e = this.fmap.get(f.id);
       if (!e || e.key !== key || force) {
         if (e) { this.furnGroup.remove(e.obj); disposeObject(e.obj); }
         const obj = buildFurniture(f, this.textureFor(f));
         obj.traverse((o) => { o.userData.fid = f.id; });
+        if (f.disabled) setGhost(obj, true);   // 비활성화한 가구: 거의 투명한 면 + 모서리 선
         if (!this.tourMode && (picked || bad.has(f.id))) {
           const outline = new THREE.LineSegments(
             new THREE.EdgesGeometry(new THREE.BoxGeometry(f.w * M + 0.02, f.h * M + 0.02, f.d * M + 0.02)),
@@ -417,7 +504,7 @@ export class View3D {
         this.fmap.set(f.id, e);
         this.furnGroup.add(obj);
       }
-      e.obj.position.set(f.x * M, (f.elev || 0) * M, f.y * M);
+      e.obj.position.set(f.x * M, (f.elev || 0) * M + (this.tourMode ? this.floorAt(f) : 0), f.y * M);   // 내린 바닥 위 가구도 함께
       e.obj.rotation.y = -f.rot * G.DEG;
     }
     for (const [id, e] of this.fmap) {

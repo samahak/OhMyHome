@@ -18,7 +18,7 @@ export function buildGrid(walls, furniture, { cell = 100, radius = 220, margin =
   }
   // 높이 걸린 것(벽걸이 등)은 걸어서 지나갈 수 있다
   const polys = walls.map((w) => wallCorners(w))
-    .concat(furniture.filter((f) => (f.elev || 0) < 1200).flatMap((f) => furnitureParts(f)));
+    .concat(furniture.filter((f) => !f.disabled && (f.elev || 0) < 1200).flatMap((f) => furnitureParts(f)));
   for (const poly of polys) {
     const pb = boundsOf(poly);
     const i0 = Math.max(0, Math.floor((pb.minX - radius - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((pb.maxX + radius - x0) / cell));

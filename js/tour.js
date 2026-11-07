@@ -94,6 +94,7 @@ export class Tour {
 
   exit() {
     const v = this.view;
+    if (this.isFull()) this.toggleFull();   // 나가면 전체 화면도 끈다
     this.unbind();
     this.hud?.remove();
     v.scene.remove(this.group);
@@ -220,7 +221,7 @@ export class Tour {
   /** 방 이름이 없을 때 그 방 가구로 짐작한 이름 */
   guessRoom(fs) {
     const t = new Set(fs.map((f) => f.type));
-    if (['toilet', 'bathtub', 'shower', 'basin', 'bath_shelf'].some((x) => t.has(x))) return '욕실';
+    if (['toilet', 'bathtub', 'shower', 'basin', 'bath_shelf', 'bath_upper_shelf'].some((x) => t.has(x))) return '욕실';
     if (t.has('bed')) return '침실';
     if ([...t].some((x) => /^(kitchen|microwave)/.test(x))) return '주방';
     if (t.has('wardrobe') || t.has('drawer') || t.has('vanity')) return '드레스룸';
@@ -618,11 +619,20 @@ export class Tour {
 
   applyCamera() {
     const cam = this.view.camera;
-    const x = this.pos.x * M, z = this.pos.y * M;
-    cam.position.set(x, EYE, z);
+    const x = this.pos.x * M, z = this.pos.y * M, eye = EYE + this.view.floorAt(this.pos);   // 현관·욕실은 내린 바닥 높이만큼
+    cam.position.set(x, eye, z);
     const cp = Math.cos(this.pitch);
-    cam.lookAt(x + Math.cos(this.yaw) * cp, EYE + Math.sin(this.pitch), z + Math.sin(this.yaw) * cp);
-    this.lamp?.position.set(x, EYE + 0.4, z);
+    cam.lookAt(x + Math.cos(this.yaw) * cp, eye + Math.sin(this.pitch), z + Math.sin(this.yaw) * cp);
+    this.lamp?.position.set(x, eye + 0.4, z);
+  }
+
+  /* ---------- 전체 화면 — 3D 칸(view.el)만 화면 가득. 안내판(HUD)이 그 안에 있어 함께 보인다 ---------- */
+  isFull() { return (document.fullscreenElement || document.webkitFullscreenElement) === this.view.el; }
+  toggleFull() {
+    const el = this.view.el;
+    const p = this.isFull() ? (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)
+      : (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    Promise.resolve(p).catch(() => {}).then(() => this.updateHud());   // 바뀐 뒤 버튼 글자 (fullscreenchange가 늦거나 안 와도)
   }
 
   /* ---------- 입력 ---------- */
@@ -647,7 +657,9 @@ export class Tour {
         const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         const key = e.key.toLowerCase();
-        if (key === 'escape') { e.preventDefault(); this.exit(); return; }
+        // 전체 화면이면 Esc는 전체 화면만 끈다(둘러보기는 그대로). F: 전체 화면 켜기/끄기
+        if (key === 'escape') { e.preventDefault(); if (this.isFull()) this.toggleFull(); else this.exit(); return; }
+        if (key === 'f') { e.preventDefault(); this.toggleFull(); return; }
         if (key === ' ') { e.preventDefault(); this.togglePause(); return; }
         if (key === 'n') { this.skip(); return; }
         if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
@@ -657,6 +669,7 @@ export class Tour {
       },
       keyup: (e) => this.keys.delete(e.key.toLowerCase()),
       blur: () => this.keys.clear(),
+      full: () => this.updateHud(),   // 전체 화면이 켜지고 꺼질 때(브라우저 Esc 포함) 버튼 글자를 바꾼다
     };
     dom.addEventListener('pointerdown', this.h.down);
     dom.addEventListener('pointermove', this.h.move);
@@ -664,6 +677,8 @@ export class Tour {
     window.addEventListener('keydown', this.h.keydown, true);
     window.addEventListener('keyup', this.h.keyup, true);
     window.addEventListener('blur', this.h.blur);
+    document.addEventListener('fullscreenchange', this.h.full);
+    document.addEventListener('webkitfullscreenchange', this.h.full);
   }
 
   unbind() {
@@ -674,6 +689,8 @@ export class Tour {
     window.removeEventListener('keydown', this.h.keydown, true);
     window.removeEventListener('keyup', this.h.keyup, true);
     window.removeEventListener('blur', this.h.blur);
+    document.removeEventListener('fullscreenchange', this.h.full);
+    document.removeEventListener('webkitfullscreenchange', this.h.full);
   }
 
   /* ---------- 화면 안내 ---------- */
@@ -687,12 +704,14 @@ export class Tour {
       <div class="tour-btns">
         <button data-act="pause"></button>
         <button data-act="next" title="N">⏭ 다음 곳</button>
+        <button data-act="full" class="full" title="F"></button>
         <button data-act="repick" title="현관문 자리를 다시 고릅니다">🚪 현관 다시 지정</button>
         <button data-act="exit" class="primary" title="Esc">✕ 나가기</button>
       </div>
-      <div class="tour-help">끌기: 고개 돌리기 · W/S·↑↓: 앞뒤 · A/D: 옆걸음 · ←→: 돌기 · Space: 멈춤/계속 · Esc: 나가기</div>`;
+      <div class="tour-help">끌기: 고개 돌리기 · W/S·↑↓: 앞뒤 · A/D: 옆걸음 · ←→: 돌기 · Space: 멈춤/계속 · F: 전체 화면 · Esc: 나가기(전체 화면이면 전체 화면만 끄기)</div>`;
     el.querySelector('[data-act=pause]').addEventListener('click', () => this.togglePause());
     el.querySelector('[data-act=next]').addEventListener('click', () => this.skip());
+    el.querySelector('[data-act=full]').addEventListener('click', () => this.toggleFull());
     el.querySelector('[data-act=exit]').addEventListener('click', () => this.exit());
     el.querySelector('[data-act=repick]').addEventListener('click', () => { this.exit(); this.onRepick?.(); });
     this.view.el.appendChild(el);
@@ -712,5 +731,6 @@ export class Tour {
     const pb = this.hud.querySelector('[data-act=pause]');
     pb.textContent = this.auto ? '⏸ 멈춤' : '▶ 자동 계속';
     pb.disabled = this.finished;
+    this.hud.querySelector('[data-act=full]').textContent = this.isFull() ? '🗗 전체 화면 끄기' : '⛶ 전체 화면';
   }
 }

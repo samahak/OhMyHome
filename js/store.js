@@ -23,6 +23,7 @@ export function freshState() {
       doorsRemoved: [],     // [{x,y}] 사용자가 지운 자동 문의 가운데 — 문 기호를 다시 찾아도 이 자리에는 달지 않는다
       wallHeight: 2300,
       floor: 10,            // 몇 층인지 — 둘러보기에서 창밖 땅 높이
+      fixtures: [],         // 이 도면의 기본 싱크대(가구 꼴, id 없음) — 도면 파일의 '기본 포함' 주방 싱크대. 싱크대가 없는 주방에 이것부터 놓는다
     },
     furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto } — 지금 보고 있는 안의 가구
     library: [],            // { id, type, name, w, d, h, color, image(dataURL), usePhoto }
@@ -205,6 +206,7 @@ export function setScale(mmPerPx) {
   p.windows = p.windows.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b) }));
   p.doors = p.doors.map((d) => ({ ...d, a: sc(d.a), b: sc(d.b), t: d.auto ? d.t * k : d.t }));
   p.doorsRemoved = p.doorsRemoved.map(sc);
+  p.fixtures = (p.fixtures || []).map((f) => ({ ...f, x: f.x * k, y: f.y * k }));
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
   if (p.entrance) p.entrance = { ...p.entrance, a: sc(p.entrance.a), b: sc(p.entrance.b), t: p.entrance.t * k };
   // 다른 안의 가구도 함께 (보호 중인 안도 — 가구가 도면 위 자리를 지키는 것이지 배치를 바꾸는 것이 아니다)
@@ -353,11 +355,18 @@ export function serialize() {
   const layouts = state.layouts.map((l) => (l.id === state.layoutId ? { ...l, furniture: state.furniture } : l));
   return { app: 'OhMyHome', version: 1, plan: state.plan, furniture: state.furniture, library: state.library, layouts, layoutId: state.layoutId };
 }
+/** 싱크대 종류 — 도면의 기본 싱크대(plan.fixtures)로 기억해 두는 가구 */
+const SINK_TYPES = new Set(['kitchen_counter', 'kitchen_l']);
+/** 도면 파일의 기본 싱크대: plan.fixtures가 있으면 그것, 없으면 그 파일 가구 가운데 '기본 포함' 싱크대 */
+function planFixtures(data) {
+  if (Array.isArray(data.plan.fixtures)) return data.plan.fixtures;
+  return (data.furniture || []).filter((f) => f.builtin && SINK_TYPES.has(f.type)).map(({ id, ...f }) => ({ elev: 0, rot: 0, ...f }));
+}
 export function loadProject(data) {
   if (!data || !data.plan) throw new Error('OhMyHome 프로젝트 파일이 아닙니다.');
   const base = freshState();
   checkpoint();
-  Object.assign(state.plan, base.plan, data.plan);
+  Object.assign(state.plan, base.plan, data.plan, { fixtures: planFixtures(data) });
   state.furniture = (data.furniture || []).map((f) => ({ elev: 0, rot: 0, ...f }));
   state.library = data.library || [];
   applyLayouts(data);
@@ -367,12 +376,13 @@ export function loadProject(data) {
 /**
  * 도면만 바꾼다 — 같은 집의 도면이 조금 고쳐졌을 때 쓴다. data.plan(도면 그림·축척·벽·방·창·문·현관)으로 바꾸고,
  * 배치 안·가구(기본 포함 가구도)·내 가구·층수는 그대로 둔다. 가구는 도면 좌표(mm) 그대로 남는다.
+ * 그 파일의 기본 싱크대는 plan.fixtures로 가져온다 — 싱크대가 없는 안에 놓는 것은 부르는 쪽(main.js)이 같은 되돌리기 안에서 한다.
  */
 export function replacePlan(data) {
   if (!data || !data.plan) throw new Error('OhMyHome 프로젝트 파일이 아닙니다.');
   checkpoint();
   const floor = state.plan.floor;
-  Object.assign(state.plan, freshState().plan, data.plan, { floor });
+  Object.assign(state.plan, freshState().plan, data.plan, { floor, fixtures: planFixtures(data) });
   ui.selection = null;
   emit('plan', 'selection');
 }

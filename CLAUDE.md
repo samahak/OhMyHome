@@ -11,7 +11,7 @@ run_ohmyhome.bat            # Windows
 python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
-# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·LICENSE만.
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A2-real 실측 기록지 PDF·LICENSE만.
 #   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
@@ -41,7 +41,7 @@ CDN(`three@0.160.0`)에서 받으므로 실행에 인터넷이 필요하다. ES 
 - `window.prompt` / `confirm`(축척 길이·방 이름·새 도면)은 CDP의 `Page.javascriptDialogOpening` →
   `Page.handleJavaScriptDialog({ accept, promptText })`로 처리한다.
 - 처음 접속하면 공지사항(`#notice-dialog`, 모달)이 뜬다 — 시험할 때는 그 `닫기` 버튼을 누르거나 localStorage에
-  `ohmyhome.notice.hidden = '1'`을 넣고 새로 고친다. 팝업(`dialog[open]`)이 열려 있으면 `main.js` 단축키는 쉰다.
+  `ohmyhome.notice.hidden = '2'`(`main.js`의 `NOTICE_VER`)를 넣고 새로 고친다. 팝업(`dialog[open]`)이 열려 있으면 `main.js` 단축키는 쉰다.
 - 깨끗한 상태에서 시작하려면 `localStorage.clear()` 후 새로 고친다(자동 저장 키 `ohmyhome.project.v1`). serve.py로 띄웠으면
   프로젝트 폴더의 `ohmyhome-project.json`도 지운다 — **이 폴더에서 시험하면 사용자 작업 파일을 덮어쓰므로**, 서버 저장을 시험할 때는
   작업 트리를 임시 폴더에 복사해 다른 포트로 띄운다.
@@ -71,7 +71,8 @@ js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
 js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4(가로·세로)에 꽉 차게 (2D·3D 캡처)          (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
-sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
+measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지, 위례자이더파크 창 A2-real 줄의 링크)
+sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형과 A-2형 실측(A2-real)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
 ```
 
 ### 좌표와 단위
@@ -86,16 +87,20 @@ sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B
 ### 상태 (`store.js`)
 
 ```
-state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], wallHeight, floor }
+state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], wallHeight, floor, fixtures[] }
   scaleRef      { a, b, mm } | null — 축척을 맞춘 기준 치수선 (2D에 주황 점선으로 그린다)
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
   room          { id, name, pts:[{x,y}], hidden? }
   window        { id, a, b, t, sill, h, auto } — a–b는 벽 중심선 위 창 양 끝, sill: 바닥~창 아래, h: 창 높이 (mm)
   door          { id, a, b, t, swing, auto, style? } — a: 경첩 끝, b: 반대 끝(벽 중심선 위), swing: 문짝이 a→b 왼쪽 법선 (-uy, ux) 쪽이면 1
-                style: 'sliding'(미닫이) | 'bypass'(미서기) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
+                style: 'double'(양여닫이) | 'sliding'(미닫이) | 'bypass'(미서기) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
   builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다
+  disabled       '비활성화'(지우지 않고 잠시 빼 둔 것)면 true. 2D 점선·연한 색, 3D `setGhost`, 겹침(`findCollisions`)·둘러보기 길(`buildGrid`)·
+                 합계·개수(`excluded()`)에서 뺀다. 엑셀 '모든 가구'에서는 기본 가구와 함께 합계 아래에 모은다
+  custom         '맞춤 제작'(기성품 아님 — 크기·비용이 다를 수 있음)이면 true. 합계에는 그대로 들고, 2D 치수 아래 `🛠️ 맞춤` 꼬리표(`editor.customTag`),
+                 목록·묶음 패널 `CUSTOM_TAG`, 엑셀 '구분' '맞춤 제작'으로만 보인다
   문도 name·model·price·builtin을 가질 수 있다(속성 패널). 현관 중문은 늘, 다른 문은 price가 있을 때만 비용 항목이다(`costDoors()`)
 state.library   예전 '가구 사진으로 크기 재기'로 만든 내 가구 { id, type, name, w, d, h, color, image(dataURL), usePhoto }
                 사진 기능은 사용자 요청으로 없앴다(더하는 길 없음). 예전 프로젝트를 열면 '내 가구' 칸에 보이고 놓을 수 있다
@@ -195,7 +200,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
     둘러보기 문짝은 경첩이 a 끝이지만, 신발장이 a 쪽이면 b 끝으로 옮겨 열린 문짝이 신발장을 가리지 않게 한다(`buildScene`).
   - 욕실/화장실: 변기·세면대. 이름이 부부·안방·마스터·파우더가 아닌 욕실 가운데 **가장 큰 한 곳**에는 욕조를 문 없는 짧은 벽에
     벽 끝까지 대고, 맞닿은 막힌 옆벽에 욕조 쪽부터 세면대 → 변기 순으로 놓는다. 안 들어가면 변기·세면대만 안쪽 벽에.
-  - 주방/부엌: 주방 싱크대(개수대·인덕션 3구·상부장·후드).
+  - 주방/부엌: 도면의 기본 싱크대(`plan.fixtures`)가 그 방에 있으면 그것(ㄱ자 등), 없으면 1자 주방 싱크대(개수대·인덕션 3구·상부장·후드).
+    '이미 있다'는 가운데뿐 아니라 바닥 모양 꼭짓점 하나라도 방 안이면(`inRoom`) 본다.
   - 놓을 벽은 방 안쪽 상자(`innerBox`, 가운데에서 `spanAt`)의 네 변 가운데 **벽 면 25mm 바깥**이 가장 많이 비어 있는 변
     (=문 쪽)의 반대편이다. 25mm보다 멀리 재면 60mm 샤프트 벽을 넘어가 '열린 변'으로 잘못 읽는다.
   - 방 이름이 없는 도면은 욕실·주방을 알 수 없어 신발장만 놓고, 상태줄에 방 이름을 붙이라고 안내한다(`hasFixtureRooms`).
@@ -209,8 +215,13 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   PointLight(열 개까지). 방이 없는 도면은 들를 곳 자리에 단다. 칸 크기(`spanBox`)는 창·현관문 틈을 막은 벽으로, 축마다
   **짧은 쪽 거리**로 잰다 — 반대쪽은 문 틈으로 새어 옆방 벽까지 잴 수 있다.
 - 방 영역의 `hidden: true`는 "도면 이미지에 이미 그려진 방"이라 2D·3D에 색과 이름표를 그리지 않는다(이름·면적용).
+- **현관·욕실 단차**: 둘러보기 중 `view3d.sunkenZones(plan)`(이름이 '현관'(창고·중문·팬트리 빼고)·'욕실'·'화장실'인 방, 현관 방이 없으면
+  현관문 안쪽 문 폭 × 1.2m)을 나무 바닥에 구멍(`Shape.holes`)으로 뚫고 `SUNKEN`(현관 120 · 욕실 60mm)만큼 내린 회색 타일 바닥 + 가장자리 옆면을 깐다.
+  그 안의 가구(`syncFurniture`)·방 색 바닥·둘러보기 눈높이(`tour.applyCamera`)는 `view.floorAt(p)`만큼 함께 내려간다. 문틀 자리(벽 두께)는 문턱으로 남는다.
 - `view3d.setTourMode(true)`는 나무 바닥·천장 높이 벽·이름표 숨김으로 다시 그린다. 문짝·문 위 벽·천장·실내등은
   `Tour.group`에 따로 두고 나갈 때 치운다. 둘러보기 중 키 입력은 `tour.js`가 capture 단계에서 받고, `main.js` 단축키는 쉰다.
+- **둘러보기 전체 화면**(안내판 `⛶ 전체 화면`·F): `view.el`(#view3d)에 `requestFullscreen` — 안내판이 그 안에 있어 함께 보이고, 크기는 ResizeObserver가 맞춘다.
+  전체 화면이면 Esc는 전체 화면만 끄고, 나가기(`exit`)는 전체 화면도 끈다. 버튼 글자는 fullscreenchange와 요청 뒤(`toggleFull`) 둘 다에서 고친다(헤드리스는 이벤트가 안 온다).
 
 ### 문 (`doors.js`)
 
@@ -228,6 +239,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 경첩·여는 쪽을 손으로 바꾸면 `auto: false`가 된다. 경첩을 반대로 하면 a↔b를 바꾸고 swing도 뒤집는다(법선이 뒤집히므로).
 - 3D: 문 위 벽(`catalog.DOOR.h` ~ 천장, `wallPiece`) + 문틀 + 90° 열린 문짝(`models3d.buildDoorFrame/buildDoorLeaf`).
   둘러보기 중 현관 자리의 문은 그리지 않는다(`tour.js`가 여닫는 현관문을 따로 만든다). 문짝은 길 찾기 장애물에 넣지 않는다.
+- **양여닫이(`double`)**: 양 끝 경첩의 반쪽 짝 둘이 swing 쪽으로 열린다. `doors.swingLeaves(d)`가 짝마다 `{ door, g }`(b 쪽 짝은 a↔b·swing을
+  뒤집은 반쪽 문)를 주고, 2D 기호·클릭·3D 문짝이 모두 이것을 돈다. 여닫이 계열인지는 `isHinged(d)`로 본다(경첩 반대로 버튼은 없다).
 - **미닫이·미서기·중문(`style`)**: `doors.slidingPanels(d)`가 문짝 자리를 준다 — 짝마다 닫힌 자리 [s0, s1], 벽 중심선에서 떨어진 거리 `off`,
   열린 자리까지 밀 길이 `shift`(-면 a 쪽). 2D(닫힌 자리 + 화살표)·3D(shift만큼 민 자리)·클릭 범위(`reach`)가 모두 이것을 쓴다.
   - 미닫이: 틈이 `SLIDE.twoOver`(1,300)보다 넓으면 두 짝이 양쪽으로, 아니면 한 짝이 a 쪽으로 문짝 폭의 92%만큼 열린다
@@ -287,10 +300,13 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 모양 함수는 다섯째 인자로 가구 항목 `f`도 받는다(소파 쿠션 수 = `f.seats`). 모양에 영향을 주는 값을 새로 쓰면
   `view3d.syncFurniture()`의 `key`에도 넣어야 다시 그려진다.
 - **ㄱ자 주방 싱크대(`kitchen_l`)**: `w` = 가로(뒤쪽), `d` = 세로(꺾인 쪽) 길이(세로가 더 길어도 된다), 상판 깊이 `f.counterD`(없으면 `catalog.L_COUNTER.depth`),
+  꺾인 쪽 깊이 `f.legD`(없으면 상판 깊이 — `catalog.lLegDepth()`, 위 조리대 600 · 옆 선반 740처럼 다를 때),
   `f.mirror`면 꺾인 쪽이 왼쪽(기본은 앞에서 볼 때 오른쪽 +x). 바닥 모양은 `G.furnitureRects(f)`(사각형 둘)가 정하고,
   겹침(`findCollisions`)·클릭·길 찾기는 `G.furnitureParts()`, 2D 그리기는 `furnitureOutline`/`furnitureFront`를 쓴다 —
   `furnitureCorners()`(바깥 상자)로 재면 안쪽 빈 모서리까지 막힌다. 새로 사각형이 아닌 가구를 넣으면 `furnitureRects`에 더한다.
-  3D는 `counterRun()`(싱크대 한 줄) 둘: 가로 쪽에 개수대, 꺾인 쪽에 인덕션·후드(꺾인 쪽이 800mm 미만이면 가로 쪽에).
+  3D는 `counterRun()`(싱크대 한 줄) 둘: 개수대와 인덕션·후드는 둘 다 가로 쪽, 모서리 칸(T)을 뺀 구간에서 왼쪽 개수대 → 오른쪽 인덕션
+  (`f.mirror`여도 같은 순서, `sinkAt`/`cookAt`). 꺾인 쪽은 상판·장만(주방 선반)이고 상부장은 모서리까지 늘려 가로 쪽 상부장에 붙인다.
+  가로 쪽 남은 구간이 1.4m 미만이면 인덕션은 꺾인 쪽 끝에서 540mm에 놓는다.
   `SHAPES[type].dims`가 있으면 속성 패널의 가로·깊이 칸 이름을 바꾼다.
 - **식물(`plant`)**: 종류는 `f.plant`(`catalog.PLANTS` 키, 없으면 몬스테라 — `plantOf()`). 종류를 바꾸면(`applyPlant`) 크기를 그 종류
   기본값으로 맞추고, 이름이 종류 이름이었으면 이름도 바꾼다. `f.color`는 화분 색(2D는 잎 색으로 칠한다). 3D는 `models3d.PLANT_SHAPES`의
@@ -304,12 +320,15 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   2D는 도면 전체 + `house`(=`houseBounds()` 벽·방·가구만 꽉 차게 — 도면 그림의 제목·설명·바깥 치수가 빠진다) 두 쪽,
   3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
   벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
-- **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `🏢 자이더파크 불러오기`(`#btn-xi-park` → `#sample-dialog`에서
-  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`
+- **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `Xi 위례자이더파크 불러오기`(`#btn-xi-park`, 자이 마크 색 남청 배경 + CSS `.xi-mark`(`css/xi-mark.png` 마스크) → `#sample-dialog`에서
+  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A2-real만)
   (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 더한다. 평면도 그림(PNG·JPG)을 여는 버튼과
   상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - **도면만 바꾸기**(`#btn-plan-only` → `confirm` 경고 한 번 → `#file-plan-only`): 같은 집 도면이 조금 고쳐졌을 때 쓴다. `store.replacePlan(data)`가
   `plan`만 바꾸고(층수 `floor`는 지금 값 유지) 가구·배치 안(기본 포함 가구도)·내 가구는 mm 좌표 그대로 둔다. 되돌리기 한 번에 돌아온다.
+  다만 주방 방에 싱크대가 하나도 없는 안(보호 중인 안 빼고)에는 새 도면의 기본 싱크대를 바로 놓는다(`fixtures.missingPlanSinks`, 같은 되돌리기 안).
+- **도면의 기본 싱크대 `plan.fixtures`**: `loadProject`·`replacePlan`이 파일의 `plan.fixtures`, 없으면 그 파일 가구 가운데 '기본 포함' 싱크대(`kitchen_counter`·`kitchen_l`)를
+  id 없이 담아 둔다. 둘러보기 설비 배치와 도면만 바꾸기가 1자 대신 이것을 놓는다(A2-real은 ㄱ자). `setScale()`도 함께 옮긴다.
 - 왼쪽 '② 가구' 탭을 누르면 `endDrawTool()`로 선택·이동 도구가 된다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
 - 방 이름표는 `CSS2DObject`다. 그룹에서 빼면(`clear()`) three.js가 DOM 요소도 함께 지운다.
@@ -336,14 +355,18 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
-  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼)에,
+  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장, 욕실 철제 선반·욕실 상부 선반)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼)에,
   벽과 겹쳐도 되는 종류는 `WALL_OK`(커튼)에 더한다.
   그 밖의 벽과의 겹침은 그대로 잰다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 팝업(`dialog[open]`)이 열려 있으면 무시한다.
 - **공지사항**(`#notice-dialog`): 처음 접속할 때 `showModal()`. 프로그램 설명 + `docs/OhMyHome_User_Guide.pdf` 내려받기 링크(그래서 배포 zip에도
-  `docs/`에 담는다). 아래 `다시 보지 않기`(value `hide`)면 localStorage `ohmyhome.notice.hidden`에 `1`을 남겨 다시 띄우지 않고, `닫기`·Esc는 이번만 닫는다.
+  `docs/`에 담는다). 아래 `다시 보지 않기`(value `hide`)면 localStorage `ohmyhome.notice.hidden`에 `NOTICE_VER`를 남겨 다시 띄우지 않고, `닫기`·Esc는 이번만 닫는다.
+  왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올린다(예전 공지를 숨긴 사람에게도 한 번 뜬다).
+  새 소식의 `A2-real 고르러 가기`(value `real`)는 위례자이더파크 창을 A2-real에 맞춰 연다.
+  그 아래 `✨ 추가 기능 보기`(`#btn-features`, type=button이라 공지를 닫지 않는다)는 `#features-dialog`(그날 더한 기능 설명)를 공지 위에 겹쳐 띄운다.
+  기능을 더하면 이 목록도 고친다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
   먹지 않는다. (예전 사진 대화상자의 안내 문구가 캔버스를 덮어 클릭을 가로챈 적이 있다.)
 

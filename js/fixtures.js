@@ -2,6 +2,7 @@
 // 방 이름에 '욕실/화장실'이 있으면 변기·세면대(가장 큰 욕실에는 욕조까지), '주방/부엌'이면 주방 싱크대를 놓는다.
 // 현관문(plan.entrance)이 정해져 있으면 현관 옆벽에 신발장을 놓는다. 방 이름이 없어도 된다.
 // 그 방(현관) 안에 같은 종류 설비가 이미 있으면 건드리지 않는다. 벽·가구와 겹치는 설비는 놓지 않는다.
+// 주방은 도면의 기본 싱크대(plan.fixtures — 도면 파일에 '기본 포함'으로 들어 있던 싱크대, 예: A2-real의 ㄱ자)가 있으면 그것을, 없으면 1자 싱크대를 놓는다.
 //
 // 놓는 자리: 방 가운데에서 벽까지 재어 안쪽 상자를 구하고, 네 변 가운데 벽이 가장 많이 끊긴 변을 문 쪽으로 본다.
 // 설비는 그 반대 변(문이 없는 벽)에 등을 대고 놓는다. 욕조가 들어가면 욕조는 짧은 막힌 벽에,
@@ -143,6 +144,32 @@ function shoeCabinet(plan, furniture, polys, uid) {
   return tries.find((t) => fits(t.f, plan, furniture))?.f || null;
 }
 
+/** 가구가 방에 걸쳐 있는가 — 가운데 또는 바닥 모양 꼭짓점 하나라도 방 안이면 (ㄱ자처럼 가운데가 방 끝에 걸려도 놓친 것으로 보지 않게) */
+const inRoom = (f, room) => G.pointInPoly(f, room.pts) || G.furnitureParts(f).some((poly) => poly.some((p) => G.pointInPoly(p, room.pts)));
+
+/**
+ * 도면의 기본 싱크대(plan.fixtures) 가운데 그 주방 방에 든 것을 새 id로 꺼낸다.
+ * 도면 파일에 ㄱ자 싱크대가 있으면 둘러보기·도면만 바꾸기도 1자 대신 그것을 놓는다.
+ */
+function planSinksFor(plan, room, uid) {
+  return (plan.fixtures || []).filter((f) => KITCHEN_TYPES.has(f.type) && G.pointInPoly(f, room.pts))
+    .map((f) => ({ libId: null, usePhoto: false, ...f, id: uid('f'), builtin: true }));
+}
+
+/**
+ * 싱크대가 없는 주방 방에 도면의 기본 싱크대를 놓는다(도면만 바꾸기 뒤). 새로 놓을 것만 돌려준다.
+ * 벽·가구와 겹치면 놓지 않는다.
+ */
+export function missingPlanSinks(plan, furniture, uid) {
+  const out = [];
+  for (const room of plan.rooms) {
+    if (!KITCHEN.test(room.name) || room.pts.length < 3) continue;
+    if (furniture.some((f) => KITCHEN_TYPES.has(f.type) && inRoom(f, room))) continue;
+    for (const f of planSinksFor(plan, room, uid)) if (fits(f, plan, furniture.concat(out))) out.push(f);
+  }
+  return out;
+}
+
 /** 이름으로 설비를 놓을 수 있는 방(욕실·주방)이 하나라도 있는가 */
 export function hasFixtureRooms(plan) {
   return plan.rooms.some((r) => BATH.test(r.name) || KITCHEN.test(r.name));
@@ -166,12 +193,13 @@ export function autoFixtures(plan, furniture, uid) {
     const kind = BATH.test(room.name) ? 'bath' : KITCHEN.test(room.name) ? 'kitchen' : null;
     if (!kind || room.pts.length < 3) continue;
     const types = kind === 'bath' ? BATH_TYPES : KITCHEN_TYPES;
-    if (furniture.some((f) => types.has(f.type) && G.pointInPoly(f, room.pts))) continue;
+    if (furniture.some((f) => types.has(f.type) && inRoom(f, room))) continue;
     const box = innerBox(room, plan.walls);
     if (box) jobs.push({ room, kind, box, area: (box.maxX - box.minX) * (box.maxY - box.minY) });
   }
   const tubRoom = jobs.filter((j) => j.kind === 'bath' && !NO_TUB.test(j.room.name)).sort((a, b) => b.area - a.area)[0];
 
+  let own;
   for (const { room, kind, box } of jobs) {
     const ss = sides(box).map((s) => ({ ...s, open: openness(s, polys) }));
     const door = ss.reduce((a, b) => (b.open > a.open ? b : a));
@@ -183,6 +211,9 @@ export function autoFixtures(plan, furniture, uid) {
       // 욕조 배치가 벽·가구에 걸리면 변기·세면대만 놓는다
       if (list.some((f) => f.type === 'bathtub') && !list.every((f) => fits(f, plan, furniture.concat(out)))) list = bathLayout(ss, door, back, false, uid);
       keep(list);
+    } else if ((own = planSinksFor(plan, room, uid)).length) {
+      // 도면 파일의 기본 싱크대(ㄱ자 등)가 있으면 그것만 놓는다 — 겹쳐서 못 놓아도 1자로 바꿔 놓지 않는다
+      keep(own);
     } else {
       const k = defaultsFor('kitchen_counter');
       const len = Math.min(back.len, 3600);

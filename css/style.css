@@ -121,6 +121,8 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .placed-group .sub { float: right; font-weight: 400; }
 .placed-list .model { display: block; color: var(--muted); font-size: 11px; text-align: left; }
 .placed-list .price { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.placed-list button.off { opacity: .55; border-style: dashed; }
+.custom-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: #fff1e0; color: #b4520a; font-size: 11px; font-weight: 600; white-space: nowrap; vertical-align: 1px; }
 .placed-list .price.builtin, .multi-list .price.builtin { color: var(--muted); font-weight: 400; }
 .multi-list .price { font-size: 12px; }
 .placed-total { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; }
@@ -167,7 +169,23 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .measure-pop .hint { margin-top: 4px; }
 .notice-dialog, .sample-dialog { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .2); color: var(--text); }
 .notice-dialog::backdrop, .sample-dialog::backdrop { background: rgba(20, 28, 40, .35); }
-.notice-dialog { width: min(520px, calc(100vw - 32px)); line-height: 1.55; }
+.notice-dialog { width: min(860px, calc(100vw - 32px)); line-height: 1.55; }
+.notice-cols { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+.notice-new { padding: 12px 14px; border: 1px solid #f0b48f; border-radius: 10px; background: #fff6ef; }
+.notice-new ul { padding-left: 16px; font-size: 13px; }
+.notice-new li.notice-key { margin: 4px 0 6px; padding: 6px 8px 6px 6px; border-radius: 6px; background: #ffe8d9; color: #7a3208; }
+.notice-new li.notice-key a, .feature-list a { color: #b04a0c; font-weight: 600; }
+.features-dialog { width: min(580px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .25); color: var(--text); line-height: 1.55; }
+.features-dialog::backdrop { background: rgba(20, 28, 40, .25); }
+.features-dialog h3 { margin: 0 0 10px; font-size: 16px; }
+.features-dialog h3 small { margin-left: 6px; color: var(--muted); font-weight: 400; font-size: 12px; }
+.feature-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 65vh; overflow: auto; }
+.feature-list li { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfc; }
+.feature-list li > b { font-size: 14px; }
+.feature-list li .xi-mark { color: #112d43; }
+.feature-list p { margin: 3px 0 0; font-size: 13px; color: #3d4652; }
+.notice-new button.block { justify-content: center; margin: 4px 0 0; }
+@media (max-width: 760px) { .notice-cols { grid-template-columns: minmax(0, 1fr); } }
 .notice-dialog h3 { margin: 0 0 8px; font-size: 16px; }
 .notice-dialog p { margin: 0 0 8px; }
 .notice-dialog ul { margin: 0 0 10px; padding-left: 18px; }
@@ -175,13 +193,25 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .notice-warn { padding: 8px 10px; border-radius: 8px; background: #fff6ef; color: #8a3d0a; font-size: 12px; }
 .notice-guide { margin: 4px 0 12px; text-decoration: none; }
 .notice-actions { display: flex; justify-content: flex-end; gap: 6px; }
-.sample-dialog { width: min(360px, calc(100vw - 32px)); }
+.sample-dialog { width: min(440px, calc(100vw - 32px)); }
 .sample-dialog h3 { margin: 0 0 4px; font-size: 15px; }
 .sample-list { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; max-height: 50vh; overflow: auto; }
 .sample-list label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
 .sample-list label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .sample-list small { margin-left: auto; color: var(--muted); font-size: 11px; }
+.sample-sheet { flex: none; padding: 2px 7px; border: 1px solid #f0b48f; border-radius: 6px; background: #fff6ef; color: #b04a0c; font-size: 11.5px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.sample-sheet:hover { background: #ffe8d9; }
 .sample-actions { display: flex; justify-content: flex-end; gap: 6px; }
+/* 자이(Xi) 마크 — css/xi-mark.png(자이 마크 그림, 2026.11 기준)를 마스크로 써서 색은 글자색(currentColor)을 따른다 */
+.xi-mark {
+  display: inline-block; width: 1.8em; height: 1em; vertical-align: -0.12em; background: currentColor;
+  -webkit-mask: url("xi-mark.png") center / contain no-repeat;
+  mask: url("xi-mark.png") center / contain no-repeat;
+}
+/* 위례자이더파크 불러오기: 자이 마크 색(남청) 배경 + 흰 Xi 마크 */
+#btn-xi-park { justify-content: center; align-items: center; gap: 8px; background: linear-gradient(135deg, #0c2233, #1d4560); border-color: #0c2233; color: #fff; font-weight: 600; }
+#btn-xi-park:hover { background: linear-gradient(135deg, #10304a, #245272); border-color: #10304a; }
+.notice-dialog li .xi-mark { color: #112d43; }
 button.primary-soft { border-color: #f0b48f; background: #fff6ef; color: #b04a0c; font-weight: 600; }
 button.primary-soft.active { border-color: #e8590c; background: #ffe8d9; color: #b04a0c; }
 .statusbar {
@@ -200,7 +230,15 @@ button.primary-soft.active { border-color: #e8590c; background: #ffe8d9; color: 
 .tour-btns button { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .25); }
 .tour-btns button:hover { background: rgba(255, 255, 255, .22); }
 .tour-btns button.primary { background: var(--accent); border-color: var(--accent); }
+/* 전체 화면 버튼은 주황색 + 굵은 글씨 + 빛 번짐으로 가장 눈에 띄게 (나가기의 파란색과 다르게) */
+.tour-btns button.full {
+  background: linear-gradient(180deg, #ffa94d, #f76707); border-color: #ffc078; color: #fff;
+  font-weight: 700; padding-left: 14px; padding-right: 14px;
+  box-shadow: 0 0 0 2px rgba(255, 169, 77, .35), 0 0 12px rgba(247, 103, 7, .65);
+}
+.tour-btns button.full:hover { background: linear-gradient(180deg, #ffb86b, #ff7a1a); box-shadow: 0 0 0 2px rgba(255, 169, 77, .5), 0 0 16px rgba(247, 103, 7, .85); }
 .tour-help { font-size: 11.5px; opacity: .75; text-align: center; }
+#view3d:fullscreen { width: 100vw; height: 100vh; background: #cfe2f3; }
 
 .label3d {
   background: rgba(20, 28, 40, .85); color: #fff; padding: 3px 8px; border-radius: 6px;
