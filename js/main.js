@@ -6,7 +6,7 @@ import {
   addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, WARDROBE_STYLES, wardrobeStyle, MIX_PARTS, mixStyles, iconFor, windowDefaults, DOOR } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, WARDROBE_STYLES, wardrobeStyle, MIX_PARTS, mixStyles, STOOL, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makePdf, dataURLBytes } from './pdf.js';
@@ -402,6 +402,7 @@ function addFurniture(def, extra = {}) {
   const preset = SIZE_PRESETS[def.type];
   if (preset && def[preset.key]) f[preset.key] = def[preset.key];
   if (def.plant) f.plant = def.plant;
+  if (def.stool) f.stool = true;
   state.furniture.push(f);
   emit('furniture');
   select({ kind: 'furniture', id: f.id });
@@ -695,6 +696,8 @@ function renderProps() {
       ${obj.type === 'plant' ? `
       <label class="field"><span>식물 종류</span><select data-f="plant">${Object.entries(PLANTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       <div class="btns preset-btns">${Object.entries(PLANTS).map(([k, v]) => `<button data-plant="${k}">${v.label}</button>`).join('')}</div>` : ''}
+      ${obj.type === 'chair' ? `
+      <label class="check" title="등받이 없이 엉덩이만 앉는 의자(스툴)로 그립니다 — 높이가 앉는 면 높이가 되고, 책상·식탁 밑으로 통째로 들어갈 수 있습니다"><input type="checkbox" data-f="stool"> 등받이 없음 (엉덩이만 앉는 스툴)</label>` : ''}
       ${obj.type === 'wardrobe' ? `
       <label class="field"><span>옷장 모양</span><select data-f="wstyle">${Object.entries(WARDROBE_STYLES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${obj.wstyle === 'mix' ? mixStyles(obj).map((_, i, all) => `
@@ -885,6 +888,7 @@ function applyProp(inp) {
     emit('furniture');
     return;
   }
+  if (k === 'stool') { applyStool(obj, v); return; }
   if (k === 'noDoor') {
     checkpoint();
     if (v) obj.noDoor = true; else delete obj.noDoor;
@@ -996,6 +1000,27 @@ function clampKitchenL(obj, k, v) {
     return Math.max(min, v);
   }
   return v;
+}
+
+/**
+ * 의자 ↔ 스툴(등받이 없음): 높이를 앉는 면 높이(STOOL.h) ↔ 등받이 의자 높이로 맞추고, 이름이 '의자'·'스툴'이면 이름도 바꾼다.
+ * 가로·깊이는 기본 크기 그대로였을 때만 바꾼다(사용자가 고친 크기는 둔다).
+ */
+function applyStool(obj, on) {
+  const chairDef = CATALOG.find((c) => c.type === 'chair' && !c.stool);
+  checkpoint();
+  if (on) {
+    obj.stool = true;
+    if (obj.h > STOOL.h + 150) obj.h = STOOL.h;
+    if (obj.w === chairDef.w && obj.d === chairDef.d) Object.assign(obj, { w: STOOL.w, d: STOOL.d });
+    if (obj.name === '의자') obj.name = '스툴';
+  } else {
+    delete obj.stool;
+    if (obj.h < chairDef.h - 200) obj.h = chairDef.h;
+    if (obj.w === STOOL.w && obj.d === STOOL.d) Object.assign(obj, { w: chairDef.w, d: chairDef.d });
+    if (obj.name === '스툴') obj.name = '의자';
+  }
+  emit('furniture');
 }
 
 /**

@@ -171,7 +171,7 @@ const CHAIR_BACK_MM = 60;   // 등받이 두께 (models3d.chair와 맞춘다)
  */
 function chairUnderDesk(chair, desk) {
   const under = desk.elev + KNEE_SPACE[desk.type](desk) - DESK_TOP_MM;   // 상판 아랫면 높이
-  const seat = chair.elev + Math.min(460, chair.h * 0.55);  // 앉는 면 높이
+  const seat = chair.elev + (chair.stool ? chair.h : Math.min(460, chair.h * 0.55));  // 앉는 면 높이 (스툴은 맨 위)
   if (seat + 20 > under) return null;                       // 들어갈 수 없다 → 일반 판정
   if (chair.elev + chair.h <= under) return false;          // 의자 전체가 들어간다
   const back = localRect(chair, -chair.w / 2 + 1, -chair.d / 2 + 1, chair.w / 2 - 1, -chair.d / 2 + CHAIR_BACK_MM);

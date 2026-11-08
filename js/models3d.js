@@ -688,8 +688,18 @@ function desk(g, W, D, H, c) {
   box(g, W - 2 * side, H * 0.4, 0.02, 0, H * 0.62, -D / 2 + 0.03, mat(shade(c, 0.9)));
 }
 
-function chair(g, W, D, H, c) {
-  const m = mat(c), seatH = Math.min(0.46, H * 0.55), leg = 0.035;
+/** 의자. f.stool이면 등받이 없는 스툴 — 높이(H)가 앉는 면 높이다 */
+function chair(g, W, D, H, c, f = {}) {
+  const m = mat(c), leg = 0.035;
+  if (f.stool) {
+    const seat = 0.05;
+    box(g, W, seat, D, 0, H - seat / 2, 0, m);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, leg, H - seat, leg, sx * (W / 2 - 0.05), (H - seat) / 2, sz * (D / 2 - 0.05), mat(shade(c, 0.6)));
+    // 다리 사이 가로대
+    for (const sz of [-1, 1]) box(g, W - 0.1, 0.02, 0.02, 0, (H - seat) * 0.3, sz * (D / 2 - 0.05), mat(shade(c, 0.6)));
+    return;
+  }
+  const seatH = Math.min(0.46, H * 0.55);
   box(g, W, 0.05, D * 0.92, 0, seatH, 0.02, m);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, leg, seatH, leg, sx * (W / 2 - 0.04), seatH / 2, sz * (D / 2 - 0.05), mat(shade(c, 0.6)));
   box(g, W, H - seatH, 0.04, 0, seatH + (H - seatH) / 2, -D / 2 + 0.03, m);
