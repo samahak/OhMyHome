@@ -1364,6 +1364,17 @@ async function autoWindows() {
   return { windows: keep.concat(add), added: add.length, removed: plan.windows.length - keep.length };
 }
 
+/**
+ * 둘러보기 중에는 편집 화면을 잠근다 — 왼쪽·속성 패널, 도면 이름·되돌리기·다시 하기·새 프로젝트, 보기 막대(2D·3D·전체 화면·카메라·벽 설정).
+ * 둘러보기와 편집을 나누려는 것이다(저장·캡처·공지는 그대로). inert라 누르기·Tab 이동이 모두 막히고, 나가면(onExit) 푼다.
+ */
+const TOUR_LOCK = ['.sidebar', '#props', '#plan-name', '#btn-undo', '#btn-redo', '#btn-new', '.stage-bar'];
+function lockForTour(on) {
+  document.body.classList.toggle('touring', on);
+  $('tour-lock').hidden = !on;
+  for (const sel of TOUR_LOCK) document.querySelectorAll(sel).forEach((el) => { el.inert = on; });
+}
+
 let tourStarting = false;
 async function startTour() {
   if (view.tour || tourStarting) return;
@@ -1393,8 +1404,10 @@ async function startTour() {
   status((names
     ? `${names}을(를) 자동으로 놓았습니다 (옮기거나 지울 수 있고, 되돌리기도 됩니다). Esc로 나갑니다.`
     : `둘러보기 중 (${plan.floor}층) — Esc로 나갑니다.`) + (win.removed ? ` 잘못 잡혔던 창 ${win.removed}개를 뺐습니다.` : '') + hint);
+  lockForTour(true);
   view.startTour({
     onExit: () => {
+      lockForTour(false);
       if (viewBeforeTour) setViewMode(viewBeforeTour);
       viewBeforeTour = null;
       status('둘러보기를 마쳤습니다.');

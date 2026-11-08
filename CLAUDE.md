@@ -224,6 +224,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - **현관·욕실 단차**: 둘러보기 중 `view3d.sunkenZones(plan)`(이름이 '현관'(창고·중문·팬트리 빼고)·'욕실'·'화장실'인 방, 현관 방이 없으면
   현관문 안쪽 문 폭 × 1.2m)을 나무 바닥에 구멍(`Shape.holes`)으로 뚫고 `SUNKEN`(현관 120 · 욕실 60mm)만큼 내린 회색 타일 바닥 + 가장자리 옆면을 깐다.
   그 안의 가구(`syncFurniture`)·방 색 바닥·둘러보기 눈높이(`tour.applyCamera`)는 `view.floorAt(p)`만큼 함께 내려간다. 문틀 자리(벽 두께)는 문턱으로 남는다.
+- **둘러보기 중 편집 잠금**(`main.js` `lockForTour`): 시작 때 `TOUR_LOCK`(왼쪽 `.sidebar`·속성 `#props`·`#plan-name`·되돌리기·다시 하기·새 프로젝트·`.stage-bar`)에
+  `inert`를 걸고 `body.touring`(흐리게) + `#tour-lock` 안내를 띄운다. 나가기(`onExit`)에서 푼다. 저장·캡처·공지는 잠그지 않는다. 편집 버튼을 새로 만들면 여기에도 넣는다.
 - `view3d.setTourMode(true)`는 나무 바닥·천장 높이 벽·이름표 숨김으로 다시 그린다. 문짝·문 위 벽·천장·실내등은
   `Tour.group`에 따로 두고 나갈 때 치운다. 둘러보기 중 키 입력은 `tour.js`가 capture 단계에서 받고, `main.js` 단축키는 쉰다.
 - **도면 편집 화면 전체 화면**(`#btn-full`, 둘러보기 버튼 왼쪽): 보기 칸 `#views`에 `requestFullscreen` — 지금 보기(2D·나란히·3D) 그대로이고,
