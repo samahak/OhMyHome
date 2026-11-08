@@ -321,6 +321,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   모자란 칸을 기본 차례로 채운다). 3D는 칸마다 `closedSection`/`openSection`, 속성은 칸별 `mix-i` 선택(가로·모양을 바꾸면 `renderProps`).
   `fridge` 냉장고장은 `fridgeCabinet()` — 옆판 + 위 장(300~600mm, 냉장고 자리 1.89m — A1-real 실측)만, 아래는 바닥판·걸레받이·뒤판 없이 바닥까지 트인다.
   기본값(통·문 있음)은 키를 남기지 않는다.
+- **스툴(`chair` + `f.stool`)**: 등받이 없는 의자. 높이 H가 곧 앉는 면이라 `chairUnderDesk`는 앉는 면을 H로 보고(책상 밑에 통째로 들어간다),
+  속성 '등받이 없음'을 켜고 끌면(`applyStool`) 높이·기본 크기(`catalog.STOOL` ↔ 의자 카드)와 이름('의자'↔'스툴')을 함께 맞춘다.
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
 - 박스·구·원기둥 지오메트리는 `sharedGeo()`로 하나씩 공유하고 `scale`로 키운다. `disposeObject()`는 공유 지오메트리를 버리지 않는다.
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.

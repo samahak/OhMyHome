@@ -141,6 +141,9 @@ export function mixStyles(f) {
   return Array.from({ length: mixCount(f.w) }, (_, i) => (MIX_PARTS.includes(f.mix?.[i]) ? f.mix[i] : MIX_DEFAULT[i % MIX_DEFAULT.length]));
 }
 
+/** 의자 등받이 없음(f.stool, 엉덩이만 앉는 스툴)을 켜고 끌 때 맞추는 크기(mm) — 높이가 곧 앉는 면 높이다 */
+export const STOOL = { w: 400, d: 400, h: 460 };
+
 /** 문 높이(mm) — 3D에서 문 위로는 천장까지 벽을 채운다 */
 export const DOOR = { h: 2100 };
 
@@ -173,6 +176,7 @@ export const CATALOG = [
   { type: 'table', name: '4인 식탁', icon: '🍽️', people: 4, ...tableSizeFromPeople(4), h: 750, color: '#a7825c' },
   { type: 'desk', name: '책상', icon: '🖥️', w: 1200, d: 600, h: 740, color: '#d8c7b0' },
   { type: 'chair', name: '의자', icon: '🪑', w: 450, d: 500, h: 850, color: '#6f7d8c' },
+  { type: 'chair', name: '스툴', icon: '🪑', stool: true, w: STOOL.w, d: STOOL.d, h: STOOL.h, color: '#a58a6c' },
   { type: 'tvstand', name: '거실장', icon: '🗄️', w: 1800, d: 400, h: 450, color: '#f0ece6' },
   { type: 'tv', name: '65인치 TV', icon: '📺', inch: 65, ...tvSizeFromInch(65), d: 60, color: '#1d2025', elev: 500 },
   // 월패드(세대 단말기): 10인치 화면급, 화면 가운데가 눈높이(약 1.4m)쯤 오게 벽에 단다
