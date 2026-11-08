@@ -6,7 +6,7 @@ import {
   addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, WARDROBE_STYLES, wardrobeStyle, MIX_PARTS, mixStyles, STOOL, iconFor, windowDefaults, DOOR } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, WARDROBE_STYLES, wardrobeStyle, MIX_PARTS, mixStyles, STOOL, ROD_DRAPES, ROD_SPAN, rodDrape, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makePdf, dataURLBytes } from './pdf.js';
@@ -758,6 +758,10 @@ function renderProps() {
       ${obj.type === 'chair' ? `
       <label class="check" title="등받이 없이 엉덩이만 앉는 의자(스툴)로 그립니다 — 높이가 앉는 면 높이가 되고, 책상·식탁 밑으로 통째로 들어갈 수 있습니다"><input type="checkbox" data-f="stool"> 등받이 없음 (엉덩이만 앉는 스툴)</label>` : ''}
       ${obj.type === 'water_purifier' ? '<p class="hint" data-v="purifier"></p>' : ''}
+      ${obj.type === 'curtain_rod' ? `
+      <label class="field"><span>커튼</span><select data-f="drape">${Object.entries(ROD_DRAPES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      <label class="check" title="봉 방향 양쪽 벽까지 길이를 늘 맞춥니다 — 끌거나 돌리면 그 자리 벽 사이로 바로 늘고 줄어듭니다. 가로를 직접 고치면 꺼집니다"><input type="checkbox" data-f="fitWalls"> ↔ 벽 사이에 자동으로 맞춤</label>
+      <p class="hint" data-v="rod"></p>` : ''}
       ${obj.type === 'wardrobe' ? `
       <label class="field"><span>옷장 모양</span><select data-f="wstyle">${Object.entries(WARDROBE_STYLES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${obj.wstyle === 'mix' ? mixStyles(obj).map((_, i, all) => `
@@ -886,6 +890,8 @@ function refreshProps() {
     if (k === 'mdepth') return Math.round(depthFromEntrance(obj, state.plan.entrance) ?? 0);
     if (k === 'plant') return plantOf(obj);
     if (k === 'wstyle') return wardrobeStyle(obj);
+    if (k === 'drape') return rodDrape(obj);
+    if (k === 'fitWalls') return !obj.manualW;
     if (k.startsWith('mix-')) return mixStyles(obj)[+k.slice(4)];
     if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
     const p = SIZE_PRESETS[obj.type];
@@ -907,6 +913,10 @@ function refreshProps() {
     if (pur) pur.textContent = obj.onCounter
       ? '💧 주방 싱크대 위에 올린 소형 정수기입니다. 싱크대 밖 바닥으로 옮기면 대형(스탠드형)으로 바뀝니다.'
       : '💧 바닥에 단독으로 선 대형(스탠드형) 정수기입니다. 주방 싱크대 위로 끌어다 놓으면 소형 정수기로 바뀌어 상판 위에 올라갑니다.';
+    const rod = el.querySelector('[data-v=rod]');   // 커튼 봉: 벽 사이에 맞췄는지(store.settleRods)
+    if (rod) rod.textContent = obj.manualW ? `🪝 봉 길이 ${fmtMM(obj.w)}mm를 직접 정했습니다. ‘벽 사이에 자동으로 맞춤’을 켜면 양쪽 벽까지 늘립니다.`
+      : G.rodSpan(obj, state.plan.walls, ROD_SPAN) ? `🪝 양쪽 벽 사이 ${fmtMM(obj.w)}mm에 걸었습니다. 끌거나 돌리면 그 자리 벽 사이로 맞춰집니다. 높이 H가 봉 높이입니다.`
+        : `🪝 봉 방향 양쪽에 ${fmtMM(ROD_SPAN.min)}~${fmtMM(ROD_SPAN.max)}mm 안의 벽이 없어 길이를 그대로 둡니다. 벽과 벽 사이로 끌어 놓거나 ⟳ 90°로 방향을 바꿔 보세요.`;
     const lside = el.querySelector('[data-v=lside]');
     if (lside) lside.textContent = obj.mirror ? '왼쪽 (앞에서 볼 때)' : '오른쪽 (앞에서 볼 때)';
   }
@@ -953,6 +963,18 @@ function applyProp(inp) {
     return;
   }
   if (k === 'stool') { applyStool(obj, v); return; }
+  if (k === 'drape') {   // 커튼 봉의 커튼 — 기본(양옆으로 걷음)은 키를 남기지 않는다
+    checkpoint();
+    if (v === 'open' || !ROD_DRAPES[v]) delete obj.drape; else obj.drape = v;
+    emit('furniture');
+    return;
+  }
+  if (k === 'fitWalls') {   // 켜면 바로 벽 사이로 늘린다(store.settleRods)
+    checkpoint();
+    if (v) delete obj.manualW; else obj.manualW = true;
+    emit('furniture');
+    return;
+  }
   if (k === 'noDoor') {
     checkpoint();
     if (v) obj.noDoor = true; else delete obj.noDoor;
@@ -1035,6 +1057,7 @@ function applyProp(inp) {
     obj[k] = v;
     // 크기를 직접 고치면 인치·인원은 지우고, 화면에는 크기로 짐작한 값을 보여 준다
     if (preset?.affects.includes(k)) delete obj[preset.key];
+    if (obj.type === 'curtain_rod' && k === 'w') obj.manualW = true;   // 봉 길이를 직접 정하면 벽 사이 맞춤을 끈다
   }
   emit(sel.kind === 'furniture' ? 'furniture' : 'plan');
   if (k === 'type' || (k === 'w' && obj.wstyle === 'mix')) renderProps();   // 모양마다 칸 이름·칸이 다르다 (ㄱ자 싱크대, 믹스장 칸 수)

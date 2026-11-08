@@ -5,8 +5,8 @@
 //   'layouts'   배치 안(1안·2안…) 목록·지금 안이 바뀜
 //   'selection' 선택이 바뀜
 
-import { counterUnder } from './geometry.js';
-import { PURIFIER, COUNTER_TOP } from './catalog.js';
+import { counterUnder, rodSpan } from './geometry.js';
+import { PURIFIER, COUNTER_TOP, ROD_SPAN } from './catalog.js';
 
 const STORAGE_KEY = 'ohmyhome.project.v1';
 const HISTORY_LIMIT = 60;
@@ -48,6 +48,7 @@ export function on(type, fn) {
   listeners.get(type).add(fn);
 }
 export function emit(...types) {
+  if (types.includes('furniture') || types.includes('plan')) settleRods();
   if (types.includes('furniture')) settlePurifiers();
   for (const t of types) listeners.get(t)?.forEach((fn) => fn());
   if (types.some((t) => t !== 'selection')) scheduleSave();
@@ -68,6 +69,19 @@ function settlePurifiers() {
       if (c) { f.onCounter = true; f.rot = c.rot; } else delete f.onCounter;
     }
     if (PURIFIER_NAMES.has(f.name)) f.name = p.name;
+  }
+}
+
+/**
+ * 커튼 봉은 벽과 벽 사이에 건다: 가로를 직접 고친 것(manualW) 말고는 봉 방향 양쪽 벽까지 길이·가운데를 맞춘다.
+ * 끌거나 돌리면 그 자리 벽 사이로 바로 늘고 줄어든다. 양쪽에 벽이 없으면(트인 곳) 그대로 둔다.
+ */
+function settleRods() {
+  for (const f of state.furniture) {
+    if (f.type !== 'curtain_rod' || f.manualW) continue;
+    const s = rodSpan(f, state.plan.walls, ROD_SPAN);
+    if (!s) continue;
+    f.x = Math.round(s.x); f.y = Math.round(s.y); f.w = Math.round(s.w);
   }
 }
 

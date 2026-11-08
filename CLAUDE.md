@@ -330,6 +330,11 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   바닥 모양 안이면(`G.counterUnder`) 소형(`catalog.PURIFIER.small`, `elev` = 싱크대 elev + `COUNTER_TOP`, 싱크대 rot, `f.onCounter = true`),
   아니면 바닥의 대형으로 바꾼다. 크기·띄움은 대형↔소형이 바뀔 때만, 이름은 기본 이름('정수기'·'대형 정수기'·'소형 정수기')일 때만 맞춘다.
   싱크대 위(`onCounter`) 정수기는 싱크대와 겹쳐도 된다. 상판 높이 `COUNTER_TOP`(850)은 3D 하부장(`counterRun`)도 쓴다.
+- **커튼 봉(`curtain_rod`)**: 벽과 벽 사이에 거는 봉 — 가로 w = 봉 길이, 높이 h = 봉 높이(바닥에서), 색 = 커튼 천. `store.emit()`이 'furniture'·'plan'마다
+  `settleRods()`로 `G.rodSpan(f, walls, catalog.ROD_SPAN)`(가운데에서 봉 방향 양쪽 반직선이 닿는 벽, 300~6,000mm)에 길이·가운데를 맞춰서, 끌거나 돌리면
+  그 자리 벽 사이로 바로 늘고 준다. 가로를 직접 고치면 `f.manualW = true`(속성 '벽 사이에 자동으로 맞춤' 끔). 커튼은 `f.drape`(`ROD_DRAPES` — 없으면 open
+  양옆으로 걷음 · closed 쳐 둠 · none 봉만, `rodDrape()`). 3D `models3d.curtainRod`(주름은 커튼과 같은 `pleats`). 벽·가구와 겹쳐도 되고(`WALL_OK`·`OVERLAP_ANY`),
+  둘러보기 길(`buildGrid`)에서는 빼서 천을 지나 걷는다.
 - **스툴(`chair` + `f.stool`)**: 등받이 없는 의자. 높이 H가 곧 앉는 면이라 `chairUnderDesk`는 앉는 면을 H로 보고(책상 밑에 통째로 들어간다),
   속성 '등받이 없음'을 켜고 끌면(`applyStool`) 높이·기본 크기(`catalog.STOOL` ↔ 의자 카드)와 이름('의자'↔'스툴')을 함께 맞춘다.
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
@@ -379,8 +384,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
-  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장, 욕실 철제 선반·욕실 상부 선반)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼)에,
-  벽과 겹쳐도 되는 종류는 `WALL_OK`(커튼)에 더한다. 냉장고장(`wstyle: 'fridge'`) 안에 넣어도 되는 종류는 `IN_FRIDGE_CABINET`(냉장고·김치냉장고)다.
+  겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장, 욕실 철제 선반·욕실 상부 선반)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼·커튼 봉)에,
+  벽과 겹쳐도 되는 종류는 `WALL_OK`(커튼·커튼 봉)에 더한다. 냉장고장(`wstyle: 'fridge'`) 안에 넣어도 되는 종류는 `IN_FRIDGE_CABINET`(냉장고·김치냉장고)다.
   그 밖의 벽과의 겹침은 그대로 잰다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.

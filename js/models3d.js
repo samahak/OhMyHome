@@ -1,7 +1,7 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
-import { lCounterDepth, lLegDepth, plantOf, WARDROBE_STYLES, wardrobeStyle, mixStyles, COUNTER_TOP } from './catalog.js';
+import { lCounterDepth, lLegDepth, plantOf, WARDROBE_STYLES, wardrobeStyle, mixStyles, COUNTER_TOP, rodDrape } from './catalog.js';
 
 // 같은 지오메트리를 여러 메시가 scale만 바꿔 함께 쓴다 (disposeObject가 버리지 않는다)
 const geoCache = new Map();
@@ -311,15 +311,7 @@ function curtain(g, W, D, H, c) {
   box(g, W, railH, Math.min(D, 0.06), 0, H - railH / 2, z0 + Math.min(D, 0.06) / 2 + 0.01, mat('#e9e6e0', { roughness: 0.5 }));   // 레일
   const fabric = mat(c, { roughness: 0.95, side: THREE.DoubleSide });
   const depth = Math.min(D * 0.55, 0.07), zMid = z0 + Math.min(D, 0.06) + depth / 2 + 0.01, hang = top - 0.01;
-  /** x0~x1 폭에 주름진 천 한 폭 */
-  const panel = (x0, x1, material, z = zMid, amp = depth / 2) => {
-    const n = Math.max(2, Math.round((x1 - x0) / 0.07)), p = (x1 - x0) / n;
-    for (let i = 0; i < n; i++) {
-      const len = Math.hypot(p, amp * 2) + 0.004;   // 이웃 판과 끝이 맞물리게 조금 길게
-      const m = box(g, len, hang, 0.006, x0 + p * (i + 0.5), 0.01 + hang / 2, z, material);
-      m.rotation.y = Math.atan2(amp * 2, p) * (i % 2 ? 1 : -1);   // 번갈아 꺾어 지그재그 주름
-    }
-  };
+  const panel = (x0, x1, material, z = zMid, amp = depth / 2) => pleats(g, x0, x1, hang, z, amp, material);
   const side = Math.min(W * 0.22, 0.6);
   panel(-W / 2, -W / 2 + side, fabric);
   panel(W / 2 - side, W / 2, fabric);
@@ -328,6 +320,41 @@ function curtain(g, W, D, H, c) {
   const before = g.children.length;
   panel(-W / 2 + side * 0.6, W / 2 - side * 0.6, sheer, zMid - depth * 0.6, depth * 0.25);
   for (const m of g.children.slice(before)) m.castShadow = false;
+}
+
+/** x0~x1 폭에 주름진 천 한 폭 — 바닥 10mm 위에서 hang 높이까지, 얇은 판을 번갈아 꺾어 지그재그 주름 */
+function pleats(g, x0, x1, hang, z, amp, material) {
+  const n = Math.max(2, Math.round((x1 - x0) / 0.07)), p = (x1 - x0) / n;
+  for (let i = 0; i < n; i++) {
+    const len = Math.hypot(p, amp * 2) + 0.004;   // 이웃 판과 끝이 맞물리게 조금 길게
+    const m = box(g, len, hang, 0.006, x0 + p * (i + 0.5), 0.01 + hang / 2, z, material);
+    m.rotation.y = Math.atan2(amp * 2, p) * (i % 2 ? 1 : -1);
+  }
+}
+
+/**
+ * 커튼 봉: 벽과 벽 사이(가로 W)에 높이 H로 건 둥근 봉 + 양 끝 벽 브래킷(원판) + 고리. 깊이 D 가운데에 단다.
+ * f.drape(catalog.rodDrape): open 양옆으로 걷은 커튼 · closed 봉 전체를 덮은 커튼 · none 봉만. 천 색은 c.
+ */
+function curtainRod(g, W, D, H, c, f = {}) {
+  const r = 0.0125, y = H - 0.035, metal = METAL();
+  cylX(g, r, W, 0, y, 0, metal);
+  for (const s of [-1, 1]) {   // 벽 브래킷: 벽 면에 붙는 원판 + 봉을 받치는 짧은 통
+    cylX(g, 0.03, 0.008, s * (W / 2 - 0.004), y, 0, metal);
+    cylX(g, r + 0.006, 0.03, s * (W / 2 - 0.02), y, 0, metal);
+  }
+  const drape = rodDrape(f);
+  if (drape === 'none') return;
+  const fabric = mat(c, { roughness: 0.95, side: THREE.DoubleSide });
+  const hang = y - r - 0.03 - 0.01, amp = Math.min(D * 0.4, 0.035);
+  const parts = drape === 'closed' ? [[-W / 2 + 0.03, W / 2 - 0.03]]
+    : (() => { const s = Math.min(W * 0.2, 0.45); return [[-W / 2 + 0.03, -W / 2 + 0.03 + s], [W / 2 - 0.03 - s, W / 2 - 0.03]]; })();
+  const ring = mat('#9aa1ab', { metalness: 0.6, roughness: 0.35 });
+  for (const [x0, x1] of parts) {
+    pleats(g, x0, x1, hang, 0, amp, fabric);
+    const n = Math.max(2, Math.round((x1 - x0) / 0.1));
+    for (let i = 0; i <= n; i++) box(g, 0.006, 0.03, 0.03, x0 + ((x1 - x0) * i) / n, y - r - 0.015, 0, ring);   // 고리
+  }
 }
 
 function drawer(g, W, D, H, c) {
@@ -1011,7 +1038,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, curtain_rod: curtainRod, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, water_purifier: waterPurifier, box: plain,
 };
 
