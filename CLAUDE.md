@@ -220,6 +220,10 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   그 안의 가구(`syncFurniture`)·방 색 바닥·둘러보기 눈높이(`tour.applyCamera`)는 `view.floorAt(p)`만큼 함께 내려간다. 문틀 자리(벽 두께)는 문턱으로 남는다.
 - `view3d.setTourMode(true)`는 나무 바닥·천장 높이 벽·이름표 숨김으로 다시 그린다. 문짝·문 위 벽·천장·실내등은
   `Tour.group`에 따로 두고 나갈 때 치운다. 둘러보기 중 키 입력은 `tour.js`가 capture 단계에서 받고, `main.js` 단축키는 쉰다.
+- **도면 편집 화면 전체 화면**(`#btn-full`, 둘러보기 버튼 왼쪽): 보기 칸 `#views`에 `requestFullscreen` — 지금 보기(2D·나란히·3D) 그대로이고,
+  캔버스 크기는 ResizeObserver가 맞춘다. `📷 캡처`(`#btn-full-cap`)·`✕ 닫기`(`#btn-full-close`)는 `#views` 안 `.full-actions`(absolute)에 두고 CSS `.views:fullscreen`일 때만 보인다.
+  캡처(`captureViews`)는 보이는 2D·3D 캔버스를 화면 자리 그대로 한 장에 그리고, DOM인 3D 이름표(`.label3d`)는 계산된 스타일로 다시 그려 PNG로 받는다
+  (전체 화면에서는 상태줄이 안 보여 결과를 버튼 글자로 알린다).
 - **둘러보기 전체 화면**(안내판 `⛶ 전체 화면`·F): `view.el`(#view3d)에 `requestFullscreen` — 안내판이 그 안에 있어 함께 보이고, 크기는 ResizeObserver가 맞춘다.
   전체 화면이면 Esc는 전체 화면만 끄고, 나가기(`exit`)는 전체 화면도 끈다. 버튼 글자는 fullscreenchange와 요청 뒤(`toggleFull`) 둘 다에서 고친다(헤드리스는 이벤트가 안 온다).
 
