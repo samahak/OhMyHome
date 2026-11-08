@@ -15,7 +15,7 @@ run_ohmyhome.bat    # Windows
 작업 내용은 프로젝트 폴더의 `ohmyhome-project.json`에 저장되므로 localhost · IP 어느 주소, 어느 기기로 열어도 같은 작업이 보입니다.
 
 배포용 zip은 `./build_ohmyhome.sh`(Windows는 `build_ohmyhome.bat`)로 `dist/OhMyHome-<날짜>.zip`에 만듭니다.
-화면 파일·실행 스크립트·`sample/`의 json·사용 가이드 PDF(`docs/OhMyHome_Guide.pdf`, 공지사항 창이 내려받게 하는
+화면 파일·실행 스크립트·`sample/plan`·`sample/real`의 json·사용 가이드 PDF(`docs/OhMyHome_Guide.pdf`, 공지사항 창이 내려받게 하는
 `docs/OhMyHome_User_Guide.pdf`)·A1-real·A2-real 실측 기록지(`measure/55A1_measured.pdf` · `55A2_measured.pdf`)만 담고, 이 README와
 브라우저에 저장된 내 작업은 들어가지 않습니다. 가이드를 고치면 `docs/guide/make_pdf.sh`로 PDF를 다시 만드세요.
 
@@ -83,13 +83,15 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 
 ## 샘플 도면 (`sample/`)
 
+분양 도면 프로젝트는 `sample/plan/`, 그 2D·3D 그림은 `sample/png/`, 실측 도면(A1-real·A2-real)의 프로젝트와 그림은 `sample/real/`에 있습니다.
+
 | 파일 | 내용 |
 | --- | --- |
 | `55A2_plan_2d.png` | 55㎡ A-2형(확장형, 알파룸 옵션 벽) 2D 평면도 — 바깥 치수 체인과 방마다 가로×세로(벽 안쪽, mm) |
 | `55A2_plan_3d.png` | 같은 도면을 이 앱으로 세운 3D 화면 (벽 낮게 보기) |
 | `55A2_plan.ohmyhome.json` | 앱 왼쪽 `📂 도면 불러오기(json)`로 바로 여는 프로젝트 (축척 1px = 5mm, 벽·창·욕실/주방 설비 입력 완료) |
 | `55A2-real_plan*` | 55㎡ A-2형 실측 도면(A2-real) — 2026.11.07 현장 실측(`measure/55A2_measured.pdf`)대로 칸막이 벽을 옮긴 2D·3D와 프로젝트 (현관창고·펜트리를 합친 대형 팬트리 + 양여닫이 문, ㄱ자 싱크대(조리대 600 · 주방 선반 740)·냉장고장(위 가벽 50 · 아래 가벽 100), 거실·침실1 큰 창 · 침실2·알파룸 높은 창(창 아래 바닥에서 1,220 · 1,200). 2026.11.08 다시 잰 현관(신발장 묻힌 벽 500 + 신발장 앞 1,100)·드레스룸 꺾임 600·실외기실 벽 1,310·거실 세로 4,020 반영) |
-| `55A1-real_plan*` | 55㎡ A-1형 실측 도면(A1-real) — 실측값(mm, 기록지 `measure/55A1_measured.pdf` — A-2형 기록지를 좌우로 뒤집어 적은 것, 받은 실측 그림 원본은 `measure/backup/`)대로 그린 2D·3D와 프로젝트 (침실1 붙박이장(깊이 600) · 드레스룸 통로 710, 펜트리 1,300 · 현관창고 860, ㄱ자 싱크대(조리대 600 · 꺾인 쪽 700, 개수대는 발코니 쪽)·냉장고장 1,100 · 1,050(위 가벽 50 · 아래 가벽 100 — A2-real 참고), 거실·침실1 바닥~천장 창 · 드레스룸 창 높이 1,300 · 침실2·알파룸 창 아래 바닥에서 1,220 · 1,200). 실측이 없는 곳은 A2-real을 좌우로 뒤집어 썼다 |
+| `55A1-real_plan*` | 55㎡ A-1형 실측 도면(A1-real) — 실측값(mm, 기록지 `measure/55A1_measured.pdf` — A-2형 기록지를 좌우로 뒤집어 적은 것)대로 그린 2D·3D와 프로젝트 (침실1 붙박이장(깊이 600) · 드레스룸 통로 710, 펜트리 1,300 · 현관창고 860, ㄱ자 싱크대(조리대 600 · 꺾인 쪽 700, 개수대는 발코니 쪽)·냉장고장 1,100 · 1,050(위 가벽 50 · 아래 가벽 100 — A2-real 참고), 거실·침실1 바닥~천장 창 · 드레스룸 창 높이 1,300 · 침실2·알파룸 창 아래 바닥에서 1,220 · 1,200). 실측이 없는 곳은 A2-real을 좌우로 뒤집어 썼다 |
 | `55A1_plan_2d.png` | A-2형을 좌우로 뒤집은 55㎡ A-1형 2D 평면도 (분양 안내 사진과 같은 방향) |
 | `55A1_plan_3d.png` | 같은 A-1형 도면을 이 앱으로 세운 3D 화면 (벽 낮게 보기) |
 | `55A1_plan.ohmyhome.json` | A-1형 프로젝트 — 벽·창·설비·현관문·기준 치수까지 A-2형을 좌우 반전한 것 |
@@ -153,8 +155,8 @@ js/doors.js           문 자동 찾기 (도면의 여닫이 문 기호)
 js/scenery.js         둘러보기 창밖 풍경 (층수 · 도로 · 아파트 · 산)
 js/xlsx.js            가구 목록 엑셀(.xlsx) 쓰기
 js/pdf.js             2D·3D 캡처 PDF 쓰기
-sample/               위례자이더파크 예시 세대 도면 (json · 2D · 3D 그림)
-measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf), backup/ 받은 실측 그림 원본(배포 zip에는 넣지 않음)
+sample/               위례자이더파크 예시 세대 도면 — plan/ json · png/ 2D · 3D 그림 · real/ 실측 도면(json · 그림)
+measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf)
 docs/                 사용 가이드 PDF와 원본(docs/guide)
 serve.py              정적 파일 서버 (기본 포트 8190) + 작업 저장(/api/project → ohmyhome-project.json)
 build_ohmyhome.sh     배포 zip 만들기 (.bat은 Windows)

@@ -1516,20 +1516,21 @@ $('file-project').addEventListener('change', async (e) => {
   }
 });
 // 위례자이더파크 불러오기 — sample 폴더의 도면을 팝업에서 골라 연다.
-// 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. sample에 json을 더하면 여기에도 더한다
+// 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. file은 sample/ 아래 경로 — 분양 도면 plan/, 실측 도면 real/
+// (그림은 png/·real/에 있고 앱은 쓰지 않는다). sample에 json을 더하면 여기에도 더한다
 const XI_PARK_SAMPLES = [
-  { file: '55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
+  { file: 'plan/55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
   // sheet: 그 형의 실측 기록지 PDF(있는 형만) — 고르는 창에 내려받기 링크를 단다
-  { file: '55A1-real_plan.ohmyhome.json', name: '55㎡ A-1형 실측 (A1-real)', sheet: 'measure/55A1_measured.pdf' },
-  { file: '55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
-  { file: '55A2-real_plan.ohmyhome.json', name: '55㎡ A-2형 실측 (A2-real)', sheet: 'measure/55A2_measured.pdf' },
-  { file: '55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
-  { file: '55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
-  { file: '55C_plan.ohmyhome.json', name: '55㎡ C형' },
-  { file: '55D_plan.ohmyhome.json', name: '55㎡ D형' },
+  { file: 'real/55A1-real_plan.ohmyhome.json', name: '55㎡ A-1형 실측 (A1-real)', sheet: 'measure/55A1_measured.pdf' },
+  { file: 'plan/55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
+  { file: 'real/55A2-real_plan.ohmyhome.json', name: '55㎡ A-2형 실측 (A2-real)', sheet: 'measure/55A2_measured.pdf' },
+  { file: 'plan/55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
+  { file: 'plan/55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
+  { file: 'plan/55C_plan.ohmyhome.json', name: '55㎡ C형' },
+  { file: 'plan/55D_plan.ohmyhome.json', name: '55㎡ D형' },
 ];
 $('sample-list').innerHTML = XI_PARK_SAMPLES.map((s, i) => `<label><input type="radio" name="xi-sample" value="${i}"${i ? '' : ' checked'}>`
-  + `<span>${s.name}</span><small>${s.file}</small>`
+  + `<span>${s.name}</span><small>${s.file.split('/').pop()}</small>`
   + (s.sheet ? `<a class="sample-sheet" href="${s.sheet}" download="${s.sheet.split('/').pop()}" title="현장 실측 치수를 적은 기록지(PDF)를 내려받습니다">📄 실측 기록지</a>` : '')
   + '</label>').join('');
 // 실측 기록지 링크를 눌러도 그 줄이 골라지거나(라벨) 두 번 눌림으로 도면이 열리지 않게
@@ -1751,7 +1752,7 @@ $('notice-dialog').addEventListener('close', () => {
   const v = $('notice-dialog').returnValue;
   const real = { real: '55A2-real', 'real-a1': '55A1-real' }[v];
   if (real) {   // 새 소식의 'A2-real · A1-real 고르러 가기': 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
-    const i = XI_PARK_SAMPLES.findIndex((s) => s.file.startsWith(real));
+    const i = XI_PARK_SAMPLES.findIndex((s) => s.file.split('/').pop().startsWith(`${real}_`));
     const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
     if (r) r.checked = true;
     $('sample-dialog').showModal();
