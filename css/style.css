@@ -95,7 +95,15 @@ input.plan-name:focus { outline: none; border-color: var(--accent); background: 
 }
 @media (prefers-reduced-motion: reduce) { .new-badge, .new-badge::after { animation: none; } }
 
-.layout { flex: 1; display: flex; min-height: 0; }
+.layout { flex: 1; display: flex; min-height: 0; position: relative; }
+/* 둘러보기 중 편집 잠금 — 잠근 곳(inert)은 흐리게, 왼쪽 위에 안내 */
+body.touring .sidebar, body.touring .props, body.touring .stage-bar,
+body.touring #plan-name, body.touring #btn-undo, body.touring #btn-redo, body.touring #btn-new { opacity: .4; filter: grayscale(.5); }
+.tour-lock {
+  position: absolute; left: 14px; top: 56px; width: 282px; z-index: 6; padding: 10px 12px; border-radius: 10px;
+  background: #1f2833; color: #fff; font-weight: 700; box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+.tour-lock small { display: block; margin-top: 4px; font-weight: 500; color: #c9d2de; }
 
 /* 왼쪽 */
 .sidebar {
