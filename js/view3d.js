@@ -549,7 +549,10 @@ export class View3D {
 
   pickFurniture(e) {
     this.raycaster.setFromCamera(this.ndc(e), this.camera);
-    const hit = this.raycaster.intersectObjects(this.furnGroup.children, true).find((h) => h.object.isMesh);
+    // 겹쳐 있으면 기본 포함이 아닌 가구를 먼저 (냉장고장 안 냉장고, 붙박이장 앞 가구 등)
+    const hits = this.raycaster.intersectObjects(this.furnGroup.children, true).filter((h) => h.object.isMesh && h.object.userData.fid);
+    const builtin = new Set(state.furniture.filter((f) => f.builtin).map((f) => f.id));
+    const hit = hits.find((h) => !builtin.has(h.object.userData.fid)) || hits[0];
     return hit ? hit.object.userData.fid : null;
   }
 

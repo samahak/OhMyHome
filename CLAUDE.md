@@ -96,7 +96,8 @@ state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, 
                 style: 'double'(양여닫이) | 'sliding'(미닫이) | 'bypass'(미서기) | 'middle'(현관 중문), 없으면 여닫이(`doorStyle(d)`). 미닫이·중문의 swing은 문짝이 붙는 벽 면, a는 열리는 쪽
 state.furniture { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto, model?, price? }
   model, price   사용자가 넣은 모델명·가격(원, 정수). 없으면 키가 없다. 합계는 price 있는 것만 더한다
-  builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다. 2D는 바닥 모양 안에 45° 빗금(`editor.hatch`)
+  builtin        '기본 포함 가구'(집에 딸려 오는 것)면 true, 아니면 키가 없다. 가격이 있어도 합계(`sumPrice`)에서 뺀다. 2D는 바닥 모양 안에 45° 빗금(`editor.hatch`)이고 다른 가구보다 먼저(맨 뒤에) 그린다.
+                 겹친 곳을 누르면 기본 포함이 아닌 가구를 먼저 고른다(2D `editor.hitFurniture`, 3D `view.pickFurniture`)
   disabled       '비활성화'(지우지 않고 잠시 빼 둔 것)면 true. 2D 점선·연한 색, 3D `setGhost`, 겹침(`findCollisions`)·둘러보기 길(`buildGrid`)·
                  합계·개수(`excluded()`)에서 뺀다. 엑셀 '모든 가구'에서는 기본 가구와 함께 합계 아래에 모은다
   custom         '맞춤 제작'(기성품 아님 — 크기·비용이 다를 수 있음)이면 true. 합계에는 그대로 들고, 2D 치수 아래 `🛠️ 맞춤` 꼬리표(`editor.customTag`),

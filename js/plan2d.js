@@ -188,12 +188,16 @@ export class PlanEditor {
   }
 
   /* ---------- 찾기 ---------- */
+  /** 누른 점의 가구 — 겹쳐 있으면 기본 포함이 아닌 가구를 먼저 고른다(기본 포함 가구는 맨 뒤에 그린다) */
   hitFurniture(p) {
+    let back = null;
     for (let i = state.furniture.length - 1; i >= 0; i--) {
       const f = state.furniture[i];
-      if (G.furnitureParts(f).some((poly) => G.pointInPoly(p, poly))) return f;
+      if (!G.furnitureParts(f).some((poly) => G.pointInPoly(p, poly))) continue;
+      if (!f.builtin) return f;
+      back ??= f;
     }
-    return null;
+    return back;
   }
   hitWall(p) {
     const tol = 4 / this.view.s;
@@ -546,7 +550,8 @@ export class PlanEditor {
 
     // 가구
     this.collisions = G.findCollisions(state.furniture, plan.walls, plan.blocked);
-    const sorted = [...state.furniture].sort((a, b) => a.elev - b.elev);
+    // 기본 포함 가구를 맨 뒤(먼저)에, 그다음 띄운 높이 순
+    const sorted = [...state.furniture].sort((a, b) => !!b.builtin - !!a.builtin || a.elev - b.elev);
     for (const f of sorted) this.drawFurniture(f, isFurnitureSelected(f.id), this.collisions.has(f.id));
 
     this.drawTool();
