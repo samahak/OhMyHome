@@ -216,7 +216,8 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .notice-warn { padding: 8px 10px; border-radius: 8px; background: #fff6ef; color: #8a3d0a; font-size: 12px; }
 .notice-guide { margin: 4px 0 12px; text-decoration: none; }
 /* 아래 버튼 줄은 위 내용(새 소식 칸)과 띄우고 가는 줄로 나눈다 */
-.notice-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.notice-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.notice-actions .notice-hide { margin: 0 auto 0 0; cursor: pointer; }
 .sample-dialog { width: min(440px, calc(100vw - 32px)); }
 .sample-dialog h3 { margin: 0 0 4px; font-size: 15px; }
 .sample-list { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; max-height: 50vh; overflow: auto; }
