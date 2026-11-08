@@ -87,7 +87,12 @@ sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B
 ### 상태 (`store.js`)
 
 ```
-state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], blocked[], wallHeight, floor, fixtures[] }
+state.plan      { name, image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], blocked[], wallHeight, floor, fixtures[] }
+  name          도면 이름('' 가능). 상단 되돌리기 왼쪽 입력칸 `#plan-name`(`renderPlanName`, 바꾸면 checkpoint + 'plan')에서 고치고, 저장(.json) 파일 이름
+                `ohmyhome-{이름}-{날짜}.json`(`fileSafe`, 이름이 없으면 `ohmyhome-{날짜}.json`)과 창 제목에 쓴다. 위례자이더파크 창으로 열면 고른 이름,
+                json 파일은 파일 안 이름 → 없으면 파일 이름에서 짐작(`nameFromFile`), 도면만 바꾸기도 같다. 샘플 도면은 '샘플 도면', 새 프로젝트는 ''.
+                날짜뿐인 이름(`DATE_ONLY` — 연도 19xx·20xx + 월 + 일, 뒤 `(1)` 허용. 파일 이름 `ohmyhome-2026-11-08 (1).json` 등, 파일 안 이름, 직접 넣은 이름, 지난 작업)은
+                `planNameOr()`가 'NewHome'으로 바꾼다. 동·호수(5206-1401) 같은 숫자 이름은 그대로 둔다
   scaleRef      { a, b, mm } | null — 축척을 맞춘 기준 치수선 (2D에 주황 점선으로 그린다)
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
   room          { id, name, pts:[{x,y}], hidden? }

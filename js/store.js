@@ -14,6 +14,7 @@ const HISTORY_LIMIT = 60;
 export function freshState() {
   return {
     plan: {
+      name: '',             // 도면 이름 — 상단 되돌리기 왼쪽에 보이고 고칠 수 있다. 저장 파일 이름(ohmyhome-{이름}-{날짜}.json)에 쓴다
       image: null,          // { src(dataURL), width, height } — 픽셀
       mmPerPx: 10,          // 이미지 1px이 몇 mm인지
       scaleSet: false,      // 사용자가 축척을 직접 맞췄는지
