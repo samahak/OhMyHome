@@ -115,6 +115,32 @@ export const PLANTS = {
 };
 export function plantOf(f) { return PLANTS[f?.plant] ? f.plant : 'monstera'; }
 
+/**
+ * 붙박이장/옷장 모양 — 가구 항목에 f.wstyle(키, 없으면 'tall' = 통 옷장)로 남는다. f.noDoor면 문 없이 안이 보이는 오픈형.
+ *   tall: 위아래 통 문짝 · split: 위 짧은 문 + 아래 긴 문(상하 분리형) · drawer2/drawer3: 아래 2단·3단 서랍 + 위 문
+ *   fridge: 냉장고장 — 위 짧은 장만 있고 아래는 바닥까지 비어 냉장고를 넣는다(냉장고·김치냉장고와 겹쳐도 된다)
+ *   mix: 믹스장 — 가로를 약 900mm 칸(mixCount)으로 나눠 칸마다 통·분리형·서랍형을 섞는다. 칸별 모양은 f.mix(왼쪽부터, 없으면 MIX_DEFAULT 차례)
+ * 3D 모양은 models3d.js의 wardrobe().
+ */
+export const WARDROBE_STYLES = {
+  tall: { label: '통 (위아래 한 문짝)' },
+  split: { label: '분리형 (위·아래 문)' },
+  drawer2: { label: '2단 서랍형', drawers: 2 },
+  drawer3: { label: '3단 서랍형', drawers: 3 },
+  fridge: { label: '냉장고장 (아래 바닥까지 트임)' },
+  mix: { label: '믹스장 (칸마다 다른 모양)' },
+};
+export function wardrobeStyle(f) { return WARDROBE_STYLES[f?.wstyle] ? f.wstyle : 'tall'; }
+/** 믹스장 한 칸에 쓸 수 있는 모양 (냉장고장·믹스장 빼고) */
+export const MIX_PARTS = ['tall', 'split', 'drawer2', 'drawer3'];
+const MIX_DEFAULT = ['tall', 'drawer3', 'split', 'drawer2'];
+/** 믹스장 칸 수 — 가로 약 900mm마다 한 칸, 적어도 두 칸 */
+export function mixCount(w) { return Math.max(2, Math.round(w / 900)); }
+/** 믹스장 칸별 모양(왼쪽부터) — f.mix에 없거나 맞지 않는 칸은 기본 차례로 채운다 */
+export function mixStyles(f) {
+  return Array.from({ length: mixCount(f.w) }, (_, i) => (MIX_PARTS.includes(f.mix?.[i]) ? f.mix[i] : MIX_DEFAULT[i % MIX_DEFAULT.length]));
+}
+
 /** 문 높이(mm) — 3D에서 문 위로는 천장까지 벽을 채운다 */
 export const DOOR = { h: 2100 };
 

@@ -184,7 +184,11 @@ const OVERLAP_OK = new Set([['desk', 'shelf'], ['bath_shelf', 'bath_upper_shelf'
 const OVERLAP_ANY = new Set(['curtain']);
 /** 벽과 겹쳐 놓아도 되는 종류 (커튼은 창틀·벽 안쪽에 걸쳐 단다) */
 const WALL_OK = new Set(['curtain']);
-const overlapOk = (a, b) => OVERLAP_ANY.has(a.type) || OVERLAP_ANY.has(b.type) || OVERLAP_OK.has([a.type, b.type].sort().join('|'));
+/** 냉장고장(옷장 모양 wstyle 'fridge')의 빈 아래 칸에 넣어도 되는 종류 */
+const IN_FRIDGE_CABINET = new Set(['fridge_side', 'fridge_top', 'kimchi', 'kimchi_stand']);
+const inFridgeCabinet = (w, x) => w.type === 'wardrobe' && w.wstyle === 'fridge' && IN_FRIDGE_CABINET.has(x.type);
+const overlapOk = (a, b) => OVERLAP_ANY.has(a.type) || OVERLAP_ANY.has(b.type) || OVERLAP_OK.has([a.type, b.type].sort().join('|'))
+  || inFridgeCabinet(a, b) || inFridgeCabinet(b, a);
 
 /** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
 export function findCollisions(furniture, walls) {

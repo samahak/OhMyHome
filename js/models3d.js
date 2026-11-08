@@ -1,7 +1,7 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
-import { lCounterDepth, lLegDepth, plantOf } from './catalog.js';
+import { lCounterDepth, lLegDepth, plantOf, WARDROBE_STYLES, wardrobeStyle, mixStyles } from './catalog.js';
 
 // 같은 지오메트리를 여러 메시가 scale만 바꿔 함께 쓴다 (disposeObject가 버리지 않는다)
 const geoCache = new Map();
@@ -121,18 +121,138 @@ function topWasher(g, W, D, H, c) {
   box(g, W, H - bodyH, D * 0.2, 0, bodyH + (H - bodyH) / 2, -D / 2 + D * 0.1, mat(shade(c, 0.82)));
 }
 
-function wardrobe(g, W, D, H, c) {
-  box(g, W, H, D, 0, H / 2, 0, mat(c, { roughness: 0.55 }));
-  const f = D / 2, base = 0.07;
-  box(g, W * 0.995, base, 0.01, 0, base / 2, f - 0.004, mat(shade(c, 0.75)));
-  const n = Math.max(1, Math.round(W / 0.55));
-  const dw = W / n, groove = GROOVE(), metal = METAL();
-  for (let i = 1; i < n; i++) box(g, 0.006, H - base, 0.004, -W / 2 + dw * i, base + (H - base) / 2, f + 0.002, groove);
+/** 막대(옷걸이 봉)를 x축 방향으로 */
+function cylX(g, r, len, x, y, z, material) {
+  const m = new THREE.Mesh(sharedGeo('cyl16', () => new THREE.CylinderGeometry(1, 1, 1, 16)), material);
+  m.scale.set(r, len, r);
+  m.rotation.z = Math.PI / 2;
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  g.add(m);
+  return m;
+}
+
+const CLOTHES = ['#3d4a5c', '#c9b79c', '#7a8b99', '#e8e2d6', '#5b6e58', '#9c5a4a', '#2e2e33', '#b7c4cf', '#d8a7a0'];
+
+/**
+ * 붙박이장/옷장. f.wstyle(catalog.WARDROBE_STYLES): 통 · 분리형(위 짧은 문 + 아래 긴 문) · 2단/3단 서랍형(아래 서랍 + 위 문) ·
+ * 믹스장(칸마다 위 모양 가운데 하나, catalog.mixStyles) · 냉장고장(fridgeCabinet).
+ * f.noDoor면 문 없이 옆판·칸막이·뒤판만 두고 안에 선반·옷걸이 봉·걸린 옷을 보인다(서랍은 그대로).
+ * 냉장고장(fridge): 옆판 + 위 짧은 장(문 또는 문 없으면 선반 칸)만 있고, 아래는 바닥판·걸레받이·뒤판 없이 바닥까지 트여 있다.
+ */
+function wardrobe(g, W, D, H, c, f = {}) {
+  const style = wardrobeStyle(f);
+  const body = mat(c, { roughness: 0.55 });
+  if (style === 'fridge') { fridgeCabinet(g, W, D, H, body, !!f.noDoor); return; }
+  const k = { g, D, H, fz: D / 2, base: 0.07, t: 0.018, body, groove: GROOVE(), metal: METAL(), seed: 0 };
+  k.dh = Math.min(0.22, (H - k.base) * 0.12);   // 서랍 한 단 높이
+  // 칸: 믹스장은 칸마다 모양이 다르고, 나머지는 가로 전체가 한 칸
+  const parts = style === 'mix' ? mixStyles({ ...f, w: W * 1000 }) : [style];
+  const sw = W / parts.length, secs = parts.map((st, i) => ({ st, x0: -W / 2 + sw * i, x1: -W / 2 + sw * (i + 1) }));
+  box(g, W * 0.995, k.base, 0.01, 0, k.base / 2, k.fz - 0.004, mat(shade(c, 0.75)));   // 걸레받이
+
+  if (!f.noDoor) {
+    box(g, W, H, D, 0, H / 2, 0, body);
+    for (let i = 1; i < secs.length; i++) box(g, 0.008, H - k.base, 0.004, secs[i].x0, k.base + (H - k.base) / 2, k.fz + 0.002, k.groove);   // 칸 경계
+    for (const s of secs) closedSection(k, s.x0, s.x1, s.st);
+    return;
+  }
+  // 문 없는 오픈형: 옆판·윗판·바닥·뒤판 + 칸 경계마다 칸막이
+  const { t, base, fz } = k;
+  for (const s of [-1, 1]) box(g, t, H, D, s * (W / 2 - t / 2), H / 2, 0, body);
+  box(g, W, t, D, 0, H - t / 2, 0, body);
+  box(g, W - 2 * t, base, D * 0.98, 0, base / 2, -0.006, mat(shade(c, 0.75)));
+  box(g, W - 2 * t, H - base, 0.008, 0, base + (H - base) / 2, -fz + 0.004, mat(shade(c, 0.9), { roughness: 0.6 }));
+  k.cloth = CLOTHES.map((x) => mat(x, { roughness: 0.9 }));
+  for (let i = 1; i < secs.length; i++) box(g, t, H - base - t, D * 0.98, secs[i].x0, base + (H - base - t) / 2, 0, body);
+  for (const s of secs) openSection(k, s.x0, s.x1, s.st);
+}
+
+/** 서랍: [x0, x1]을 cols칸 × nd단으로, 앞면 홈과 가로 손잡이 */
+function wardrobeDrawers(k, x0, x1, nd, cols) {
+  const { g, base, dh, fz, groove, metal } = k, w = x1 - x0, cw = w / cols, cx = (x0 + x1) / 2;
+  for (let n = 1; n <= nd; n++) box(g, w * 0.98, 0.006, 0.004, cx, base + dh * n, fz + 0.002, groove);
+  for (let j = 1; j < cols; j++) box(g, 0.006, nd * dh, 0.004, x0 + cw * j, base + nd * dh / 2, fz + 0.002, groove);
+  for (let j = 0; j < cols; j++) {
+    for (let n = 0; n < nd; n++) box(g, Math.min(0.24, cw * 0.35), 0.015, 0.02, x0 + cw * (j + 0.5), base + dh * (n + 0.55), fz + 0.012, metal);
+  }
+}
+
+/** 문 달린 칸 하나 [x0, x1]: 문짝 홈·손잡이(분리형은 위아래), 서랍형은 아래 서랍 */
+function closedSection(k, x0, x1, st) {
+  const { g, H, base, dh, fz, groove, metal } = k, w = x1 - x0;
+  const nd = WARDROBE_STYLES[st].drawers || 0, drawTop = base + nd * dh;
+  const splitY = st === 'split' ? H - Math.min(0.6, H * 0.26) : null;
+  const n = Math.max(1, Math.round(w / 0.55)), dw = w / n;
+  for (let i = 1; i < n; i++) box(g, 0.006, H - drawTop, 0.004, x0 + dw * i, drawTop + (H - drawTop) / 2, fz + 0.002, groove);
+  if (splitY) box(g, w * 0.98, 0.006, 0.004, (x0 + x1) / 2, splitY, fz + 0.002, groove);
   for (let i = 0; i < n; i++) {
-    const left = -W / 2 + dw * i;
+    const left = x0 + dw * i;
     // 문 두 짝이 마주 보는 쪽에 손잡이를 단다
-    const hx = i % 2 === 0 ? left + dw - 0.04 : left + 0.04;
-    box(g, 0.018, Math.min(0.5, H * 0.25), 0.025, n === 1 ? left + dw - 0.04 : hx, H * 0.5, f + 0.015, metal);
+    const hx = n === 1 || i % 2 === 0 ? left + dw - 0.04 : left + 0.04;
+    if (splitY) {
+      const hl = Math.min(0.4, (splitY - drawTop) * 0.25);
+      box(g, 0.018, hl, 0.025, hx, Math.min(1.05, (splitY + drawTop) / 2), fz + 0.015, metal);   // 아래 긴 문
+      box(g, 0.018, 0.14, 0.025, hx, splitY + 0.1, fz + 0.015, metal);                           // 위 짧은 문(아래쪽에)
+    } else {
+      const hl = Math.min(0.5, (H - drawTop) * 0.25);
+      box(g, 0.018, hl, 0.025, hx, Math.max(drawTop + hl / 2 + 0.08, Math.min(H * 0.5, drawTop + (H - drawTop) * 0.45)), fz + 0.015, metal);
+    }
+  }
+  if (nd) wardrobeDrawers(k, x0, x1, nd, n >= 2 ? Math.floor(n / 2) : 1);
+}
+
+/** 문 없는 칸 하나 [x0, x1]: 아래 서랍, 맨 위 선반 + 갠 옷, 옷걸이 봉(분리형은 위아래 두 줄) + 걸린 옷. 900mm마다 칸막이 */
+function openSection(k, x0, x1, st) {
+  const { g, D, H, base, dh, t, body, cloth } = k;
+  const nd = WARDROBE_STYLES[st].drawers || 0, drawTop = base + nd * dh;
+  const cols = Math.max(1, Math.round((x1 - x0) / 0.9)), cw = (x1 - x0) / cols, cx = (x0 + x1) / 2, iw = x1 - x0 - t;
+  for (let i = 1; i < cols; i++) box(g, t, H - base - t, D * 0.98, x0 + cw * i, base + (H - base - t) / 2, 0, body);
+  if (nd) { box(g, iw, nd * dh, D, cx, base + nd * dh / 2, 0, body); wardrobeDrawers(k, x0 + t / 2, x1 - t / 2, nd, cols); }
+  const topY = H - Math.min(0.32, H * 0.15), midY = (drawTop + topY) / 2;
+  const rods = st === 'split'
+    ? [{ y: topY - 0.06, bottom: midY + 0.03 }, { y: midY - 0.03, bottom: drawTop + 0.08 }]
+    : [{ y: topY - 0.06, bottom: drawTop + (nd ? 0.1 : 0.25) }];
+  if (st === 'split') box(g, iw, t, D * 0.96, cx, midY + 0.01, 0, body);   // 위·아래 칸 사이 선반
+  box(g, iw, t, D * 0.96, cx, topY, 0, body);
+  const metal = METAL();
+  for (let j = 0; j < cols; j++) {
+    const a = x0 + cw * j + t, b = a + cw - 2 * t;
+    // 선반 위 갠 옷 상자 두 더미
+    for (const [m, fx] of [[0, 0.27], [1, 0.73]]) {
+      const bw = Math.min(0.32, (b - a) * 0.36), bh = Math.min(0.12, (H - topY - t) * 0.45);
+      if (bh > 0.03) for (let l = 0; l < 2; l++) box(g, bw, bh * 0.9, D * 0.6, a + (b - a) * fx, topY + t / 2 + bh * (l + 0.45), 0.02, cloth[(k.seed + m * 2 + l + 4) % cloth.length]);
+    }
+    for (const r of rods) {
+      cylX(g, 0.012, b - a, (a + b) / 2, r.y, 0, metal);
+      const len = r.y - 0.04 - r.bottom;
+      if (len < 0.15) continue;
+      const m = Math.max(1, Math.floor((b - a - 0.08) / 0.07));
+      for (let i = 0; i < m; i++) {
+        k.seed++;
+        const l = len * (0.62 + 0.38 * (((k.seed * 37) % 7) / 6));
+        box(g, 0.03, l, D * 0.7, a + 0.06 + ((b - a - 0.12) * (i + 0.5)) / m, r.y - 0.03 - l / 2, 0, cloth[(k.seed * 5) % cloth.length]);
+      }
+    }
+  }
+}
+
+/** 냉장고장: 양 옆판 + 위 장(높이 300~600mm, 냉장고 자리 1.89m를 남긴다 — A1-real 실측). 아래는 바닥까지 비운다 */
+function fridgeCabinet(g, W, D, H, body, open) {
+  const t = 0.018, fz = D / 2, top = Math.max(0.3, Math.min(0.6, H - 1.89)), y0 = H - top;
+  for (const s of [-1, 1]) box(g, t, H, D, s * (W / 2 - t / 2), H / 2, 0, body);
+  if (open) {   // 문 없는 위 칸: 윗판·밑판·뒤판만
+    box(g, W - 2 * t, t, D, 0, H - t / 2, 0, body);
+    box(g, W - 2 * t, t, D, 0, y0 + t / 2, 0, body);
+    box(g, W - 2 * t, top, 0.008, 0, y0 + top / 2, -fz + 0.004, mat(body.color.clone().multiplyScalar(0.9)));
+    return;
+  }
+  box(g, W - 2 * t, top, D, 0, y0 + top / 2, 0, body);
+  const n = Math.max(1, Math.round((W - 2 * t) / 0.55)), dw = (W - 2 * t) / n, groove = GROOVE(), metal = METAL();
+  for (let i = 1; i < n; i++) box(g, 0.006, top, 0.004, -W / 2 + t + dw * i, y0 + top / 2, fz + 0.002, groove);
+  for (let i = 0; i < n; i++) {
+    const left = -W / 2 + t + dw * i, hx = n === 1 || i % 2 === 0 ? left + dw - 0.04 : left + 0.04;
+    box(g, 0.018, Math.min(0.14, top * 0.4), 0.025, hx, y0 + 0.1, fz + 0.015, metal);   // 문 아래쪽 손잡이
   }
 }
 

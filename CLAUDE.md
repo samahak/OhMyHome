@@ -315,6 +315,12 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   기본값으로 맞추고, 이름이 종류 이름이었으면 이름도 바꾼다. `f.color`는 화분 색(2D는 잎 색으로 칠한다). 3D는 `models3d.PLANT_SHAPES`의
   종류별 함수가 `leaf()`(납작한 타원)·`rod()`(줄기)로 그리고, 고정 씨앗 난수라 다시 그려도 모양이 같다. 스킨답서스 덩굴은 바닥을 뚫지 않게
   `f.elev`만큼만 늘어지므로 `syncFurniture()` key에 식물의 elev가 들어간다. 잎·줄기 지오메트리는 `sharedGeo()`로 함께 쓴다.
+- **붙박이장/옷장(`wardrobe`)**: 모양은 `f.wstyle`(`catalog.WARDROBE_STYLES` 키 — `split` 상하 분리형, `drawer2`·`drawer3` 아래 서랍, 없으면 통 `tall`
+  — `wardrobeStyle()`), `f.noDoor`면 문짝 없이 옆판·칸막이·뒤판 + 선반·옷걸이 봉·걸린 옷(오픈형, 서랍은 그대로).
+  `mix` 믹스장은 가로를 `catalog.mixCount(w)`(약 900mm, 두 칸 이상) 칸으로 나눠 칸마다 `MIX_PARTS` 모양 — 칸별 모양은 `f.mix`(왼쪽부터, `mixStyles(f)`가
+  모자란 칸을 기본 차례로 채운다). 3D는 칸마다 `closedSection`/`openSection`, 속성은 칸별 `mix-i` 선택(가로·모양을 바꾸면 `renderProps`).
+  `fridge` 냉장고장은 `fridgeCabinet()` — 옆판 + 위 장(300~600mm, 냉장고 자리 1.89m — A1-real 실측)만, 아래는 바닥판·걸레받이·뒤판 없이 바닥까지 트인다.
+  기본값(통·문 있음)은 키를 남기지 않는다.
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
 - 박스·구·원기둥 지오메트리는 `sharedGeo()`로 하나씩 공유하고 `scale`로 키운다. `disposeObject()`는 공유 지오메트리를 버리지 않는다.
 - 사진 텍스처는 `library` id별로 캐시한다. `'library'` 이벤트가 나면 캐시를 비우고 전부 다시 만든다.
@@ -359,7 +365,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠
   (`CHAIR_BACK_MM`, 의자 로컬 -y 쪽)가 책상과 겹칠 때만 겹침이다. 앉는 면이 상판 밑으로 못 들어가는 낮은 테이블은 평소대로 잰다.
   겹쳐 놓아도 되는 종류 짝은 `OVERLAP_OK`(지금은 책상·책장 — 책상 책장, 욕실 철제 선반·욕실 상부 선반)에, 어떤 가구와도 겹쳐도 되는 종류는 `OVERLAP_ANY`(커튼)에,
-  벽과 겹쳐도 되는 종류는 `WALL_OK`(커튼)에 더한다.
+  벽과 겹쳐도 되는 종류는 `WALL_OK`(커튼)에 더한다. 냉장고장(`wstyle: 'fridge'`) 안에 넣어도 되는 종류는 `IN_FRIDGE_CABINET`(냉장고·김치냉장고)다.
   그 밖의 벽과의 겹침은 그대로 잰다.
 - 그리기 도구는 켜진 버튼을 다시 누르거나 Esc(그리던 것 취소 → 도구 끄기 → 선택 해제 순)로 끈다. 목록·3D·샘플 가구에서 가구를
   누르면 `endDrawTool()`로 끈다 — 이미 고른 가구를 다시 누르면 'selection' 이벤트가 안 나므로 누르는 곳에서 직접 부른다.
