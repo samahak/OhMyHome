@@ -9,7 +9,7 @@ import { buildGrid, isFree, nearestFree, findPath, roomCenters, orderByWalk, cle
 import { innerBox } from './fixtures.js';
 import { buildScenery } from './scenery.js';
 import { DOOR } from './catalog.js';
-import { setGhost } from './models3d.js';
+import { setGhost, buildSteelDoor, STEEL_DOOR } from './models3d.js';
 
 const M = 0.001;
 const EYE = 1.55;          // 눈높이 m
@@ -22,7 +22,6 @@ const PITCH_OUT = -0.04;   // 현관 밖에서 시선 (거의 정면 — 현관�
 const PITCH_WALK = -0.14;  // 집 안에서 걸을 때 시선 (약 8° 아래)
 const PITCH_LOOK = -0.24;  // 들른 곳에서 둘러볼 때 시선 (약 14° 아래 — 바닥에 놓인 가구가 화면 가운데쯤 오게)
 const DOOR_H = DOOR.h * M;  // 문 높이 m
-const ENTRY_T = 0.08;      // 현관문 문짝 두께 m (방화문이라 방문보다 두껍게)
 const COFFER_INSET = 450;  // 우물천장: 벽에서 안쪽으로 들어온 폭 mm
 const COFFER_DEPTH = 0.15; // 우물천장: 가운데가 올라간 높이 m
 const COFFER_ROOMS = /거실/;      // 우물천장은 거실만(이 이름의 방, 없으면 아래쪽에서 가로가 가장 넓은 공간). 다른 방은 네모난 LED 방등
@@ -306,31 +305,25 @@ export class Tour {
   /* ---------- 3D: 현관문 · 문틀 위 벽 · 천장 ---------- */
   buildScene() {
     const e = this.door, H = state.plan.wallHeight * M;
-    // 문짝: 경첩 끝을 축으로 돈다. 경첩은 a 끝이되, 신발장이 a 쪽에 있으면 열린 문짝이 가리지 않게 b 끝으로 옮긴다
-    const shoe = state.furniture.find((f) => (f.type === 'shoe_cabinet' || /신발/.test(f.name)) && Math.hypot(f.x - this.mid.x, f.y - this.mid.y) < 3000);
-    const [hinge, latch] = shoe && G.dist(shoe, e.a) < G.dist(shoe, e.b) ? [e.b, e.a] : [e.a, e.b];
+    // 현관문은 두꺼운 철문(models3d.buildSteelDoor)이고 집 밖(공용 홀) 쪽으로 열린다. 경첩 끝을 축으로 돈다.
+    // 경첩은 도면의 현관문(plan.doors 가운데 현관 자리, a = 경첩 끝)을 따르고, 없으면 entrance의 a 끝
+    const pd = (state.plan.doors || []).find((d) => G.distToSegment({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 }, e.a, e.b).dist < 200);
+    const [hinge, latch] = pd && G.dist(pd.a, e.b) < G.dist(pd.a, e.a) ? [e.b, e.a] : [e.a, e.b];
     const dx = latch.x - hinge.x, dy = latch.y - hinge.y, len = Math.hypot(dx, dy);
     const ang = -Math.atan2(dy, dx);
     this.pivot = new THREE.Group();
     this.pivot.position.set(hinge.x * M, 0, hinge.y * M);
     this.pivot.rotation.y = ang;
-    const leaf = new THREE.Mesh(
-      new THREE.BoxGeometry(len * M - 0.02, DOOR_H, ENTRY_T),
-      new THREE.MeshStandardMaterial({ color: '#6f6255', roughness: 0.6 }),
-    );
-    leaf.position.set((len * M) / 2, DOOR_H / 2, 0);
-    leaf.castShadow = true;
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.8, roughness: 0.3 }));
-    knob.position.set(len * M - 0.08, 1.0, ENTRY_T / 2 + 0.02);   // 손잡이는 문짝 면에서 조금 튀어나오게
-    const knob2 = knob.clone();
-    knob2.position.z = -knob.position.z;
-    this.pivot.add(leaf, knob, knob2);
-    // 안쪽으로 열리도록 돌릴 방향을 고른다
-    const inward = { x: -e.out.x, y: -e.out.y };
+    // 문짝 로컬 +z는 도면에서 경첩→끝 방향의 왼쪽 법선 (-dy, dx) — 그쪽이 바깥이면 바깥 면(도어록 번호 키)을 +z에
+    const outZ = (-dy * e.out.x + dx * e.out.y) >= 0 ? 1 : -1;
+    const leaf = buildSteelDoor(len * M - 0.02, DOOR_H, STEEL_DOOR.t, outZ);
+    leaf.position.x = 0.01;
+    this.pivot.add(leaf);
+    // 바깥(공용 홀) 쪽으로 열리도록 돌릴 방향을 고른다
     const tryAng = (s) => {
       const r = ang + s * (Math.PI / 2);
       const cx = Math.cos(-r), cy = Math.sin(-r); // 문짝이 향하는 방향 (도면 좌표)
-      return cx * inward.x + cy * inward.y;
+      return cx * e.out.x + cy * e.out.y;
     };
     this.doorOpen = (tryAng(1) > tryAng(-1) ? 1 : -1) * (Math.PI / 2) * 0.95;
     this.doorBase = ang;

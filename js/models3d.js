@@ -949,6 +949,55 @@ export function buildDoorLeaf(W, H, zSide = 1) {
   return g;
 }
 
+/** 현관 철문 색 (짙은 차콜 강철) · 철문 두께(m) · 철문틀 색 */
+export const STEEL_DOOR = { color: '#6b7078', t: 0.075, frame: '#4f545b' };
+
+/**
+ * 현관 철문 (m) — 두꺼운 강철 방화문. 원점은 경첩 바닥, 문짝은 +x로 L만큼, 두께 T는 z 가운데(-T/2~T/2).
+ * 양면에 위·아래 두 칸 판 무늬, 레버 손잡이, 가운데 위 도어 렌즈, 경첩 셋. outZ(±1)는 집 바깥 면 쪽 z:
+ * 바깥 면에는 번호 키 디지털 도어록, 안쪽 면에는 도어록 몸체와 위쪽 도어 클로저를 단다.
+ */
+export function buildSteelDoor(L, H, T = STEEL_DOOR.t, outZ = 1) {
+  const g = new THREE.Group();
+  // 비출 환경맵이 없어 금속성을 높이면 검게 나온다 — 낮은 금속성 + 조금 밝은 강철 색
+  const steel = mat(STEEL_DOOR.color, { metalness: 0.25, roughness: 0.45 });
+  const panel = mat(shade(STEEL_DOOR.color, 0.88), { metalness: 0.25, roughness: 0.55 });
+  const metal = METAL(), black = mat('#1b1d21', { metalness: 0.3, roughness: 0.25 });
+  box(g, L - 0.01, H - 0.01, T, L / 2, H / 2, 0, steel);
+  // 판 무늬: 면마다 위·아래 두 칸, 살짝 튀어나온 판
+  const px = L * 0.72, ph = [H * 0.36, H * 0.4], py = [H * 0.27, H * 0.71];
+  for (const s of [1, -1]) for (let i = 0; i < 2; i++) box(g, px, ph[i], 0.006, L / 2, py[i], s * (T / 2 + 0.003), panel);
+  // 경첩 셋 (경첩 끝 모서리)
+  for (const y of [0.25, H / 2, H - 0.25]) {
+    const m = new THREE.Mesh(sharedGeo('cyl16', () => new THREE.CylinderGeometry(1, 1, 1, 16)), metal);
+    m.scale.set(0.012, 0.13, 0.012); m.position.set(-0.004, y, -outZ * (T / 2 - 0.012)); g.add(m);
+  }
+  const lx = L - 0.1, ly = 1.0;
+  // 레버 손잡이 (양면)
+  for (const s of [1, -1]) {
+    box(g, 0.05, 0.05, 0.012, lx, ly - 0.17, s * (T / 2 + 0.006), metal);                 // 손잡이 받침
+    box(g, 0.014, 0.014, 0.05, lx, ly - 0.17, s * (T / 2 + 0.03), metal);                 // 목
+    box(g, 0.13, 0.02, 0.02, lx - 0.06, ly - 0.17, s * (T / 2 + 0.055), metal);           // 레버
+  }
+  // 바깥 면: 디지털 도어록(번호 키) · 안쪽 면: 도어록 몸체
+  const zo = outZ * (T / 2), zi = -outZ * (T / 2);
+  box(g, 0.075, 0.27, 0.028, lx, ly + 0.12, zo + outZ * 0.014, black);
+  box(g, 0.05, 0.13, 0.004, lx, ly + 0.15, zo + outZ * 0.03, mat('#7fb8e8', { emissive: '#3d84c6', emissiveIntensity: 0.6, roughness: 0.3 }));   // 번호 키 창
+  for (const k of [1 / 3, 2 / 3]) box(g, 0.05, 0.003, 0.002, lx, ly + 0.15 - 0.065 + 0.13 * k, zo + outZ * 0.033, black);
+  box(g, 0.085, 0.29, 0.045, lx, ly + 0.11, zi - outZ * 0.0225, mat('#2a2d32', { metalness: 0.4, roughness: 0.35 }));
+  box(g, 0.03, 0.05, 0.03, lx, ly + 0.17, zi - outZ * 0.06, metal);                        // 안쪽 잠금 손잡이
+  // 도어 렌즈 (가운데 위, 양면)
+  for (const s of [1, -1]) {
+    const m = new THREE.Mesh(sharedGeo('cyl16', () => new THREE.CylinderGeometry(1, 1, 1, 16)), metal);
+    m.scale.set(0.011, 0.012, 0.011); m.rotation.x = Math.PI / 2; m.position.set(L / 2, 1.5, s * (T / 2 + 0.006)); g.add(m);
+  }
+  // 도어 클로저 (안쪽 면 위, 경첩 쪽) + 팔
+  box(g, 0.3, 0.055, 0.05, 0.3, H - 0.07, zi - outZ * 0.025, mat('#9aa0a8', { metalness: 0.6, roughness: 0.35 }));
+  box(g, 0.25, 0.015, 0.015, 0.45, H - 0.02, zi - outZ * 0.06, metal);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
 /**
  * 미닫이 문짝 (m). 원점은 문짝 바닥 가운데, 폭은 x, 두께는 z. 손잡이(세로 홈 손잡이)는 x = edge 쪽 끝 양면에.
  * 가운데에 간살 무늬 유리를 넣는다.
