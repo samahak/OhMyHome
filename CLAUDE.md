@@ -87,7 +87,7 @@ sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B
 ### 상태 (`store.js`)
 
 ```
-state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], wallHeight, floor, fixtures[] }
+state.plan      { image:{src,width,height} | null, mmPerPx, scaleSet, scaleRef, entrance, walls[], rooms[], windows[], doors[], doorsRemoved[], blocked[], wallHeight, floor, fixtures[] }
   scaleRef      { a, b, mm } | null — 축척을 맞춘 기준 치수선 (2D에 주황 점선으로 그린다)
   wall          { id, a:{x,y}, b:{x,y}, t(두께), cap, auto }
   room          { id, name, pts:[{x,y}], hidden? }
@@ -370,6 +370,10 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   `모든 가구`(`#xlsx-all`)면 기본 가구가 아닌 것을 모두 위에, 합계 줄 아래에 기본 가구를 회색으로 따로 모은다. 순서는 목록과 같은 `byTypeThenName`.
 - 왼쪽 '배치된 가구' 목록은 `SHAPES` 순서로 종류별로 묶고(제목 + 개수), 같은 종류 안은 이름순(`Intl.Collator('ko', { numeric })`)이다.
 - 새 가구는 `dropPoint()`가 화면 가운데에서 나선형으로 돌며 벽·가구와 겹치지 않는 첫 자리에 놓는다.
+- **배치 금지 구역 `plan.blocked`**(`{ id, pts }`, 도면의 빗금 칸 — 샤프트 등): `G.findCollisions(furniture, walls, blocked)`가 벽처럼 재므로
+  (WALL_OK 종류는 넘어간다) 부르는 곳은 늘 셋째 인자로 `plan.blocked`를 넘긴다. 2D는 회색 빗금 + 점선 테두리(`editor.hatch`)로 그린다.
+  샘플 JSON에는 생성 스크립트의 샤프트 사각형이 들어 있고, `blocked` 키가 없는 예전 프로젝트·저장본을 열면 `blockedForOldProject()`가
+  `wallDetect.findHatchRects()`(빗금 바탕 #e3e5e9 · 선 #9aa1ab 색의 8px 칸 → 사각형, ㄱ자는 둘)로 한 번 찾아 넣는다. `setScale()`도 함께 옮긴다.
 - 겹침 판정은 `G.findCollisions()` 하나다. 맞닿기만 한 것은 겹침이 아니도록 꼭짓점을 1~2mm 안쪽으로 줄여 잰다.
   가구끼리는 높이 구간(`elev`~`elev+h`)이 겹칠 때만 겹침이다(벽걸이 TV와 거실장).
   **의자와 책상·식탁·화장대(`KNEE_SPACE`, 종류별 상판 높이)**는 앉는 부분이 상판 밑으로 들어가도 되고, 상판보다 높은 등받이 띠

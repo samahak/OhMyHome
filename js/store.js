@@ -26,6 +26,7 @@ export function freshState() {
       doorsRemoved: [],     // [{x,y}] 사용자가 지운 자동 문의 가운데 — 문 기호를 다시 찾아도 이 자리에는 달지 않는다
       wallHeight: 2300,
       floor: 10,            // 몇 층인지 — 둘러보기에서 창밖 땅 높이
+      blocked: [],          // { id, pts:[{x,y}] } 가구 배치 금지 구역 — 도면의 빗금(샤프트 등). 가구가 겹치면 겹침으로 친다
       fixtures: [],         // 이 도면의 기본 싱크대(가구 꼴, id 없음) — 도면 파일의 '기본 포함' 주방 싱크대. 싱크대가 없는 주방에 이것부터 놓는다
     },
     furniture: [],          // { id, type, name, w, d, h, x, y, rot, elev, color, libId, usePhoto } — 지금 보고 있는 안의 가구
@@ -228,6 +229,7 @@ export function setScale(mmPerPx) {
   p.windows = p.windows.map((w) => ({ ...w, a: sc(w.a), b: sc(w.b) }));
   p.doors = p.doors.map((d) => ({ ...d, a: sc(d.a), b: sc(d.b), t: d.auto ? d.t * k : d.t }));
   p.doorsRemoved = p.doorsRemoved.map(sc);
+  p.blocked = (p.blocked || []).map((z) => ({ ...z, pts: z.pts.map(sc) }));
   p.fixtures = (p.fixtures || []).map((f) => ({ ...f, x: f.x * k, y: f.y * k }));
   if (p.scaleRef) p.scaleRef = { ...p.scaleRef, a: sc(p.scaleRef.a), b: sc(p.scaleRef.b) };
   if (p.entrance) p.entrance = { ...p.entrance, a: sc(p.entrance.a), b: sc(p.entrance.b), t: p.entrance.t * k };

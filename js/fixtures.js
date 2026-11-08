@@ -71,7 +71,7 @@ const item = (type, pos, uid, extra = {}) => {
 
 /** 벽·기존 가구와 겹치지 않는가 */
 function fits(f, plan, others) {
-  return !G.findCollisions(others.concat([f]), plan.walls).has(f.id);
+  return !G.findCollisions(others.concat([f]), plan.walls, plan.blocked).has(f.id);
 }
 
 /**
