@@ -217,7 +217,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   방 영역이 있으면 방들 중에서(`innerBox`), 없으면 아래 바깥벽 80cm 안쪽 줄을 가로로 훑어 벽 사이 구간 중에서 고른다.
   방 가운데에서 좌우로 재면 문 틈으로 옆방까지 새므로 이렇게 한다. 깊이는 가로의 1.2배(최소 3m)까지(위가 주방으로 트인 경우).
   고른 칸 안의 들를 곳은 이름이 '공간 n'이면 '거실'로 바꾼다.
-- 나머지 방은 천장 가운데 네모 LED 방등(`buildLeds`, 방 짧은 변 2.6m↑ 600 / 1.6m↑ 450 / 그 밖 300mm)과 그 아래 약한
+- 나머지 방(벽등 `wall_light`이 있는 방 빼고)은 천장 가운데 네모 LED 방등(`buildLeds`, 방 짧은 변 2.6m↑ 600 / 1.6m↑ 450 / 그 밖 300mm)과 그 아래 약한
   PointLight(열 개까지). 방이 없는 도면은 들를 곳 자리에 단다. 칸 크기(`spanBox`)는 창·현관문 틈을 막은 벽으로, 축마다
   **짧은 쪽 거리**로 잰다 — 반대쪽은 문 틈으로 새어 옆방 벽까지 잴 수 있다.
 - 방 영역의 `hidden: true`는 "도면 이미지에 이미 그려진 방"이라 2D·3D에 색과 이름표를 그리지 않는다(이름·면적용).
@@ -341,6 +341,12 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   바닥 모양 안이면(`G.counterUnder`) 소형(`catalog.PURIFIER.small`, `elev` = 싱크대 elev + `COUNTER_TOP`, 싱크대 rot, `f.onCounter = true`),
   아니면 바닥의 대형으로 바꾼다. 크기·띄움은 대형↔소형이 바뀔 때만, 이름은 기본 이름('정수기'·'대형 정수기'·'소형 정수기')일 때만 맞춘다.
   싱크대 위(`onCounter`) 정수기는 싱크대와 겹쳐도 된다. 상판 높이 `COUNTER_TOP`(850)은 3D 하부장(`counterRun`)도 쓴다.
+- **벽등(`wall_light`)**: 벽에 다는 등(260×110×130, `elev` 1,900, 덮개가 은은히 빛난다 — `models3d.wallLight`). 둘러보기 `buildLeds`는 벽등이 든 방(`rooms`)에는
+  천장 LED 방등을 달지 않고, 벽등마다 등 앞 30cm에 PointLight를 둔다(빛은 벽등이 먼저 — 합쳐 열 개까지). A-1·A-2형·A1-real·A2-real 실외기실은 문 들어가서 오른쪽 벽
+  (A-1 계열 아래 벽, 좌우가 뒤집힌 A-2 계열 위 벽의 창과 문 사이)에 벽등이 기본 포함 가구로 있다.
+- **전열교환기(`erv`)**: 천장에 매단 환기 장치(800×600×270, `elev` 2,030 — 위가 천장 2,300). 3D `models3d.erv`(본체 + 가로 양 끝 덕트 둘씩 + 매달기 쇠). 덕트는 본체 끝에서 벽 면까지
+  (`f.ductL`·`f.ductR` mm — `store.settleRods`가 'furniture'·'plan' 때마다 `G.ductReach`로 잰다, 한쪽은 창 쪽 바깥벽으로 나간다) 이어 벽 관통 마감판을 단다.
+  위례자이더파크 A-1·A-2형·A1-real·A2-real 샘플의 실외기실 천장 정중앙에 세로(긴 변이 위아래)로 기본 포함 가구로 들어 있다. 1.2m 위라 둘러보기 길을 막지 않는다.
 - **커튼 봉(`curtain_rod`)**: 벽과 벽 사이에 거는 봉 — 가로 w = 봉 길이, 높이 h = 봉 높이(바닥에서), 색 = 커튼 천. `store.emit()`이 'furniture'·'plan'마다
   `settleRods()`로 `G.rodSpan(f, walls, catalog.ROD_SPAN)`(가운데에서 봉 방향 양쪽 반직선이 닿는 벽, 300~6,000mm)에 길이·가운데를 맞춰서, 끌거나 돌리면
   그 자리 벽 사이로 바로 늘고 준다. 가로를 직접 고치면 `f.manualW = true`(속성 '벽 사이에 자동으로 맞춤' 끔). 커튼은 `f.drape`(`ROD_DRAPES` — 없으면 open
