@@ -698,6 +698,7 @@ function renderProps() {
       <div class="btns preset-btns">${Object.entries(PLANTS).map(([k, v]) => `<button data-plant="${k}">${v.label}</button>`).join('')}</div>` : ''}
       ${obj.type === 'chair' ? `
       <label class="check" title="등받이 없이 엉덩이만 앉는 의자(스툴)로 그립니다 — 높이가 앉는 면 높이가 되고, 책상·식탁 밑으로 통째로 들어갈 수 있습니다"><input type="checkbox" data-f="stool"> 등받이 없음 (엉덩이만 앉는 스툴)</label>` : ''}
+      ${obj.type === 'water_purifier' ? '<p class="hint" data-v="purifier"></p>' : ''}
       ${obj.type === 'wardrobe' ? `
       <label class="field"><span>옷장 모양</span><select data-f="wstyle">${Object.entries(WARDROBE_STYLES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       ${obj.wstyle === 'mix' ? mixStyles(obj).map((_, i, all) => `
@@ -843,6 +844,10 @@ function refreshProps() {
     const cur = p && (obj[p.key] ?? p.guess(obj));
     el.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', +b.dataset.preset === cur));
     el.querySelectorAll('[data-plant]').forEach((b) => b.classList.toggle('active', b.dataset.plant === plantOf(obj)));
+    const pur = el.querySelector('[data-v=purifier]');   // 정수기는 놓인 자리에 따라 대형↔소형이 바뀐다(store.settlePurifiers)
+    if (pur) pur.textContent = obj.onCounter
+      ? '💧 주방 싱크대 위에 올린 소형 정수기입니다. 싱크대 밖 바닥으로 옮기면 대형(스탠드형)으로 바뀝니다.'
+      : '💧 바닥에 단독으로 선 대형(스탠드형) 정수기입니다. 주방 싱크대 위로 끌어다 놓으면 소형 정수기로 바뀌어 상판 위에 올라갑니다.';
     const lside = el.querySelector('[data-v=lside]');
     if (lside) lside.textContent = obj.mirror ? '왼쪽 (앞에서 볼 때)' : '오른쪽 (앞에서 볼 때)';
   }

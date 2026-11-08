@@ -1,7 +1,7 @@
 // 샘플 가구의 3D 모양. 단위는 m, 원점은 바닥 사각형 가운데, 앞면은 +z.
 // 모양은 박스·원기둥 몇 개로 단순하게 만들고 크기(W·D·H)에 맞춰 늘린다.
 import * as THREE from 'three';
-import { lCounterDepth, lLegDepth, plantOf, WARDROBE_STYLES, wardrobeStyle, mixStyles } from './catalog.js';
+import { lCounterDepth, lLegDepth, plantOf, WARDROBE_STYLES, wardrobeStyle, mixStyles, COUNTER_TOP } from './catalog.js';
 
 // 같은 지오메트리를 여러 메시가 scale만 바꿔 함께 쓴다 (disposeObject가 버리지 않는다)
 const geoCache = new Map();
@@ -707,6 +707,21 @@ function chair(g, W, D, H, c, f = {}) {
 
 /* ---------- 욕실 · 주방 설비 ---------- */
 
+/**
+ * 정수기. 싱크대 위 소형(f.onCounter, 또는 낮은 것)은 납작한 몸통 + 아래 물받이,
+ * 바닥에 선 대형은 키 큰 몸통의 위쪽에 물 받는 자리, 아래는 수납 문. 앞면에 어두운 물 받는 칸 + 꼭지 + 물받이 + 파란 표시창.
+ */
+function waterPurifier(g, W, D, H, c, f = {}) {
+  const small = f.onCounter || H < 0.7, fz = D / 2;
+  box(g, W, H, D, 0, H / 2, 0, mat(c, { roughness: 0.3, metalness: 0.1 }));
+  const z0 = small ? 0.03 : H * 0.6, z1 = small ? H * 0.62 : H * 0.86;   // 물 받는 칸 아래·위
+  box(g, W * 0.8, z1 - z0, 0.004, 0, (z0 + z1) / 2, fz + 0.002, mat('#3a4049', { roughness: 0.5 }));
+  box(g, 0.03, 0.035, 0.07, 0, z1 - 0.03, fz + 0.035, METAL());                                     // 꼭지
+  box(g, W * 0.85, 0.015, 0.1, 0, z0 + 0.0075, fz + 0.05, mat('#9aa1a9', { metalness: 0.5, roughness: 0.3 }));   // 물받이
+  box(g, W * 0.55, 0.03, 0.004, 0, Math.min(H - 0.03, z1 + 0.05), fz + 0.003, mat('#1d2a38', { emissive: '#3b8fd9', emissiveIntensity: 0.5 }));   // 표시창
+  if (!small) box(g, W * 0.96, 0.005, 0.004, 0, H * 0.5, fz + 0.002, GROOVE());   // 아래 수납 문
+}
+
 /** 세로축 타원 기둥 (rx: 가로 반지름, rz: 깊이 반지름) */
 function ovalY(g, rx, rz, h, x, y, z, material, taper = 1) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rx, rx * taper, h, 32), material);
@@ -811,7 +826,7 @@ function kitchenCounter(g, W, D, H, c) {
  * sinkAt/cookAt: 개수대·인덕션 가운데 x(m)를 직접 정한다(ㄱ자는 도면 그림 자리). 후드는 인덕션 위로 따라간다.
  */
 function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false, upperExt = 0, upperExtBy = null, sinkAt = null, cookAt = null } = {}) {
-  const cab = mat(c), baseH = 0.85, top = 0.04, plinth = 0.1;
+  const cab = mat(c), baseH = COUNTER_TOP / 1000, top = 0.04, plinth = 0.1;
   box(g, W, plinth, D * 0.9, 0, plinth / 2, -D * 0.05, mat(shade(c, 0.6)));
   box(g, W, baseH - top - plinth, D * 0.96, 0, plinth + (baseH - top - plinth) / 2, -D * 0.02, cab);
   box(g, W, top, D, 0, baseH - top / 2, 0, mat('#d8d4cd', { roughness: 0.35 }));
@@ -995,7 +1010,7 @@ const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
   kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
-  bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, box: plain,
+  bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, water_purifier: waterPurifier, box: plain,
 };
 
 /**
