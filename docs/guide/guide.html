@@ -99,7 +99,7 @@
     <tr><td><code>run_ohmyhome.sh</code> / <code>run_ohmyhome.bat</code></td><td>실행 파일 (macOS·Linux / Windows)</td></tr>
     <tr><td><code>serve.py</code></td><td>실행 파일이 띄우는 서버 — 작업을 같은 폴더의 <code>ohmyhome-project.json</code>에 저장합니다</td></tr>
     <tr><td><code>index.html</code>, <code>css/</code>, <code>js/</code></td><td>프로그램 본체</td></tr>
-    <tr><td><code>sample/*.ohmyhome.json</code></td><td>바로 열어 볼 수 있는 예시 도면 (55㎡ A-1 · A-2 · B-1 · B-2 · C · D형, A-1형 실측 A1-real · A-2형 실측 A2-real)</td></tr>
+    <tr><td><code>sample/plan/*.ohmyhome.json</code> · <code>sample/real/*.ohmyhome.json</code></td><td>바로 열어 볼 수 있는 예시 도면 (55㎡ A-1 · A-2 · B-1 · B-2 · C · D형, A-1형 실측 A1-real · A-2형 실측 A2-real)</td></tr>
     <tr><td><code>OhMyHome_Guide.pdf</code></td><td>이 문서</td></tr>
   </table>
 </section>
@@ -177,10 +177,10 @@ run_ohmyhome.bat</pre>
   <p>처음이라면 들어 있는 예시 도면으로 기능을 먼저 둘러보세요. 벽·창·욕실/주방 설비·현관문까지 모두 입력되어 있습니다.</p>
   <ol class="steps">
     <li>왼쪽 <span class="btn">① 도면</span> 탭의 <span class="btn"><b style="color:#112d43">Xi</b> 위례자이더파크 불러오기</span>를 누릅니다.</li>
-    <li>뜨는 창에서 보고 싶은 형(55㎡ A-1 · A-2 · B-1 · B-2 · C · D형, A-1형 실측 A1-real · A-2형 실측 A2-real — <code>sample/</code>의 json 파일)을 고르고 <span class="btn">불러오기</span>를 누릅니다. A1-real · A2-real 줄의 <b>📄 실측 기록지</b>를 누르면 현장 실측 치수(mm)를 적은 기록지 PDF(<code>measure/55A1_measured.pdf</code> · <code>55A2_measured.pdf</code>)를 받습니다.</li>
+    <li>뜨는 창에서 보고 싶은 형(55㎡ A-1 · A-2 · B-1 · B-2 · C · D형, A-1형 실측 A1-real · A-2형 실측 A2-real — <code>sample/plan/</code> · <code>sample/real/</code>의 json 파일)을 고르고 <span class="btn">불러오기</span>를 누릅니다. A1-real · A2-real 줄의 <b>📄 실측 기록지</b>를 누르면 현장 실측 치수(mm)를 적은 기록지 PDF(<code>measure/55A1_measured.pdf</code> · <code>55A2_measured.pdf</code>)를 받습니다.</li>
     <li><span class="btn">나란히</span>로 2D와 3D를 함께 보거나, <span class="btn">🚶 둘러보기</span>를 눌러 바로 걸어 들어가 봅니다.</li>
   </ol>
-  <div class="note"><b>참고</b>왼쪽 <span class="btn">샘플 도면으로 해 보기</span>는 벽 자동 인식을 시험하는 간단한 연습용 도면을 띄웁니다. <code>sample/</code>의 파일은 <span class="btn">📂 도면 불러오기(json)</span>로 직접 열어도 됩니다.</div>
+  <div class="note"><b>참고</b>왼쪽 <span class="btn">샘플 도면으로 해 보기</span>는 벽 자동 인식을 시험하는 간단한 연습용 도면을 띄웁니다. <code>sample/plan/</code> · <code>sample/real/</code>의 파일은 <span class="btn">📂 도면 불러오기(json)</span>로 직접 열어도 됩니다.</div>
   <div class="note"><b>공지사항</b>처음 접속하면 프로그램을 소개하는 공지사항 창이 뜹니다. 창의 <span class="btn">📘 사용 가이드(PDF) 내려받기</span>로 웹 사용 가이드(<code>docs/OhMyHome_User_Guide.pdf</code>)를 받을 수 있습니다. 창 아래 <b>다시 보지 않기</b>에 체크해 두면 그 브라우저에서는 접속할 때 저절로 뜨지 않습니다(체크하지 않고 <span class="btn">닫기</span>를 누르면 이번만 닫힙니다). 다시 띄우고 싶으면 <span class="btn">📢 공지사항</span>으로 열어 체크를 풀고 닫으면 다음 접속부터 다시 뜹니다. 언제든 위쪽 <span class="btn">📢 공지사항</span> 버튼으로 다시 볼 수 있고, 공지가 바뀐 뒤 7일 동안 그 공지를 아직 읽지 않았으면 버튼에 <b>NEW</b>가 붙습니다(한 번 읽으면 그 브라우저에서는 사라지고, 공지가 또 바뀌면 다시 붙습니다).</div>
 </section>
 

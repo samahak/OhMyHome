@@ -11,7 +11,7 @@ run_ohmyhome.bat            # Windows
 python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
-# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A1-real·A2-real 실측 기록지 PDF·LICENSE만.
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample/plan·sample/real의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A1-real·A2-real 실측 기록지 PDF·LICENSE만.
 #   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
@@ -71,8 +71,9 @@ js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
 js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4(가로·세로)에 꽉 차게 (2D·3D 캡처)          (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
-measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지, 받은 실측 그림 원본은 measure/backup/ — 배포 zip에 넣지 않는다) — 위례자이더파크 창 A2-real·A1-real 줄의 링크
-sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형과 A-2·A-1형 실측(A2-real·A1-real)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
+measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지) — 위례자이더파크 창 A2-real·A1-real 줄의 링크
+sample/                실제 세대 예시 (1px = 5mm) — plan/ 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형 프로젝트 JSON · png/ 그 2D·3D 이미지 ·
+                       real/ A-2·A-1형 실측(A2-real·A1-real)의 JSON과 2D·3D 이미지
 ```
 
 ### 좌표와 단위
@@ -363,8 +364,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
   벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
 - **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `Xi 위례자이더파크 불러오기`(`#btn-xi-park`, 자이 마크 색 남청 배경 + CSS `.xi-mark`(`css/xi-mark.png` 마스크) → `#sample-dialog`에서
-  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A1-real·A2-real)
-  (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 더한다. 평면도 그림(PNG·JPG)을 여는 버튼과
+  라디오로 고른 `sample/` 아래 파일(`plan/…` · `real/…`)을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A1-real·A2-real)
+  (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 `file: 'plan/…'`(실측은 `'real/…'`)로 더한다. 공지·새 소식의 A1-real·A2-real 내려받기 링크(`index.html`)도 `sample/real/`을 가리킨다. 평면도 그림(PNG·JPG)을 여는 버튼과
   상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - **도면만 바꾸기**(`#btn-plan-only` → `confirm` 경고 한 번 → `#file-plan-only`): 같은 집 도면이 조금 고쳐졌을 때 쓴다. `store.replacePlan(data)`가
   `plan`만 바꾸고(층수 `floor`는 지금 값 유지) 가구·배치 안(기본 포함 가구도)·내 가구는 mm 좌표 그대로 둔다. 되돌리기 한 번에 돌아온다.
