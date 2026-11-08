@@ -181,9 +181,9 @@ function chairUnderDesk(chair, desk) {
 /** 서로 겹쳐 놓아도 되는 가구 종류 짝 (책상 위·옆으로 책장을 겹쳐 세우는 책상 책장 등) */
 const OVERLAP_OK = new Set([['desk', 'shelf'], ['bath_shelf', 'bath_upper_shelf']].map((p) => p.sort().join('|')));
 /** 어떤 가구와도 겹쳐 놓아도 되는 종류 (커튼은 소파·침대·책상 등 창 앞 가구 뒤로 늘어진다) */
-const OVERLAP_ANY = new Set(['curtain']);
-/** 벽과 겹쳐 놓아도 되는 종류 (커튼은 창틀·벽 안쪽에 걸쳐 단다) */
-const WALL_OK = new Set(['curtain']);
+const OVERLAP_ANY = new Set(['curtain', 'curtain_rod']);
+/** 벽과 겹쳐 놓아도 되는 종류 (커튼은 창틀·벽 안쪽에 걸쳐 단다, 커튼 봉은 양 끝을 벽에 박는다) */
+const WALL_OK = new Set(['curtain', 'curtain_rod']);
 /** 주방 싱크대 종류 — 정수기를 올릴 수 있다 */
 const COUNTER_TYPES = new Set(['kitchen_counter', 'kitchen_l']);
 /** 가구 f의 가운데가 바닥 모양 안에 드는 주방 싱크대(비활성화한 것 빼고). 없으면 null — 정수기를 싱크대 위에 올렸는지 본다 */
@@ -288,6 +288,21 @@ export function spanAt(p, walls) {
   };
   const h = axis(1, 0), v = axis(0, 1);
   return h || v ? { h, v } : null;
+}
+
+/**
+ * 커튼 봉 f가 걸릴 벽 사이: 봉 가운데에서 봉 방향(로컬 x) 양쪽으로 쏜 반직선이 처음 닿는 벽까지.
+ * 반환 { x, y, w } — 새 가운데와 길이(mm). 가운데가 벽 안이거나 한쪽이 안 막히거나 길이가 min~max 밖이면 null.
+ */
+export function rodSpan(f, walls, { min = 300, max = 6000 } = {}) {
+  const polys = walls.map((w) => wallCorners(w));
+  if (polys.some((poly) => pointInPoly(f, poly))) return null;
+  const u = rotatePt(1, 0, (f.rot || 0) * DEG);
+  const reach = (dx, dy) => Math.min(...polys.map((poly) => rayHit(f, dx, dy, poly)));
+  const r = reach(u.x, u.y), l = reach(-u.x, -u.y), w = r + l;
+  if (!isFinite(w) || w < min || w > max) return null;
+  const m = (r - l) / 2;
+  return { x: f.x + u.x * m, y: f.y + u.y * m, w };
 }
 
 /**

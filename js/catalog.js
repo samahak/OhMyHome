@@ -13,6 +13,7 @@ export const SHAPES = {
   shoe_cabinet: { label: '신발장' },
   microwave_cabinet: { label: '전자레인지 장' },
   curtain: { label: '커튼' },
+  curtain_rod: { label: '커튼 봉', dims: { w: '봉 길이 (벽 사이)', d: '깊이 (브래킷)' } },
   drawer: { label: '서랍장' },
   vanity: { label: '화장대' },
   shelf: { label: '책장' },
@@ -153,6 +154,15 @@ export const PURIFIER = {
   small: { name: '소형 정수기', w: 180, d: 430, h: 380 },
 };
 
+/**
+ * 커튼 봉(curtain_rod)에 거는 커튼 — f.drape (없으면 open). 봉 길이는 f.manualW가 없으면 봉 방향 양쪽 벽 사이에 늘 맞춘다
+ * (store.settleRods → geometry.rodSpan). 가로를 직접 고치면 manualW = true로 그 길이를 지킨다.
+ */
+export const ROD_DRAPES = { open: { label: '양옆으로 걷음' }, closed: { label: '쳐 둠 (가림막)' }, none: { label: '봉만' } };
+export const rodDrape = (f) => (ROD_DRAPES[f.drape] ? f.drape : 'open');
+/** 봉을 맞출 벽 사이 길이 범위(mm) — 이보다 짧거나 길면 맞추지 않고 그대로 둔다 */
+export const ROD_SPAN = { min: 300, max: 6000 };
+
 /** 의자 등받이 없음(f.stool, 엉덩이만 앉는 스툴)을 켜고 끌 때 맞추는 크기(mm) — 높이가 곧 앉는 면 높이다 */
 export const STOOL = { w: 400, d: 400, h: 460 };
 
@@ -180,6 +190,8 @@ export const CATALOG = [
   { type: 'microwave_cabinet', name: '전자레인지 장', icon: '♨️', w: 600, d: 450, h: 1800, color: '#f2efea' },
   // 커튼: 창을 덮는 폭 × 레일 깊이 × 천장 높이. 등(-y)을 창 쪽 벽에 대고(🧲 벽에 붙이기) 쓴다. 색은 겉 커튼 천 색
   { type: 'curtain', name: '커튼', icon: '🪟', w: 2400, d: 150, h: 2300, color: '#c9b9a3' },
+  // 커튼 봉: 벽과 벽 사이에 거는 봉(드레스룸·다용도실 입구 가림막 등). 가로 = 벽 사이 길이(store.settleRods가 맞춘다), 높이 = 봉 높이. 색은 커튼 천 색
+  { type: 'curtain_rod', name: '커튼 봉', icon: '🪝', w: 1500, d: 80, h: 2250, color: '#d9cfc0' },
   { type: 'bed', name: '싱글 침대', icon: '🛏️', w: 1000, d: 2050, h: 900, color: '#b89a7a' },
   { type: 'bed', name: '슈퍼싱글 침대', icon: '🛏️', w: 1150, d: 2050, h: 900, color: '#b89a7a' },
   { type: 'bed', name: '퀸 침대', icon: '🛏️', w: 1550, d: 2100, h: 1000, color: '#9c7b5b' },
