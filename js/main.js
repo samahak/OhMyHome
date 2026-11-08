@@ -1437,8 +1437,9 @@ $('file-project').addEventListener('change', async (e) => {
 // 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. sample에 json을 더하면 여기에도 더한다
 const XI_PARK_SAMPLES = [
   { file: '55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
-  { file: '55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
   // sheet: 그 형의 실측 기록지 PDF(있는 형만) — 고르는 창에 내려받기 링크를 단다
+  { file: '55A1-real_plan.ohmyhome.json', name: '55㎡ A-1형 실측 (A1-real)', sheet: 'measure/55A1_measured.pdf' },
+  { file: '55A2_plan.ohmyhome.json', name: '55㎡ A-2형' },
   { file: '55A2-real_plan.ohmyhome.json', name: '55㎡ A-2형 실측 (A2-real)', sheet: 'measure/55A2_measured.pdf' },
   { file: '55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
   { file: '55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
@@ -1660,8 +1661,9 @@ $('notice-dialog').addEventListener('close', () => {
   try { localStorage.setItem(NOTICE_READ_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 NEW가 남는다 */ }
   updateNoticeBadge();
   const v = $('notice-dialog').returnValue;
-  if (v === 'real') {   // 새 소식의 'A2-real 고르러 가기': 위례자이더파크 목록을 A2-real에 맞춰 연다
-    const i = XI_PARK_SAMPLES.findIndex((s) => s.file.startsWith('55A2-real'));
+  const real = { real: '55A2-real', 'real-a1': '55A1-real' }[v];
+  if (real) {   // 새 소식의 'A2-real · A1-real 고르러 가기': 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
+    const i = XI_PARK_SAMPLES.findIndex((s) => s.file.startsWith(real));
     const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
     if (r) r.checked = true;
     $('sample-dialog').showModal();

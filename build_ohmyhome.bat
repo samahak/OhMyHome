@@ -27,6 +27,7 @@ xcopy /e /i /q css "%DEST%\css" >nul
 xcopy /e /i /q js "%DEST%\js" >nul
 copy /y sample\*.json "%DEST%\sample\" >nul
 copy /y docs\OhMyHome_User_Guide.pdf "%DEST%\docs\" >nul
+copy /y measure\55A1_measured.pdf "%DEST%\measure\" >nul
 copy /y measure\55A2_measured.pdf "%DEST%\measure\" >nul
 
 if not exist dist mkdir dist

@@ -865,7 +865,7 @@ function counterRun(g, W, D, H, c, { sink = true, cook = W > 1.2, flip = false, 
  * ㄱ자 주방 싱크대: 뒤쪽 가로(W) + 옆쪽 꺾인 세로(D). 상판 깊이 T는 f.counterD.
  * 꺾인 쪽 깊이 TL은 f.legD(없으면 T) — 위 조리대보다 깊은 옆 선반(냉장고장과 면 맞춤) 등.
  * 꺾인 쪽은 앞에서 볼 때 오른쪽(+x), f.mirror면 왼쪽. 개수대와 인덕션(+ 후드)은 둘 다 가로 쪽에 놓는다 — 모서리 칸(T)을 뺀 구간 안에서
- * 왼쪽이 개수대, 그 오른쪽이 인덕션(꺾인 쪽이 어느 쪽이든). 꺾인 쪽은 상판·하부장·상부장만(주방 선반).
+ * 꺾인 쪽 반대 끝이 개수대, 꺾인 쪽(모서리)에 가까운 쪽이 인덕션(f.mirror면 좌우가 함께 뒤집힌다 — A-1·A-2형 실측). 꺾인 쪽은 상판·하부장·상부장만(주방 선반).
  * 가로 쪽 남은 구간이 1.4m보다 짧으면 인덕션은 꺾인 쪽 끝(0.8m 이상일 때)에 놓는다. 바닥 모양은 geometry.furnitureRects와 같다.
  */
 function kitchenL(g, W, D, H, c, f) {
@@ -874,7 +874,9 @@ function kitchenL(g, W, D, H, c, f) {
   const longCook = span >= 1.4, legCook = !longCook && legL >= 0.8;
   const long = new THREE.Group();
   counterRun(long, W, T, H, c, longCook
-    ? { cook: true, sinkAt: a + Math.min(span * 0.28, 0.75), cookAt: a + span - 0.42 }   // 인덕션 폭 0.59 + 모서리 쪽 여유
+    ? (side > 0
+      ? { cook: true, sinkAt: a + Math.min(span * 0.28, 0.75), cookAt: a + span - 0.42 }    // 인덕션 폭 0.59 + 모서리 쪽 여유
+      : { cook: true, sinkAt: a + span - Math.min(span * 0.28, 0.75), cookAt: a + 0.42 })
     : { cook: false, sinkAt: a + span / 2 });
   long.position.z = -D / 2 + T / 2;
   g.add(long);

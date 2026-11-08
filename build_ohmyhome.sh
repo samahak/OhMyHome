@@ -2,7 +2,7 @@
 # OhMyHome 배포 파일 만들기 — dist/OhMyHome-<날짜>.zip
 # 정해 둔 파일만 담는다: 화면(index.html·css·js), 실행 스크립트, sample 폴더의 json 전부, 사용 가이드 PDF, LICENSE.
 # 웹 사용 가이드(docs/OhMyHome_User_Guide.pdf)는 공지사항 창의 내려받기 링크가 가리키므로 같은 자리(docs/)에 담는다.
-# A2-real 실측 기록지(measure/55A2_measured.pdf)도 위례자이더파크 창의 링크가 가리키므로 measure/에 담는다.
+# A1-real·A2-real 실측 기록지(measure/55A1_measured.pdf · 55A2_measured.pdf)도 위례자이더파크 창의 링크가 가리키므로 measure/에 담는다.
 # README(개발용 설명)와 sample의 png는 넣지 않는다. 가이드 PDF는 docs/guide/make_pdf.sh로 미리 만들어 둔다.
 # 사용자가 작업한 도면·가구는 브라우저 localStorage에만 있으므로 담기지 않는다.
 set -euo pipefail
@@ -24,7 +24,7 @@ cp index.html serve.py run_ohmyhome.sh run_ohmyhome.bat LICENSE "$GUIDE" "$DEST/
 cp -R css js "$DEST/"
 cp sample/*.json "$DEST/sample/"
 cp "$USER_GUIDE" "$DEST/docs/"
-cp measure/55A2_measured.pdf "$DEST/measure/"   # 위례자이더파크 창의 A2-real 실측 기록지 링크
+cp measure/55A1_measured.pdf measure/55A2_measured.pdf "$DEST/measure/"   # 위례자이더파크 창의 A1-real·A2-real 실측 기록지 링크
 chmod +x "$DEST/run_ohmyhome.sh"
 find "$DEST" -name '.DS_Store' -delete
 
