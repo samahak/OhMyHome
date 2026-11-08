@@ -11,7 +11,7 @@ run_ohmyhome.bat            # Windows
 python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
-# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A2-real 실측 기록지 PDF·LICENSE만.
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A1-real·A2-real 실측 기록지 PDF·LICENSE만.
 #   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
@@ -71,8 +71,8 @@ js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
 js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4(가로·세로)에 꽉 차게 (2D·3D 캡처)          (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
-measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지, 위례자이더파크 창 A2-real 줄의 링크)
-sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형과 A-2형 실측(A2-real)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
+measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지, 받은 실측 그림 원본은 measure/backup/ — 배포 zip에 넣지 않는다) — 위례자이더파크 창 A2-real·A1-real 줄의 링크
+sample/                실제 세대 예시 — 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형과 A-2·A-1형 실측(A2-real·A1-real)의 2D·3D 이미지와 바로 여는 프로젝트 JSON (1px = 5mm)
 ```
 
 ### 좌표와 단위
@@ -311,8 +311,8 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   `f.mirror`면 꺾인 쪽이 왼쪽(기본은 앞에서 볼 때 오른쪽 +x). 바닥 모양은 `G.furnitureRects(f)`(사각형 둘)가 정하고,
   겹침(`findCollisions`)·클릭·길 찾기는 `G.furnitureParts()`, 2D 그리기는 `furnitureOutline`/`furnitureFront`를 쓴다 —
   `furnitureCorners()`(바깥 상자)로 재면 안쪽 빈 모서리까지 막힌다. 새로 사각형이 아닌 가구를 넣으면 `furnitureRects`에 더한다.
-  3D는 `counterRun()`(싱크대 한 줄) 둘: 개수대와 인덕션·후드는 둘 다 가로 쪽, 모서리 칸(T)을 뺀 구간에서 왼쪽 개수대 → 오른쪽 인덕션
-  (`f.mirror`여도 같은 순서, `sinkAt`/`cookAt`). 꺾인 쪽은 상판·장만(주방 선반)이고 상부장은 모서리까지 늘려 가로 쪽 상부장에 붙인다.
+  3D는 `counterRun()`(싱크대 한 줄) 둘: 개수대와 인덕션·후드는 둘 다 가로 쪽, 모서리 칸(T)을 뺀 구간에서 꺾인 쪽 반대 끝이 개수대, 모서리 쪽이 인덕션
+  (기본은 왼쪽 개수대 → 오른쪽 인덕션, `f.mirror`면 함께 뒤집힌다 — A2-real·A1-real 실측. `sinkAt`/`cookAt`). 꺾인 쪽은 상판·장만(주방 선반)이고 상부장은 모서리까지 늘려 가로 쪽 상부장에 붙인다.
   가로 쪽 남은 구간이 1.4m 미만이면 인덕션은 꺾인 쪽 끝에서 540mm에 놓는다.
   `SHAPES[type].dims`가 있으면 속성 패널의 가로·깊이 칸 이름을 바꾼다.
 - **식물(`plant`)**: 종류는 `f.plant`(`catalog.PLANTS` 키, 없으면 몬스테라 — `plantOf()`). 종류를 바꾸면(`applyPlant`) 크기를 그 종류
@@ -340,14 +340,14 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
   벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
 - **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `Xi 위례자이더파크 불러오기`(`#btn-xi-park`, 자이 마크 색 남청 배경 + CSS `.xi-mark`(`css/xi-mark.png` 마스크) → `#sample-dialog`에서
-  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A2-real만)
+  라디오로 고른 `sample/` 파일을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A1-real·A2-real)
   (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 더한다. 평면도 그림(PNG·JPG)을 여는 버튼과
   상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - **도면만 바꾸기**(`#btn-plan-only` → `confirm` 경고 한 번 → `#file-plan-only`): 같은 집 도면이 조금 고쳐졌을 때 쓴다. `store.replacePlan(data)`가
   `plan`만 바꾸고(층수 `floor`는 지금 값 유지) 가구·배치 안(기본 포함 가구도)·내 가구는 mm 좌표 그대로 둔다. 되돌리기 한 번에 돌아온다.
   다만 주방 방에 싱크대가 하나도 없는 안(보호 중인 안 빼고)에는 새 도면의 기본 싱크대를 바로 놓는다(`fixtures.missingPlanSinks`, 같은 되돌리기 안).
 - **도면의 기본 싱크대 `plan.fixtures`**: `loadProject`·`replacePlan`이 파일의 `plan.fixtures`, 없으면 그 파일 가구 가운데 '기본 포함' 싱크대(`kitchen_counter`·`kitchen_l`)를
-  id 없이 담아 둔다. 둘러보기 설비 배치와 도면만 바꾸기가 1자 대신 이것을 놓는다(A2-real은 ㄱ자). `setScale()`도 함께 옮긴다.
+  id 없이 담아 둔다. 둘러보기 설비 배치와 도면만 바꾸기가 1자 대신 이것을 놓는다(A2-real·A1-real은 ㄱ자). `setScale()`도 함께 옮긴다.
 - 왼쪽 '② 가구' 탭을 누르면 `endDrawTool()`로 선택·이동 도구가 된다.
 - 카메라는 사용자가 아직 돌리지 않았을 때(`userMoved === false`)만 화면 크기가 바뀔 때 다시 맞춘다.
 - 방 이름표는 `CSS2DObject`다. 그룹에서 빼면(`clear()`) three.js가 DOM 요소도 함께 지운다.
@@ -389,7 +389,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올리고(예전 공지를 숨긴 사람에게도 한 번 뜬다)
   `NOTICE_DATE`(바꾼 날, `YYYY-MM-DD`)도 고친다 — 상단 `📢 공지사항`(`#btn-notice`, 언제든 공지를 다시 연다)에 그날부터 `NOTICE_NEW_DAYS`(7)일 동안 `NEW`(`.new-badge`, 통통 튀고 빨간 고리가 퍼지는 CSS 애니메이션 — 동작 줄이기 설정이면 멈춤)가 붙는다.
   공지 창을 닫으면(처음 뜬 공지도) localStorage `ohmyhome.notice.read`에 `NOTICE_VER`를 남겨 NEW를 지운다 — 버전이 바뀌면 다시 붙는다(`updateNoticeBadge`).
-  새 소식의 `A2-real 고르러 가기`(value `real`)는 위례자이더파크 창을 A2-real에 맞춰 연다.
+  새 소식의 `A1-real 고르러 가기`(value `real-a1`) · `A2-real 고르러 가기`(value `real`)는 위례자이더파크 창을 그 실측 도면에 맞춰 연다.
   그 아래 `✨ 추가 기능 보기`(`#btn-features`, type=button이라 공지를 닫지 않는다)는 `#features-dialog`(그날 더한 기능 설명)를 공지 위에 겹쳐 띄운다.
   기능을 더하면 이 목록도 고친다.
 - **CSS의 `[hidden] { display: none !important; }`를 지우지 말 것.** `display`를 준 요소는 `hidden` 속성이
