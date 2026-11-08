@@ -6,7 +6,7 @@ import {
   addLayout, switchLayout, renameLayout, deleteLayout, currentLayout, layoutFurniture, setLayoutLocked, furnitureLocked, setLockedHandler,
 } from './store.js';
 import * as G from './geometry.js';
-import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, iconFor, windowDefaults, DOOR } from './catalog.js';
+import { CATALOG, SHAPES, SIZE_PRESETS, L_COUNTER, lCounterDepth, lLegDepth, PLANTS, plantOf, WARDROBE_STYLES, wardrobeStyle, MIX_PARTS, mixStyles, iconFor, windowDefaults, DOOR } from './catalog.js';
 import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makePdf, dataURLBytes } from './pdf.js';
@@ -695,6 +695,11 @@ function renderProps() {
       ${obj.type === 'plant' ? `
       <label class="field"><span>식물 종류</span><select data-f="plant">${Object.entries(PLANTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       <div class="btns preset-btns">${Object.entries(PLANTS).map(([k, v]) => `<button data-plant="${k}">${v.label}</button>`).join('')}</div>` : ''}
+      ${obj.type === 'wardrobe' ? `
+      <label class="field"><span>옷장 모양</span><select data-f="wstyle">${Object.entries(WARDROBE_STYLES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      ${obj.wstyle === 'mix' ? mixStyles(obj).map((_, i, all) => `
+      <label class="field indent"><span>칸 ${i + 1}${i === 0 ? ' (왼쪽)' : i === all.length - 1 ? ' (오른쪽)' : ''}</span><select data-f="mix-${i}">${MIX_PARTS.map((k) => `<option value="${k}">${WARDROBE_STYLES[k].label}</option>`).join('')}</select></label>`).join('') : ''}
+      <label class="check" title="문짝 없이 칸·선반·옷걸이 봉이 드러나는 오픈형(드레스룸 시스템장)으로 그립니다"><input type="checkbox" data-f="noDoor"> 문 없음 (오픈형 — 안의 선반·옷이 보임)</label>` : ''}
       ${preset ? `
       <label class="field"><span>${preset.label}</span><input type="number" min="${preset.min}" max="${preset.max}" step="1" data-f="${preset.key}"></label>
       <div class="btns preset-btns">${preset.options.map((n) => `<button data-preset="${n}">${n}${preset.unit}</button>`).join('')}</div>` : ''}
@@ -817,6 +822,8 @@ function refreshProps() {
     if (k === 'legD') return lLegDepth(obj);
     if (k === 'mdepth') return Math.round(depthFromEntrance(obj, state.plan.entrance) ?? 0);
     if (k === 'plant') return plantOf(obj);
+    if (k === 'wstyle') return wardrobeStyle(obj);
+    if (k.startsWith('mix-')) return mixStyles(obj)[+k.slice(4)];
     if (k === 'price') return obj.price != null ? obj.price.toLocaleString('ko-KR') : '';
     const p = SIZE_PRESETS[obj.type];
     if (p && k === p.key) return obj[k] ?? p.guess(obj);
@@ -875,6 +882,27 @@ function applyProp(inp) {
   if (k === 'custom') {
     checkpoint();
     if (v) obj.custom = true; else delete obj.custom;
+    emit('furniture');
+    return;
+  }
+  if (k === 'noDoor') {
+    checkpoint();
+    if (v) obj.noDoor = true; else delete obj.noDoor;
+    emit('furniture');
+    return;
+  }
+  if (k === 'wstyle') {   // 기본(통)은 키를 남기지 않는다
+    checkpoint();
+    if (v === 'tall' || !WARDROBE_STYLES[v]) delete obj.wstyle; else obj.wstyle = v;
+    emit('furniture');
+    renderProps();   // 믹스장이면 칸별 모양 칸을 보인다
+    return;
+  }
+  if (k.startsWith('mix-')) {   // 믹스장 한 칸의 모양 — 칸 수만큼 채워 남긴다(가로를 바꿔 칸이 늘면 늘어난 칸은 기본 차례)
+    checkpoint();
+    const parts = mixStyles(obj);
+    parts[+k.slice(4)] = v;
+    obj.mix = parts;
     emit('furniture');
     return;
   }
@@ -941,7 +969,7 @@ function applyProp(inp) {
     if (preset?.affects.includes(k)) delete obj[preset.key];
   }
   emit(sel.kind === 'furniture' ? 'furniture' : 'plan');
-  if (k === 'type') renderProps();   // 모양마다 칸 이름·칸이 다르다 (ㄱ자 싱크대)
+  if (k === 'type' || (k === 'w' && obj.wstyle === 'mix')) renderProps();   // 모양마다 칸 이름·칸이 다르다 (ㄱ자 싱크대, 믹스장 칸 수)
 }
 
 /** 중문을 현관문에서 depth mm 안쪽으로 옮긴다 (양옆 벽을 따라, 폭은 새 자리 양옆 벽에 맞춘다) */
