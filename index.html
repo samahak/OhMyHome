@@ -173,6 +173,7 @@
           <button data-view="split" class="active">나란히</button>
           <button data-view="3d">3D</button>
         </div>
+        <button id="btn-full" title="지금 보기(2D 도면 · 나란히 · 3D) 그대로 화면 전체에 띄웁니다 — 오른쪽 위 📷 캡처로 그림 저장, ✕ 닫기나 Esc로 돌아옵니다">⛶ 전체 화면</button>
         <button id="btn-tour" class="primary-soft" title="현관에서 문을 열고 들어가 집 안을 둘러봅니다">🚶 둘러보기</button>
         <div class="stage-3d-tools">
           <button id="cam-top">위에서</button>
@@ -185,6 +186,10 @@
       <div class="views split" id="views">
         <div class="view" id="view2d"><canvas id="plan-canvas"></canvas><div id="measure-pop" class="measure-pop" hidden></div></div>
         <div class="view" id="view3d"></div>
+        <div class="full-actions">
+          <button id="btn-full-cap" title="지금 전체 화면에 보이는 그대로 그림(PNG)으로 저장합니다">📷 캡처</button>
+          <button id="btn-full-close" title="전체 화면 닫기 (Esc)">✕ 닫기</button>
+        </div>
       </div>
       <div class="statusbar">
         <span id="status">도면 불러오기(json)로 시작하거나 샘플 도면으로 해 보세요.</span>
@@ -260,6 +265,9 @@
             <b>믹스장</b>은 약 90cm 칸마다 모양을 섞은 옷장으로, 칸별로(왼쪽부터) 통·분리형·서랍형을 따로 고를 수 있습니다.
             <b>냉장고장</b>은 위 짧은 장만 있고 아래는 바닥까지 트여 있어, 냉장고·김치냉장고를 겹쳐 넣어도 겹침으로 잡히지 않습니다.
             <b>문 없음</b>에 체크하면 문짝 없이 칸·선반·옷걸이 봉과 걸린 옷이 보이는 오픈형(드레스룸 시스템장)으로 그립니다.</p></li>
+        <li><b>⛶ 도면 편집 화면 전체 화면</b>
+          <p>가운데 위 막대의 <b>⛶ 전체 화면</b>(둘러보기 왼쪽)을 누르면 지금 보기(2D 도면 · 나란히 · 3D) 그대로 모니터 가득 커집니다.
+            오른쪽 위 <b>📷 캡처</b>는 지금 보이는 화면 그대로를 그림(PNG)으로 저장하고, <b>✕ 닫기</b>나 Esc로 돌아옵니다.</p></li>
         <li><b>💧 정수기</b>
           <p>② 가구에 <b>정수기</b>가 생겼습니다. 바닥에 단독으로 두면 <b>대형(스탠드형) 정수기</b>이고, 주방 싱크대 위로 끌어다 놓으면
             <b>소형 정수기</b>로 바뀌어 상판 위에 올라갑니다(싱크대 방향으로 돌아가고, 싱크대와 겹쳐도 괜찮습니다). 다시 바닥으로 옮기면 대형으로 돌아옵니다.</p></li>

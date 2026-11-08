@@ -77,6 +77,65 @@ function setViewMode(mode) {
 }
 try { setViewMode(localStorage.getItem('ohmyhome.view') || 'split'); } catch { setViewMode('split'); }
 
+// ⛶ 전체 화면: 보기 칸(#views)을 지금 보기(2D · 나란히 · 3D) 그대로 전체 화면으로. 오른쪽 위 ✕ 닫기나 Esc로 돌아온다.
+// 캔버스 크기는 2D·3D의 ResizeObserver가 맞춘다
+$('btn-full').addEventListener('click', () => {
+  const el = $('views');
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) { status('이 브라우저는 전체 화면을 지원하지 않습니다.'); return; }
+  Promise.resolve(req.call(el)).catch(() => status('전체 화면을 열지 못했습니다.'));
+});
+$('btn-full-close').addEventListener('click', () => {
+  if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+});
+// 📷 캡처: 전체 화면에 보이는 그대로(2D 캔버스 · 3D 캔버스 · 3D 이름표)를 한 장의 PNG로. 상태줄이 안 보이므로 버튼 글자로 알린다
+$('btn-full-cap').addEventListener('click', () => {
+  const btn = $('btn-full-cap');
+  try {
+    const url = captureViews();
+    const mode = { '2d': '2d', split: '나란히', '3d': '3d' }[currentViewMode()] || '';
+    download(url, `ohmyhome-화면-${mode}-${layoutTag()}${today()}.png`);
+    btn.textContent = '✓ 저장했습니다';
+  } catch (err) {
+    btn.textContent = '⚠ 저장 못 함';
+    console.error(err);
+  }
+  clearTimeout(btn.timer);
+  btn.timer = setTimeout(() => { btn.textContent = '📷 캡처'; }, 1600);
+});
+/** 보기 칸(#views)에 지금 보이는 캔버스들과 3D 이름표를 화면 배치 그대로 한 장에 그려 PNG dataURL로 */
+function captureViews() {
+  const box = $('views').getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(box.width * dpr); cv.height = Math.round(box.height * dpr);
+  const c = cv.getContext('2d');
+  c.scale(dpr, dpr);
+  c.fillStyle = getComputedStyle(document.body).backgroundColor || '#fff';
+  c.fillRect(0, 0, box.width, box.height);
+  view.renderer.render(view.scene, view.camera);   // 3D 그림을 지금 카메라로 한 번 더 그려 둔다
+  for (const [v, el] of [[$('view2d'), $('plan-canvas')], [$('view3d'), view.renderer.domElement]]) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;   // 숨긴 보기
+    c.fillStyle = getComputedStyle(v).backgroundColor;   // 캔버스 뒤 바탕(투명한 곳)
+    c.fillRect(r.left - box.left, r.top - box.top, r.width, r.height);
+    c.drawImage(el, r.left - box.left, r.top - box.top, r.width, r.height);
+  }
+  // 3D 이름표(CSS2D, DOM)는 캔버스에 없으므로 보이는 것만 같은 자리에 다시 그린다
+  for (const el of $('view3d').querySelectorAll('.label3d')) {
+    const r = el.getBoundingClientRect(), st = getComputedStyle(el);
+    if (!r.width || st.display === 'none' || st.visibility === 'hidden') continue;
+    const x = r.left - box.left, y = r.top - box.top;
+    c.fillStyle = st.backgroundColor;
+    c.beginPath(); c.roundRect(x, y, r.width, r.height, parseFloat(st.borderTopLeftRadius) || 0); c.fill();
+    c.fillStyle = st.color;
+    c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const lines = el.innerText.split('\n').filter(Boolean), lh = r.height / Math.max(1, lines.length);
+    lines.forEach((t, i) => c.fillText(t, x + r.width / 2, y + lh * (i + 0.5)));
+  }
+  return cv.toDataURL('image/png');
+}
+
 $('cam-top').addEventListener('click', () => view.resetCamera('top'));
 $('cam-persp').addEventListener('click', () => view.resetCamera('persp'));
 $('wall-opacity').addEventListener('input', (e) => view.setWallOpacity(+e.target.value));
