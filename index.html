@@ -197,7 +197,7 @@
   </div>
 
 
-  <!-- 공지사항: 처음 접속할 때 띄운다. '다시 보지 않기'를 누르면 이 브라우저에서는 다시 띄우지 않는다 -->
+  <!-- 공지사항: 처음 접속할 때 띄운다. '다시 보지 않기'에 체크해 두면 이 브라우저에서는 저절로 띄우지 않는다(풀면 다시 뜬다) -->
   <dialog id="notice-dialog" class="notice-dialog">
     <form method="dialog">
       <div class="notice-cols">
@@ -229,7 +229,7 @@
       </section>
       </div>
       <div class="notice-actions">
-        <button id="btn-notice-hide" value="hide">다시 보지 않기</button>
+        <label class="check notice-hide" title="체크해 두면 다음 접속부터 공지가 저절로 뜨지 않습니다 — 위 '📢 공지사항'으로 언제든 다시 열고, 체크를 풀면 다시 뜹니다"><input type="checkbox" id="notice-hide"> 다시 보지 않기</label>
         <button class="primary" value="close" autofocus>닫기</button>
       </div>
     </form>
@@ -238,7 +238,7 @@
   <!-- 추가 기능: 공지사항 '새 소식'의 '추가 기능 보기'로 공지 위에 띄운다 -->
   <dialog id="features-dialog" class="features-dialog">
     <form method="dialog">
-      <h3>✨ 추가 기능 <small>2026.11.07</small></h3>
+      <h3>✨ 추가 기능 <small>2026.11.08</small></h3>
       <ul class="feature-list">
         <li><b><span class="xi-mark" aria-hidden="true"></span> 실측 도면 A2-real</b>
           <p>55㎡ A-2형을 현장에서 직접 잰 치수로 다시 그린 도면입니다. ‘위례자이더파크 불러오기’에서 <b>55㎡ A-2형 실측 (A2-real)</b>을 고르세요.

@@ -1540,11 +1540,11 @@ else status('📂 ‘도면 불러오기(json)’로 저장한 도면을 열거�
 // 개발·점검용
 window.__ohmyhome = { state, editor, view, runDetect };
 
-/* ---------- 공지사항 — 처음 접속할 때. '다시 보지 않기'면 이 브라우저에서는 다시 띄우지 않는다 ---------- */
+/* ---------- 공지사항 — 처음 접속할 때. '다시 보지 않기'에 체크해 두면 이 브라우저에서는 저절로 띄우지 않는다(체크를 풀면 다시 뜬다) ---------- */
 // 공지 내용이 바뀌면 NOTICE_VER를 올리고 NOTICE_DATE를 바꾼 날로 고친다 — 예전 공지를 '다시 보지 않기' 한 사람에게도 새 공지는 한 번 뜨고,
 // 상단 '📢 공지사항' 버튼에 그날부터 NOTICE_NEW_DAYS일 동안 NEW가 붙는다 — 이 PC(브라우저)에서 이 공지를 한 번 읽으면(창을 닫으면) 지운다
 const NOTICE_KEY = 'ohmyhome.notice.hidden', NOTICE_READ_KEY = 'ohmyhome.notice.read';
-const NOTICE_VER = '2', NOTICE_DATE = '2026-11-07', NOTICE_NEW_DAYS = 7;
+const NOTICE_VER = '3', NOTICE_DATE = '2026-11-08', NOTICE_NEW_DAYS = 7;
 /** 공지가 바뀐 지 NOTICE_NEW_DAYS일이 안 지났는가 (바뀐 날 0시부터, 이 PC 시각 기준) */
 function noticeIsNew(now = new Date()) {
   const [y, m, d] = NOTICE_DATE.split('-').map(Number);
@@ -1559,9 +1559,18 @@ $('btn-notice').addEventListener('click', () => {
   const dlg = $('notice-dialog');
   if (dlg.open) return;
   dlg.returnValue = '';   // 지난번 닫을 때의 값('real' 등)이 남지 않게
-  dlg.showModal();
+  showNotice();
 });
 function noticeHidden() { try { return localStorage.getItem(NOTICE_KEY) === NOTICE_VER; } catch { return false; } }
+/** 공지를 띄운다 — '다시 보지 않기' 체크는 지금 저장된 값으로 맞춘다 */
+function showNotice() {
+  $('notice-hide').checked = noticeHidden();
+  $('notice-dialog').showModal();
+}
+// 체크하면 바로 남기고(닫기를 안 눌러도), 풀면 지워 다음 접속 때 다시 뜬다
+$('notice-hide').addEventListener('change', (e) => {
+  try { if (e.target.checked) localStorage.setItem(NOTICE_KEY, NOTICE_VER); else localStorage.removeItem(NOTICE_KEY); } catch { /* 저장소를 못 쓰면 다음에도 뜬다 */ }
+});
 $('notice-dialog').addEventListener('close', () => {
   // 처음 뜬 공지든 버튼으로 연 공지든, 닫으면 읽은 것으로 남기고 NEW를 지운다
   try { localStorage.setItem(NOTICE_READ_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 NEW가 남는다 */ }
@@ -1572,10 +1581,7 @@ $('notice-dialog').addEventListener('close', () => {
     const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
     if (r) r.checked = true;
     $('sample-dialog').showModal();
-    return;
   }
-  if (v !== 'hide') return;
-  try { localStorage.setItem(NOTICE_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 다음에도 뜬다 */ }
 });
 $('btn-features').addEventListener('click', () => $('features-dialog').showModal());   // 공지 위에 겹쳐 띄우고, 닫으면 공지로 돌아온다
-if (!noticeHidden()) $('notice-dialog').showModal();
+if (!noticeHidden()) showNotice();
