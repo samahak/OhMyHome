@@ -6,7 +6,7 @@ import {
   state, on, select, selectedFurnitureIds, isFurnitureSelected, toggleFurnitureSelection, beginFurnitureDrag, dragFurnitureTo,
 } from './store.js';
 import {
-  buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSlidingLeaf, buildGlassLeaf, buildTransom, setGhost, disposeObject, MIDDLE_FRAME,
+  buildFurniture, buildWindow, buildDoorFrame, buildDoorLeaf, buildSteelDoor, STEEL_DOOR, buildSlidingLeaf, buildGlassLeaf, buildTransom, setGhost, disposeObject, MIDDLE_FRAME,
 } from './models3d.js';
 import { DOOR } from './catalog.js';
 import { doorGeometry, slidingPanels, doorStyle, isHinged, swingLeaves, SLIDE } from './doors.js';
@@ -412,7 +412,8 @@ export class View3D {
     this.doorLeaves = [];
     for (const d of p.doors || []) {
       const g = doorGeometry(d), mid = { x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 };
-      if (this.tourMode && e && G.distToSegment(mid, e.a, e.b).dist < 200) continue;
+      const entry = !!e && G.distToSegment(mid, e.a, e.b).dist < 200;   // 현관문 — 두꺼운 철문(문틀도 강철 색)
+      if (this.tourMode && entry) continue;
       const doorH = Math.min(DOOR.h, Hmm), style = doorStyle(d), rot = -Math.atan2(g.u.y, g.u.x);
       if (style === 'middle' && Hmm - DOOR.h > 60) {   // 중문: 문 위는 벽 대신 고정 유리
         const tr = buildTransom(g.len * M, (Hmm - DOOR.h) * M, 0.05);
@@ -420,7 +421,7 @@ export class View3D {
         tr.rotation.y = rot;
         this.planGroup.add(tr);
       } else if (Hmm > DOOR.h) this.wallPiece(d.a, g.u, 0, g.len, DOOR.h, Hmm, d.t, new THREE.MeshStandardMaterial({ color: '#f2efe9', roughness: 0.9 }));
-      const frame = buildDoorFrame(g.len * M, doorH * M, d.t * M, style === 'middle' ? MIDDLE_FRAME : undefined);
+      const frame = buildDoorFrame(g.len * M, doorH * M, d.t * M, style === 'middle' ? MIDDLE_FRAME : entry ? STEEL_DOOR.frame : undefined);
       frame.position.set(mid.x * M, 0, mid.y * M);
       frame.rotation.y = rot;
       this.planGroup.add(frame);
@@ -428,7 +429,13 @@ export class View3D {
       // 문짝: 로컬 +x → 도면 n(문짝이 뻗는 쪽). 로컬 +z는 도면 (-n.y, n.x) = -swing·u 이므로 두께는 틈 안쪽(+u)으로 둔다.
       // 양여닫이는 양 끝 경첩에 반쪽 짝 둘 (swingLeaves)
       for (const { door: h, g: lg } of swingLeaves(d)) {
-        const leaf = buildDoorLeaf(lg.len * M, doorH * M, -h.swing);
+        let leaf;
+        if (entry) {   // 철문은 두께 가운데가 원점이라 여닫이 문짝 자리(z = 0~zSide·T)로 감싸 옮긴다. 바깥 면(번호 키)은 닫혔을 때 e.out 쪽
+          const outZ = (-lg.u.y * e.out.x + lg.u.x * e.out.y) >= 0 ? 1 : -1;
+          const steel = buildSteelDoor(lg.len * M - 0.01, doorH * M, STEEL_DOOR.t, outZ);
+          steel.position.z = (-h.swing * STEEL_DOOR.t) / 2;
+          leaf = new THREE.Group().add(steel);
+        } else leaf = buildDoorLeaf(lg.len * M, doorH * M, -h.swing);
         leaf.position.set((lg.hinge.x + lg.u.x * 40) * M, 0, (lg.hinge.y + lg.u.y * 40) * M);
         leaf.rotation.y = -Math.atan2(lg.n.y, lg.n.x);
         this.planGroup.add(leaf);
