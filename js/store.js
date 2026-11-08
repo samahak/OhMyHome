@@ -5,6 +5,9 @@
 //   'layouts'   배치 안(1안·2안…) 목록·지금 안이 바뀜
 //   'selection' 선택이 바뀜
 
+import { counterUnder } from './geometry.js';
+import { PURIFIER, COUNTER_TOP } from './catalog.js';
+
 const STORAGE_KEY = 'ohmyhome.project.v1';
 const HISTORY_LIMIT = 60;
 
@@ -44,8 +47,27 @@ export function on(type, fn) {
   listeners.get(type).add(fn);
 }
 export function emit(...types) {
+  if (types.includes('furniture')) settlePurifiers();
   for (const t of types) listeners.get(t)?.forEach((fn) => fn());
   if (types.some((t) => t !== 'selection')) scheduleSave();
+}
+
+/**
+ * 정수기는 놓인 자리를 따른다: 가운데가 주방 싱크대 위면 소형(상판 높이에 올리고 싱크대 방향으로), 아니면 바닥에 선 대형.
+ * 크기·띄움은 대형↔소형이 바뀔 때만 맞추고(그 뒤 사용자가 고친 크기는 둔다), 이름은 기본 이름일 때만 따라 바꾼다.
+ * 가구를 옮기는 길이 여럿이라(끌기·방향키·속성 칸·되돌리기) 'furniture' 이벤트마다 여기서 한 번에 맞춘다.
+ */
+const PURIFIER_NAMES = new Set(['정수기', PURIFIER.large.name, PURIFIER.small.name]);
+function settlePurifiers() {
+  for (const f of state.furniture) {
+    if (f.type !== 'water_purifier') continue;
+    const c = counterUnder(f, state.furniture), kind = c ? 'small' : 'large', p = PURIFIER[kind];
+    if (!!c !== !!f.onCounter) {
+      Object.assign(f, { w: p.w, d: p.d, h: p.h, elev: c ? (c.elev || 0) + COUNTER_TOP : 0 });
+      if (c) { f.onCounter = true; f.rot = c.rot; } else delete f.onCounter;
+    }
+    if (PURIFIER_NAMES.has(f.name)) f.name = p.name;
+  }
 }
 
 let seq = Date.now() % 100000;

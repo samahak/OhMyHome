@@ -37,6 +37,7 @@ export const SHAPES = {
   bath_upper_shelf: { label: '욕실 상부 선반' },
   kitchen_counter: { label: '주방 싱크대' },
   kitchen_l: { label: 'ㄱ자 주방 싱크대', dims: { w: '가로 길이 (뒤쪽)', d: '세로 길이 (꺾인 쪽)' } },
+  water_purifier: { label: '정수기' },
   box: { label: '상자(기본)' },
 };
 
@@ -141,6 +142,17 @@ export function mixStyles(f) {
   return Array.from({ length: mixCount(f.w) }, (_, i) => (MIX_PARTS.includes(f.mix?.[i]) ? f.mix[i] : MIX_DEFAULT[i % MIX_DEFAULT.length]));
 }
 
+/** 주방 싱크대 상판 높이(mm) — 3D 하부장 높이이고, 싱크대 위에 올린 정수기는 이만큼 띄운다 */
+export const COUNTER_TOP = 850;
+/**
+ * 정수기: 바닥에 단독으로 세우면 대형(스탠드형), 가운데가 주방 싱크대 위에 오면 소형(카운터탑).
+ * store.settlePurifiers()가 놓인 자리를 보고 크기·띄움·이름을 바꾸고, 싱크대 위면 f.onCounter = true.
+ */
+export const PURIFIER = {
+  large: { name: '대형 정수기', w: 330, d: 500, h: 1200 },
+  small: { name: '소형 정수기', w: 180, d: 430, h: 380 },
+};
+
 /** 의자 등받이 없음(f.stool, 엉덩이만 앉는 스툴)을 켜고 끌 때 맞추는 크기(mm) — 높이가 곧 앉는 면 높이다 */
 export const STOOL = { w: 400, d: 400, h: 460 };
 
@@ -191,6 +203,7 @@ export const CATALOG = [
   { type: 'aircon_outdoor', name: '에어컨 실외기', icon: '🌬️', w: 880, d: 330, h: 640, color: '#e8e9eb' },
   { type: 'kitchen_counter', name: '주방 싱크대', icon: '🍳', w: 2400, d: 600, h: 2200, color: '#eeeae4' },
   { type: 'kitchen_l', name: 'ㄱ자 주방 싱크대', icon: '🍳', w: 2700, d: 1800, h: 2200, color: '#eeeae4' },
+  { type: 'water_purifier', name: '정수기', icon: '💧', w: PURIFIER.large.w, d: PURIFIER.large.d, h: PURIFIER.large.h, color: '#f4f5f7' },
   { type: 'toilet', name: '변기', icon: '🚽', w: 400, d: 700, h: 780, color: '#f7f7f5' },
   { type: 'basin', name: '세면대', icon: '🚰', w: 600, d: 450, h: 850, color: '#f1efea' },
   { type: 'bathtub', name: '욕조', icon: '🛁', w: 1500, d: 750, h: 550, color: '#f7f7f5' },

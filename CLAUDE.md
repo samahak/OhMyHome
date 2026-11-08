@@ -321,6 +321,10 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   모자란 칸을 기본 차례로 채운다). 3D는 칸마다 `closedSection`/`openSection`, 속성은 칸별 `mix-i` 선택(가로·모양을 바꾸면 `renderProps`).
   `fridge` 냉장고장은 `fridgeCabinet()` — 옆판 + 위 장(300~600mm, 냉장고 자리 1.89m — A1-real 실측)만, 아래는 바닥판·걸레받이·뒤판 없이 바닥까지 트인다.
   기본값(통·문 있음)은 키를 남기지 않는다.
+- **정수기(`water_purifier`)**: 놓인 자리를 따른다 — `store.emit()`이 'furniture' 이벤트마다 `settlePurifiers()`를 불러, 가운데가 주방 싱크대
+  바닥 모양 안이면(`G.counterUnder`) 소형(`catalog.PURIFIER.small`, `elev` = 싱크대 elev + `COUNTER_TOP`, 싱크대 rot, `f.onCounter = true`),
+  아니면 바닥의 대형으로 바꾼다. 크기·띄움은 대형↔소형이 바뀔 때만, 이름은 기본 이름('정수기'·'대형 정수기'·'소형 정수기')일 때만 맞춘다.
+  싱크대 위(`onCounter`) 정수기는 싱크대와 겹쳐도 된다. 상판 높이 `COUNTER_TOP`(850)은 3D 하부장(`counterRun`)도 쓴다.
 - **스툴(`chair` + `f.stool`)**: 등받이 없는 의자. 높이 H가 곧 앉는 면이라 `chairUnderDesk`는 앉는 면을 H로 보고(책상 밑에 통째로 들어간다),
   속성 '등받이 없음'을 켜고 끌면(`applyStool`) 높이·기본 크기(`catalog.STOOL` ↔ 의자 카드)와 이름('의자'↔'스툴')을 함께 맞춘다.
 - 거울은 비출 환경맵이 없어 금속성을 높이면 검게 나온다. `MIRROR()`(밝은 회청색, 낮은 금속성)를 쓴다.
