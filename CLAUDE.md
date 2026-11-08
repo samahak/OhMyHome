@@ -266,8 +266,9 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
     `doors.moveDoorAlong(door, walls, dist)` — 문 폭에 수직으로만 옮기고, 새 가운데에서 양쪽으로 쏜 반직선이 닿는 벽까지로 a·b를 다시 잡는다.
     양옆 벽이 없거나(복도로 나감) 벽 속이면 null이라 그 자리로는 가지 않는다.
   - 속성에서 모양을 고르면 `editor.doorStyle`에 남아 🚪 문 도구로 새로 다는 문도 그 모양이 된다.
-- 둘러보기에서 현관문 줄보다 300mm 넘게 안쪽에 있으면 문짝(`view.doorLeaves`, 현관문 `Tour.pivot`)을 `models3d.setGhost()`로
-  거의 투명한 면 + 모서리 선으로 바꾼다(`Tour.updateDoorsGhost`, 바뀔 때만). 원래 재질은 `userData.solid`에 두고 되돌린다.
+- 둘러보기에서 집 안에 있으면 문짝(`view.doorLeaves`, 현관문 `Tour.pivot`)을 `models3d.setGhost()`로
+  거의 투명한 면 + 모서리 선으로 바꾼다(`Tour.updateDoorsGhost`, 바뀔 때만). 밖은 `Tour.isOutside`(벽·창·현관문·모든 틈을 막은 `G.outsideTester`)와
+  현관문 문턱(줄에서 안쪽 300mm까지, 문 폭 안)만이다 — 현관문 줄만 보면 그보다 바깥쪽에 있는 실외기실·발코니에서 투명이 풀린다. 원래 재질은 `userData.solid`에 두고 되돌린다.
   `view.doorsGhost`는 도면을 다시 그려도 유지되고, `setTourMode(false)`에서 끈다.
 
 ### 창 (`windows.js`, `G.findWindowGaps`)

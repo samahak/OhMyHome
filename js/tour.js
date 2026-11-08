@@ -50,6 +50,9 @@ export class Tour {
     this.grid = buildGrid(closed, state.furniture);
     this.closedWalls = closed;
     this._closedPolys = null;
+    // 집 바깥(공용 홀) — 벽·창·현관문과 모든 틈을 막은 칸 지도에서 테두리부터 채운 곳. 문짝 투명(updateDoorsGhost)이 쓴다
+    const closers = G.findWindowGaps(plan.walls, { skip: [], outsideOnly: false }).map((g) => ({ ...g, cap: false }));
+    this.isOutside = G.outsideTester(closed.concat(closers).map((w) => G.wallCorners({ ...w, cap: !!w.cap })));
     // 직접 걷기는 현관문이 열린 지도로 — 닫힌 지도를 쓰면 현관 앞(빈 칸)에서 문으로 못 들어간다
     this.walkGrid = buildGrid(solid, state.furniture);
     this.outside = { x: this.mid.x + e.out.x * 1400, y: this.mid.y + e.out.y * 1400 };
@@ -474,10 +477,16 @@ export class Tour {
     this.applyCamera();
   }
 
-  /** 집 안(현관문 줄에서 안쪽으로 30cm 넘게)에 들어오면 현관문·방문 문짝을 형태만 보이게 해 문 너머 방이 보이도록 한다 */
+  /**
+   * 집 안에 들어오면 현관문·방문 문짝을 형태만 보이게 해 문 너머 방이 보이도록 한다.
+   * 밖은 집 바깥 칸(this.isOutside)과 현관문 문턱(현관문 줄에서 안쪽 30cm까지, 문 폭 안)만 친다.
+   * 현관문 줄만 보면 그보다 바깥쪽에 있는 방(A1-real·A2-real 실외기실·발코니 등)에 가까이 갈 때 밖으로 잘못 보고 투명이 풀린다.
+   */
   updateDoorsGhost() {
-    const e = this.door, out = (this.pos.x - this.mid.x) * e.out.x + (this.pos.y - this.mid.y) * e.out.y;
-    const inside = out < -300;
+    const e = this.door, dx = this.pos.x - this.mid.x, dy = this.pos.y - this.mid.y;
+    const out = dx * e.out.x + dy * e.out.y, side = Math.abs(dx * e.out.y - dy * e.out.x);
+    const half = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y) / 2;
+    const inside = !((this.isOutside?.(this.pos) ?? out >= -300) || (out >= -300 && out <= e.t && side <= half + 100));
     if (inside === this.ghosted) return;
     this.ghosted = inside;
     this.view.setDoorsGhost(inside);
