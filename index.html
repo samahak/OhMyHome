@@ -177,7 +177,7 @@
           <button data-view="split" class="active">나란히</button>
           <button data-view="3d">3D</button>
         </div>
-        <button id="btn-full" title="지금 보기(2D 도면 · 나란히 · 3D) 그대로 화면 전체에 띄웁니다 — 오른쪽 위 📷 캡처로 그림 저장, ✕ 닫기나 Esc로 돌아옵니다">⛶ 전체 화면</button>
+        <button id="btn-full" title="지금 보기(2D 도면 · 나란히 · 3D) 그대로 화면 전체에 띄웁니다 — 오른쪽 위 ⤢ 맞추기로 화면 크기에 맞추고, 📷 캡처로 그림 저장, ✕ 닫기나 Esc로 돌아옵니다">⛶ 전체 화면</button>
         <button id="btn-tour" class="primary-soft" title="현관에서 문을 열고 들어가 집 안을 둘러봅니다">🚶 둘러보기</button>
         <div class="stage-3d-tools">
           <button id="cam-top">위에서</button>
@@ -191,6 +191,7 @@
         <div class="view" id="view2d"><canvas id="plan-canvas"></canvas><div id="measure-pop" class="measure-pop" hidden></div></div>
         <div class="view" id="view3d"></div>
         <div class="full-actions">
+          <button id="btn-full-fit" title="2D 도면과 3D 화면을 지금 화면 크기에 맞춰 도면 전체가 보이게 다시 맞춥니다 (F)">⤢ 맞추기</button>
           <button id="btn-full-cap" title="지금 전체 화면에 보이는 그대로 그림(PNG)으로 저장합니다">📷 캡처</button>
           <button id="btn-full-close" title="전체 화면 닫기 (Esc)">✕ 닫기</button>
         </div>
@@ -303,7 +304,7 @@
             예전에 저장한 작업도 열면 도면 그림에서 빗금 칸을 찾아 표시합니다.</p></li>
         <li><b>⛶ 도면 편집 화면 전체 화면</b>
           <p>가운데 위 막대의 <b>⛶ 전체 화면</b>(둘러보기 왼쪽)을 누르면 지금 보기(2D 도면 · 나란히 · 3D) 그대로 모니터 가득 커집니다.
-            오른쪽 위 <b>📷 캡처</b>는 지금 보이는 화면 그대로를 그림(PNG)으로 저장하고, <b>✕ 닫기</b>나 Esc로 돌아옵니다.</p></li>
+            오른쪽 위 <b>⤢ 맞추기</b>는 2D 도면과 3D 화면을 전체 화면 크기에 맞춰 도면 전체가 보이게 다시 잡고, <b>📷 캡처</b>는 지금 보이는 화면 그대로를 그림(PNG)으로 저장하며, <b>✕ 닫기</b>나 Esc로 돌아옵니다.</p></li>
         <li><b>💧 정수기</b>
           <p>② 가구에 <b>정수기</b>가 생겼습니다. 바닥에 단독으로 두면 <b>대형(스탠드형) 정수기</b>이고, 주방 싱크대 위로 끌어다 놓으면
             <b>소형 정수기</b>로 바뀌어 상판 위에 올라갑니다(싱크대 방향으로 돌아가고, 싱크대와 겹쳐도 괜찮습니다). 다시 바닥으로 옮기면 대형으로 돌아옵니다.</p></li>

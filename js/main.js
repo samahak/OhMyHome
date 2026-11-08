@@ -88,6 +88,11 @@ $('btn-full').addEventListener('click', () => {
 $('btn-full-close').addEventListener('click', () => {
   if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
 });
+// ⤢ 맞추기: 전체 화면 크기에 맞춰 2D는 도면 전체, 3D는 지금 시점(위에서·비스듬히)으로 집 전체가 보이게 다시 잡는다
+$('btn-full-fit').addEventListener('click', () => {
+  editor.fit();
+  view.resetCamera(view.camMode);
+});
 // 📷 캡처: 전체 화면에 보이는 그대로(2D 캔버스 · 3D 캔버스 · 3D 이름표)를 한 장의 PNG로. 상태줄이 안 보이므로 버튼 글자로 알린다
 $('btn-full-cap').addEventListener('click', () => {
   const btn = $('btn-full-cap');
