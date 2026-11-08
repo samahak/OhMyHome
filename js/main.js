@@ -178,6 +178,7 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.scaleSet = scaleSet;
   p.scaleRef = null;
   if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; }
+  p.name = image ? '샘플 도면' : '';
   ui.selection = null;
   emit('plan', 'selection');
   editor.fit();
@@ -1433,10 +1434,50 @@ $('btn-new').addEventListener('click', () => {
 });
 $('btn-export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(serialize())], { type: 'application/json' });
-  download(URL.createObjectURL(blob), `ohmyhome-${today()}.json`);
+  const name = fileSafe(state.plan.name);
+  download(URL.createObjectURL(blob), `ohmyhome-${name ? `${name}-` : ''}${today()}.json`);
 });
-/** 프로젝트 json(파일·샘플)을 연다 */
-function openProject(data, msg = '도면을 불러왔습니다.') {
+/** 파일 이름에 넣을 수 있게: 쓸 수 없는 글자·빈칸이 이어진 곳은 _ 하나로 */
+function fileSafe(s) {
+  return String(s || '').trim().replace(/[\\/:*?"<>|\u0000-\u001f\s]+/g, '_').replace(/^[._]+|_+$/g, '').slice(0, 60);
+}
+/** 이름이 없는 도면 파일은 파일 이름에서 짐작한다 — ohmyhome-{이름}-{날짜}.json · {이름}.ohmyhome.json */
+function nameFromFile(fileName) {
+  return planNameOr(fileName.replace(/\.json$/i, '').replace(/\.ohmyhome$/i, '').replace(/^ohmyhome-?/i, '').replace(/-?\d{4}-\d{2}-\d{2}$/, '').replace(/_/g, ' ').trim());
+}
+/**
+ * 날짜뿐인 이름(2026-11-08 · 2026.11.08 · 20261108 · 2026-11-08 (1) 등 — 받은 파일 이름에서 온 것)이나 빈 이름은 기본 이름 NewHome으로.
+ * 날짜는 연도 19xx·20xx + 월 1~12 + 일 1~31일 때만 본다 — 동·호수(5206-1401) 같은 숫자 이름은 그대로 둔다.
+ */
+const DEFAULT_PLAN_NAME = 'NewHome';
+const DATE_ONLY = /^(19|20)\d{2}[-./_ ]?(0?[1-9]|1[0-2])[-./_ ]?(0?[1-9]|[12]\d|3[01])(\s*\(\d+\)|[-_ ]\d{1,2})?$/;
+function planNameOr(name) {
+  const s = String(name ?? '').trim();
+  return s && !DATE_ONLY.test(s) ? s : DEFAULT_PLAN_NAME;
+}
+/** 도면 이름 입력칸 — 상단 되돌리기 왼쪽. 바꾸면(Enter·다른 곳 누르기) 되돌리기 기록을 남기고 저장한다 */
+function renderPlanName() {
+  const el = $('plan-name');
+  if (el !== document.activeElement) el.value = state.plan.name || '';
+  document.title = state.plan.name ? `${state.plan.name} — OhMyHome` : 'OhMyHome';
+}
+$('plan-name').addEventListener('change', (e) => {
+  let v = e.target.value.trim();
+  if (v) v = planNameOr(v);   // 날짜만 넣으면 NewHome (지우면 이름 없음)
+  e.target.value = v;
+  if (v === (state.plan.name || '')) return;
+  checkpoint();
+  state.plan.name = v;
+  emit('plan');
+  status(v ? `도면 이름을 ‘${v}’(으)로 바꿨습니다. 저장(.json) 파일 이름에 들어갑니다.` : '도면 이름을 지웠습니다.');
+});
+$('plan-name').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') e.target.blur();
+  if (e.key === 'Escape') { e.target.value = state.plan.name || ''; e.target.blur(); }
+});
+/** 프로젝트 json(파일·샘플)을 연다. name: 파일에 도면 이름이 없을 때 쓸 이름 */
+function openProject(data, msg = '도면을 불러왔습니다.', name = '') {
+  if (data?.plan) data.plan.name = data.plan.name ? planNameOr(data.plan.name) : name;   // 파일 안 이름이 날짜뿐이면 NewHome
   loadProject(data);
   $('wall-height').value = state.plan.wallHeight;
   $('floor-num').value = state.plan.floor;
@@ -1451,7 +1492,7 @@ $('file-project').addEventListener('change', async (e) => {
   e.target.value = '';
   if (!file) return;
   try {
-    openProject(JSON.parse(await file.text()));
+    openProject(JSON.parse(await file.text()), undefined, nameFromFile(file.name));
   } catch (err) {
     alert(`불러오지 못했습니다: ${err.message}`);
   }
@@ -1486,7 +1527,9 @@ $('sample-dialog').addEventListener('close', async () => {
   try {
     const res = await fetch(`sample/${s.file}`, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`sample/${s.file}을 찾지 못했습니다 (${res.status})`);
-    openProject(await res.json(), `위례자이더파크 ${s.name} 도면을 불러왔습니다.`);
+    const data = await res.json();
+    if (data?.plan) data.plan.name = s.name;   // 위례자이더파크 창에서 고른 이름으로
+    openProject(data, `위례자이더파크 ${s.name} 도면을 불러왔습니다.`);
   } catch (err) {
     status('');
     alert(`불러오지 못했습니다: ${err.message}`);
@@ -1504,6 +1547,7 @@ $('file-plan-only').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
+    if (data?.plan) data.plan.name = data.plan.name ? planNameOr(data.plan.name) : nameFromFile(file.name);
     replacePlan(data);
     // 그 도면의 기본 싱크대(ㄱ자 등)를 싱크대가 없는 안마다 바로 놓는다 (보호 중인 안은 빼고, 되돌리기 한 번에 함께 돌아온다)
     const sinkIn = [];
@@ -1603,7 +1647,7 @@ window.addEventListener('keydown', (e) => {
 
 /* ---------- 연결 ---------- */
 on('plan', () => {
-  renderScaleInfo(); renderPlanInfo(); renderPlaced(); renderLayouts(); refreshOrRender();
+  renderScaleInfo(); renderPlanInfo(); renderPlaced(); renderLayouts(); refreshOrRender(); renderPlanName();
   // 되돌리기·새 도면·불러오기 뒤에도 입력칸이 상태를 따라가게 (입력 중인 칸은 건드리지 않는다)
   for (const [id, v] of [['wall-height', state.plan.wallHeight], ['floor-num', state.plan.floor]]) {
     if ($(id) !== document.activeElement) $(id).value = v;
@@ -1632,8 +1676,11 @@ renderCatalog();
 renderLibrary();
 renderScaleInfo();
 renderPlanInfo();
+renderPlanName();
 renderPlaced();
 renderLayouts();
+// 예전에 날짜만 들어간 도면 이름(파일 이름에서 짐작한 것)은 NewHome으로
+if (state.plan.name && planNameOr(state.plan.name) !== state.plan.name) { state.plan.name = planNameOr(state.plan.name); renderPlanName(); }
 if (restored) {
   status(fromServer
     ? '지난번 작업을 불러왔습니다. (프로젝트 폴더의 ohmyhome-project.json에 자동 저장 — localhost·IP 어느 주소로 열어도 같습니다)'

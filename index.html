@@ -19,6 +19,7 @@
   <header class="topbar">
     <div class="brand">🏠 <b>OhMyHome</b> <span>도면 위에 우리집 가구 배치해 보기</span></div>
     <div class="top-actions">
+      <input id="plan-name" class="plan-name" type="text" maxlength="60" placeholder="이름 없는 도면" title="도면 이름 — 눌러서 고치고 Enter로 정합니다. 저장(.json) 파일 이름에 들어갑니다" aria-label="도면 이름">
       <button id="btn-undo" title="되돌리기 (Ctrl+Z)">↶ 되돌리기</button>
       <button id="btn-redo" title="다시 하기 (Ctrl+Shift+Z)">↷</button>
       <span class="sep"></span>
@@ -263,6 +264,8 @@
         <li><b>🪝 커튼 봉</b>
           <p>‘② 가구’의 <b>커튼 봉</b>은 벽과 벽 사이에 거는 봉입니다(드레스룸·다용도실 입구 가림막 등). 벽 사이로 끌어 놓으면 양쪽 벽까지 길이가 저절로 맞춰지고,
             ⟳ 90°로 돌리면 그 방향 벽 사이로 맞춰집니다. 속성에서 커튼을 <b>양옆으로 걷음</b> · <b>쳐 둠</b> · <b>봉만</b>으로 고르고, 높이 H가 봉 높이입니다.</p></li>
+        <li><b>🏷️ 도면 이름</b>
+          <p>상단 되돌리기 왼쪽에 도면 이름이 보이고, 눌러서 바로 고칠 수 있습니다. <b>저장(.json)</b> 파일 이름이 <b>ohmyhome-도면이름-날짜.json</b>이 됩니다.</p></li>
         <li><b>🧱 기본 포함 가구는 맨 뒤로</b>
           <p>기본 포함 가구(빗금)는 2D 도면에서 다른 가구보다 뒤에 그려집니다. 냉장고장 안 냉장고처럼 겹쳐 있는 곳을 누르면
             기본 포함이 아닌 가구가 먼저 골라집니다(3D에서도 같습니다).</p></li>
