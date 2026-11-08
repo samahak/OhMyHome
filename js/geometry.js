@@ -197,11 +197,14 @@ const inFridgeCabinet = (w, x) => w.type === 'wardrobe' && w.wstyle === 'fridge'
 const overlapOk = (a, b) => OVERLAP_ANY.has(a.type) || OVERLAP_ANY.has(b.type) || OVERLAP_OK.has([a.type, b.type].sort().join('|'))
   || inFridgeCabinet(a, b) || inFridgeCabinet(b, a) || onCounter(a, b) || onCounter(b, a);
 
-/** 벽이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다. */
-export function findCollisions(furniture, walls) {
+/**
+ * 벽·배치 금지 구역(plan.blocked — 도면의 빗금 샤프트 등)이나 다른 가구와 겹치는 가구 id 집합. 맞닿기만 한 것은 겹침이 아니다.
+ * 벽과 겹쳐도 되는 종류(WALL_OK)는 금지 구역도 함께 넘어간다(커튼).
+ */
+export function findCollisions(furniture, walls, blocked = []) {
   const bad = new Set();
   const fc = furniture.map((f) => furnitureParts(f, 2));
-  const wc = walls.map((w) => wallCorners(w, 1));
+  const wc = walls.map((w) => wallCorners(w, 1)).concat((blocked || []).map((z) => z.pts));
   const overlap = (A, B) => A.some((a) => B.some((b) => convexOverlap(a, b)));   // 조각(ㄱ자는 둘) 중 하나라도 겹치면
   furniture.forEach((f, i) => {
     if (f.disabled) return;   // 비활성화한 가구는 없는 것으로 친다

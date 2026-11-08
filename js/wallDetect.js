@@ -163,3 +163,50 @@ export function rectToWall(r, mmPerPx) {
   const x = (r.x + r.w / 2) * s;
   return { a: { x, y: r.y * s }, b: { x, y: (r.y + r.h) * s }, t: r.w * s };
 }
+
+/**
+ * 도면 그림의 빗금 칸(샤프트 등 가구를 놓을 수 없는 곳)을 찾는다 — 샘플 도면의 빗금(바탕 #e3e5e9 + 45° 선 #9aa1ab).
+ * 8px 칸마다 빗금 색 비율을 보고, 이어진 칸을 축에 나란한 사각형 여러 개로 덮은 뒤(ㄱ자 빗금은 둘) 가장자리를 픽셀 단위로 늘린다.
+ * 돌려주는 것은 픽셀 사각형 [{ x, y, w, h }].
+ */
+export function findHatchRects(img, { cell = 8, minCells = 3 } = {}) {
+  const { data, width: W, height: H } = img;
+  const hatchAt = (x, y) => {
+    const i = (y * W + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
+    // 바탕색과 선 색 사이(선의 안티에일리어싱 포함): 푸른 기가 조금 도는 회색
+    return r >= 0x90 && r <= 0xe7 && g >= r && b >= g && b - r >= 3 && b - r <= 22;
+  };
+  const bgAt = (x, y) => { const i = (y * W + x) * 4; return Math.abs(data[i] - 0xe3) <= 4 && Math.abs(data[i + 1] - 0xe5) <= 4 && Math.abs(data[i + 2] - 0xe9) <= 4; };
+  const cw = Math.floor(W / cell), ch = Math.floor(H / cell), on = new Uint8Array(cw * ch);
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+    let n = 0, bg = 0;
+    for (let y = cy * cell; y < (cy + 1) * cell; y++) for (let x = cx * cell; x < (cx + 1) * cell; x++) { if (hatchAt(x, y)) n++; if (bgAt(x, y)) bg++; }
+    // 빗금 색이 칸의 90% 이상이고 바탕색이 꽤 섞여 있어야(회색 선만 있는 테두리·글자는 빼고)
+    on[cy * cw + cx] = n >= cell * cell * 0.9 && bg >= cell * cell * 0.5 ? 1 : 0;
+  }
+  // 줄마다 이어진 칸 → 바로 위 줄의 같은 가로 구간 사각형에 잇는다
+  const rects = [], open = new Map();
+  for (let cy = 0; cy < ch; cy++) {
+    const next = new Map();
+    for (let cx = 0; cx < cw;) {
+      if (!on[cy * cw + cx]) { cx++; continue; }
+      let e = cx;
+      while (e < cw && on[cy * cw + e]) e++;
+      const key = `${cx},${e}`, r = open.get(key);
+      if (r) { r.y1 = cy + 1; next.set(key, r); } else { const n = { x0: cx, x1: e, y0: cy, y1: cy + 1 }; rects.push(n); next.set(key, n); }
+      cx = e;
+    }
+    open.clear(); for (const [k, v] of next) open.set(k, v);
+  }
+  // 칸 단위 → 픽셀, 가장자리는 빗금 색이 절반 넘게 이어지는 데까지 늘린다
+  const colOk = (x, y0, y1) => { let n = 0; for (let y = y0; y < y1; y++) if (hatchAt(x, y)) n++; return n >= (y1 - y0) * 0.5; };
+  const rowOk = (y, x0, x1) => { let n = 0; for (let x = x0; x < x1; x++) if (hatchAt(x, y)) n++; return n >= (x1 - x0) * 0.5; };
+  return rects.filter((r) => r.x1 - r.x0 >= minCells && r.y1 - r.y0 >= minCells).map((r) => {
+    let x0 = r.x0 * cell, x1 = r.x1 * cell, y0 = r.y0 * cell, y1 = r.y1 * cell;
+    for (let k = 0; k < cell && x0 > 0 && colOk(x0 - 1, y0, y1); k++) x0--;
+    for (let k = 0; k < cell && x1 < W && colOk(x1, y0, y1); k++) x1++;
+    for (let k = 0; k < cell && y0 > 0 && rowOk(y0 - 1, x0, x1); k++) y0--;
+    for (let k = 0; k < cell && y1 < H && rowOk(y1, x0, x1); k++) y1++;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  });
+}

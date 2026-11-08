@@ -526,13 +526,26 @@ export class PlanEditor {
       if (w) this.wallLabel(w);
     }
 
+    // 가구 배치 금지 구역(도면 빗금 — 샤프트 등): 연한 회색 + 빗금 + 점선 테두리
+    for (const z of plan.blocked || []) {
+      const shape = new Path2D();
+      z.pts.forEach((p, i) => { const q = this.toScr(p); i ? shape.lineTo(q.x, q.y) : shape.moveTo(q.x, q.y); });
+      shape.closePath();
+      c.fillStyle = 'rgba(120,128,140,.16)';
+      c.fill(shape);
+      this.hatch(shape, z.pts, 'rgba(90,98,110,.5)', 8);
+      c.strokeStyle = 'rgba(90,98,110,.7)'; c.lineWidth = 1; c.setLineDash([4, 3]);
+      c.stroke(shape);
+      c.setLineDash([]);
+    }
+
     for (const w of plan.windows) this.drawWindow(w, sel?.id === w.id);
     for (const d of plan.doors) this.drawDoor(d, sel?.id === d.id);
     this.drawScaleRef();
     this.drawEntrance();
 
     // 가구
-    this.collisions = G.findCollisions(state.furniture, plan.walls);
+    this.collisions = G.findCollisions(state.furniture, plan.walls, plan.blocked);
     const sorted = [...state.furniture].sort((a, b) => a.elev - b.elev);
     for (const f of sorted) this.drawFurniture(f, isFurnitureSelected(f.id), this.collisions.has(f.id));
 
@@ -791,7 +804,7 @@ export class PlanEditor {
     const off = !!f.disabled;
     c.fillStyle = bad ? 'rgba(229,72,64,.45)' : hexA(f.type === 'plant' ? '#7fb27a' : f.color || '#cccccc', off ? 0.18 : f.elev > 0 ? 0.55 : 0.85);
     c.fill(shape);
-    if (f.builtin) this.hatch(shape, f, off);
+    if (f.builtin) this.hatch(shape, G.furnitureCorners(f), off ? 'rgba(40,52,66,.18)' : 'rgba(40,52,66,.38)');
     c.lineWidth = selected ? 2.5 : 1.2;
     c.strokeStyle = selected ? '#2f6fed' : bad ? '#d9443b' : off ? 'rgba(30,40,50,.4)' : 'rgba(30,40,50,.75)';
     c.setLineDash(off ? [6, 4] : f.elev > 0 ? [5, 3] : []);
@@ -832,13 +845,13 @@ export class PlanEditor {
     }
   }
 
-  /** 기본 포함 가구 빗금 — 바닥 모양 안을 45° 가는 선으로 채운다 (선 간격은 화면 px로 늘 같다) */
-  hatch(shape, f, faded) {
-    const c = this.ctx, gap = 7;
-    const b = G.boundsOf(G.furnitureCorners(f).map((p) => this.toScr(p)));
+  /** 빗금 — 경로(shape) 안을 45° 가는 선으로 채운다(선 간격은 화면 px로 늘 같다). pts: 경로를 덮는 도면 점들(mm) — 기본 포함 가구·배치 금지 구역 */
+  hatch(shape, pts, color, gap = 7) {
+    const c = this.ctx;
+    const b = G.boundsOf(pts.map((p) => this.toScr(p)));
     c.save();
     c.clip(shape);
-    c.strokeStyle = faded ? 'rgba(40,52,66,.18)' : 'rgba(40,52,66,.38)';
+    c.strokeStyle = color;
     c.lineWidth = 1;
     c.beginPath();
     // 왼쪽 아래 → 오른쪽 위로 가는 선: x - y가 일정. 상자를 다 덮도록 x0 - (높이)부터 x1까지

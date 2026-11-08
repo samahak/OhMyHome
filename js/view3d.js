@@ -498,7 +498,7 @@ export class View3D {
 
   syncFurniture(force = false) {
     this.invalidate();
-    const bad = G.findCollisions(state.furniture, state.plan.walls);
+    const bad = G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked);
     const alive = new Set();
     const selIds = new Set(selectedFurnitureIds());
     for (const f of state.furniture) {

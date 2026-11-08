@@ -11,7 +11,7 @@ import { PlanEditor, fmtMM, isTyping } from './plan2d.js';
 import { View3D, SHOTS } from './view3d.js';
 import { makePdf, dataURLBytes } from './pdf.js';
 import { makeXlsx, STYLE } from './xlsx.js';
-import { detectWallRects, rectToWall } from './wallDetect.js';
+import { detectWallRects, rectToWall, findHatchRects } from './wallDetect.js';
 import { drawSamplePlan } from './samplePlan.js';
 import { autoFixtures, hasFixtureRooms, missingPlanSinks } from './fixtures.js';
 import { findWindows } from './windows.js';
@@ -443,7 +443,7 @@ function dropPoint(def) {
     for (let i = -ring; i <= ring; i++) {
       for (const [dx, dy] of [[i, -ring], [i, ring], [-ring, i], [ring, i]]) {
         Object.assign(probe, { x: cx + dx * step, y: cy + dy * step });
-        if (!G.findCollisions([...state.furniture, probe], state.plan.walls).has('__probe')) return { x: probe.x, y: probe.y };
+        if (!G.findCollisions([...state.furniture, probe], state.plan.walls, state.plan.blocked).has('__probe')) return { x: probe.x, y: probe.y };
       }
     }
   }
@@ -615,7 +615,7 @@ const CUSTOM_TAG = ' <span class="custom-tag" title="맞춤 제작 — 기성품
 /** 배치된 가구: 종류별로 묶고(제목 + 개수 + 소계), 같은 종류 안에서는 이름순 */
 function renderPlaced() {
   renderPlacedTotal();
-  const bad = G.findCollisions(state.furniture, state.plan.walls);
+  const bad = G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked);
   const groups = new Map();
   for (const f of [...state.furniture].sort(byTypeThenName)) {
     if (!groups.has(f.type)) groups.set(f.type, []);
@@ -719,7 +719,7 @@ function renderProps() {
   if (sel.ids) {
     el.innerHTML = `
       <h3><span>🗂️ 가구 ${sel.ids.length}개</span><button data-act="close" class="icon">✕</button></h3>
-      <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽이나 다른 가구와 겹치는 것이 있습니다.</div>
+      <div class="warn" data-warn hidden>⚠ 고른 가구 가운데 벽·빗금 구역(배치 금지)이나 다른 가구와 겹치는 것이 있습니다.</div>
       <ul class="multi-list">${sel.ids.map((id) => state.furniture.find((f) => f.id === id))
         .sort(byTypeThenName).map((f) => `<li>${iconFor(f.type)} ${esc(f.name)}${f.custom ? CUSTOM_TAG : ''} ${priceTag(f)}</li>`).join('')}</ul>
       ${(() => {
@@ -744,7 +744,7 @@ function renderProps() {
     el.innerHTML = `
       <h3><span>${iconFor(obj.type)} 가구</span><button data-act="close" class="icon">✕</button></h3>
       ${lib?.image ? `<img class="thumb" src="${lib.image}" alt="">` : ''}
-      <div class="warn" data-warn hidden>⚠ 벽이나 다른 가구와 겹칩니다.</div>
+      <div class="warn" data-warn hidden>⚠ 벽·빗금 구역(배치 금지)이나 다른 가구와 겹칩니다.</div>
       <label class="field"><span>이름</span><input type="text" data-f="name"></label>
       <label class="field"><span>모델명</span><input type="text" data-f="model" placeholder="예: LG 오브제 M873"></label>
       <label class="field"><span>가격 (원)</span><input type="text" inputmode="numeric" data-f="price" placeholder="예: 1,290,000 · 129만"></label>
@@ -871,7 +871,7 @@ function refreshProps() {
   if (!obj) return;
   const el = $('props');
   if (sel.ids) {
-    const bad = G.findCollisions(state.furniture, state.plan.walls);
+    const bad = G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked);
     el.querySelector('[data-warn]').hidden = !sel.ids.some((id) => bad.has(id));
     return;
   }
@@ -898,7 +898,7 @@ function refreshProps() {
     if (inp.type === 'checkbox') inp.checked = !!v; else inp.value = v ?? '';
   });
   if (sel.kind === 'furniture') {
-    el.querySelector('[data-warn]').hidden = !G.findCollisions(state.furniture, state.plan.walls).has(obj.id);
+    el.querySelector('[data-warn]').hidden = !G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked).has(obj.id);
     const p = SIZE_PRESETS[obj.type];
     const cur = p && (obj[p.key] ?? p.guess(obj));
     el.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', +b.dataset.preset === cur));
@@ -1300,6 +1300,23 @@ function placeMiddleDoor() {
 $('btn-middle-door').addEventListener('click', () => placeMiddleDoor());
 
 /** 문 목록이 없던 예전 프로젝트·저장본을 열면 문 기호를 한 번 찾아 단다 (되돌리기 기록은 남기지 않는다) */
+/**
+ * 배치 금지 구역(plan.blocked)이 없는 예전 프로젝트·저장본을 열면 도면 그림의 빗금(샤프트 등)을 한 번 찾아 넣는다.
+ * 되돌리기 기록은 남기지 않는다(문 찾기와 같이 '열면서 채우는' 것).
+ */
+async function blockedForOldProject(data) {
+  if (!data?.plan || data.plan.blocked !== undefined || !state.plan.image) return;
+  const img = await planImageData(), k = state.plan.mmPerPx;
+  const zones = findHatchRects(img).map((r, i) => ({
+    id: uid('z'), pts: [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]].map(([x, y]) => ({ x: x * k, y: y * k })),
+  }));
+  state.plan.blocked = zones;
+  if (!zones.length) return;
+  emit('plan', 'furniture');   // 가구 겹침 표시도 다시
+  const bad = G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked).size;
+  status(`도면의 빗금 칸(샤프트 등) ${zones.length}곳을 가구 배치 금지 구역으로 표시했습니다.${bad ? ` 벽·빗금 구역·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''}`);
+}
+
 async function doorsForOldProject(data) {
   if (!data?.plan || data.plan.doors !== undefined || !state.plan.image || !state.plan.walls.length) return;
   const r = await autoDoors();
@@ -1404,6 +1421,7 @@ function openProject(data, msg = '도면을 불러왔습니다.') {
   view.resetCamera('persp');
   status(msg);
   doorsForOldProject(data);
+  blockedForOldProject(data);
 }
 $('file-project').addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -1474,10 +1492,11 @@ $('file-plan-only').addEventListener('change', async (e) => {
     $('wall-height').value = state.plan.wallHeight;
     editor.fit();
     view.resetCamera('persp');
-    const bad = G.findCollisions(state.furniture, state.plan.walls).size;
+    const bad = G.findCollisions(state.furniture, state.plan.walls, state.plan.blocked).size;
     const sinkMsg = sinkIn.length ? ` 싱크대가 없던 ${state.layouts.length > 1 ? `${sinkIn.join('·')}에` : '배치에'} 이 도면의 기본 싱크대를 놓았습니다.` : '';
-    status(`도면만 바꿨습니다. 가구 배치는 그대로입니다.${sinkMsg}${bad ? ` 벽·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''} 되돌리기(Ctrl+Z)로 예전 도면으로 돌아갈 수 있습니다.`);
+    status(`도면만 바꿨습니다. 가구 배치는 그대로입니다.${sinkMsg}${bad ? ` 벽·빗금 구역·다른 가구와 겹치는 가구 ${bad}개는 빨갛게 보입니다.` : ''} 되돌리기(Ctrl+Z)로 예전 도면으로 돌아갈 수 있습니다.`);
     doorsForOldProject(data);
+    blockedForOldProject(data);
   } catch (err) {
     alert(`도면을 바꾸지 못했습니다: ${err.message}`);
   }
@@ -1596,6 +1615,7 @@ if (restored) {
     ? '지난번 작업을 불러왔습니다. (프로젝트 폴더의 ohmyhome-project.json에 자동 저장 — localhost·IP 어느 주소로 열어도 같습니다)'
     : `지난번 작업을 불러왔습니다. (${savesToServer() ? '이제 프로젝트 폴더의 ohmyhome-project.json에도' : '브라우저에'} 자동 저장됩니다)`);
   doorsForOldProject(restored);
+  blockedForOldProject(restored);
   // 브라우저 저장소에만 있던 작업이면 바로 프로젝트 폴더에도 써 둔다 (다른 주소에서도 보이게)
   if (!fromServer && savesToServer()) saveNow();
 }
