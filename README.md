@@ -16,7 +16,7 @@ run_ohmyhome.bat    # Windows
 
 배포용 zip은 `./build_ohmyhome.sh`(Windows는 `build_ohmyhome.bat`)로 `dist/OhMyHome-<날짜>.zip`에 만듭니다.
 화면 파일·실행 스크립트·`sample/plan`·`sample/real`의 json·사용 가이드 PDF(`docs/OhMyHome_Guide.pdf`, 공지사항 창이 내려받게 하는
-`docs/OhMyHome_User_Guide.pdf`)·A1-real·A2-real 실측 기록지(`measure/55A1_measured.pdf` · `55A2_measured.pdf`)만 담고, 이 README와
+`docs/OhMyHome_User_Guide.pdf`)·A1-real·A2-real·B1-real 실측 기록지(`measure/55A1_measured.pdf` · `55A2_measured.pdf` · `55B1_measured.pdf`)만 담고, 이 README와
 브라우저에 저장된 내 작업은 들어가지 않습니다. 가이드를 고치면 `docs/guide/make_pdf.sh`로 PDF를 다시 만드세요.
 
 ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작하지 않습니다. 반드시 웹 서버로 여세요.
@@ -83,7 +83,7 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 
 ## 샘플 도면 (`sample/`)
 
-분양 도면 프로젝트는 `sample/plan/`, 그 2D·3D 그림은 `sample/png/`, 실측 도면(A1-real·A2-real)의 프로젝트와 그림은 `sample/real/`에 있습니다.
+분양 도면 프로젝트는 `sample/plan/`, 그 2D·3D 그림은 `sample/png/`, 실측 도면(A1-real·A2-real·B1-real)의 프로젝트와 그림은 `sample/real/`에 있습니다.
 
 | 파일 | 내용 |
 | --- | --- |
@@ -96,6 +96,7 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 | `55A1_plan_3d.png` | 같은 A-1형 도면을 이 앱으로 세운 3D 화면 (벽 낮게 보기) |
 | `55A1_plan.ohmyhome.json` | A-1형 프로젝트 — 벽·창·설비·현관문·기준 치수까지 A-2형을 좌우 반전한 것 |
 | `55B1_plan*` | 55㎡ B-1형(확장형) — 단위세대 평면도의 표기 치수로 다시 그린 2D·3D와 프로젝트. B-2형과 같은 방향(현관 위, 거실·침실1 창 오른쪽)으로 돌려 그림 (침실2·알파룸 꺾인 칸막이, ㄱ자 주방) |
+| `55B1-real_plan*` | 55㎡ B-1형 실측 도면(B1-real) — 2026.11.06 현장 실측(`measure/55B1_measured.pdf`, 자료 출처 5207동l위례고)대로 B-1형 샘플을 고친 2D·3D와 프로젝트 (침실2 2,380 × 2,880 · 알파룸 2,220 × 2,880 · 칸막이 꺾임 404 / 1,110, 침실1 5,810 × 3,529 · 창 2,174(위 벽에서 808) · 문 1,024, 거실 세로 3,593 · 창 칸막이에서 447 / 아래 벽에서 516, 현관 폭 1,082 + 현관창고 636 × 1,364, 알파룸/주방 벽이 100 내려가 주방 1,960). 재지 않은 욕실·발코니·실외기실·키큰장은 샘플 그대로 |
 | `55B2_plan*` | 55㎡ B-2형(확장형) — 분양 안내 평면도의 바깥 치수 체인(벽 중심)으로 다시 그린 2D·3D와 프로젝트 (B-1형처럼 침실2·알파룸 꺾인 칸막이) |
 | `55C_plan*` | 55㎡ C형(확장형) — 분양 안내 평면도의 바깥 치수 체인으로 다시 그린 2D·3D와 프로젝트 (펜트리 공간) |
 | `55D_plan*` | 55㎡ D형(확장형) — 옆으로 누운 단위세대 평면도를 180° 돌려 거실·침실1 창이 왼쪽, 현관이 위로 오게 다시 그린 2D·3D와 프로젝트 (드레스룸이 트인 침실2, 침실2 쪽으로 늘어난 알파룸과 ㄱ자 칸막이) |
@@ -156,7 +157,7 @@ js/scenery.js         둘러보기 창밖 풍경 (층수 · 도로 · 아파트 
 js/xlsx.js            가구 목록 엑셀(.xlsx) 쓰기
 js/pdf.js             2D·3D 캡처 PDF 쓰기
 sample/               위례자이더파크 예시 세대 도면 — plan/ json · png/ 2D · 3D 그림 · real/ 실측 도면(json · 그림)
-measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf)
+measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf · 55B1_measured.pdf)
 docs/                 사용 가이드 PDF와 원본(docs/guide)
 serve.py              정적 파일 서버 (기본 포트 8190) + 작업 저장(/api/project → ohmyhome-project.json)
 build_ohmyhome.sh     배포 zip 만들기 (.bat은 Windows)

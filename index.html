@@ -225,18 +225,20 @@
       <a class="btn block notice-guide" href="docs/OhMyHome_User_Guide.pdf" download="OhMyHome_User_Guide.pdf">📘 사용 가이드(PDF) 내려받기</a>
       </section>
       <section class="notice-new">
-        <h3>🆕 새 소식 — 실측 도면 A1-real · A2-real</h3>
-        <p>55㎡ A-1형·A-2형을 현장에서 직접 잰 실측 치수로 다시 그린 도면 <b>A1-real</b>(새로 추가) · <b>A2-real</b>을 열 수 있습니다.</p>
+        <h3>🆕 새 소식 — 실측 도면 A1-real · A2-real · B1-real</h3>
+        <p>55㎡ A-1형·A-2형·B-1형을 현장에서 직접 잰 실측 치수로 다시 그린 도면 <b>A1-real</b> · <b>A2-real</b> · <b>B1-real</b>(새로 추가)을 열 수 있습니다.</p>
         <ul>
-          <li>‘<span class="xi-mark" aria-hidden="true"></span> 위례자이더파크 불러오기’에서 <b>55㎡ A-1형 실측 (A1-real)</b> 또는 <b>A-2형 실측 (A2-real)</b>을 고르세요.</li>
-          <li class="notice-key"><b>이미 A-1형·A-2형에 가구를 배치 중이라면</b> <a href="sample/real/55A1-real_plan.ohmyhome.json" download="55A1-real_plan.ohmyhome.json">A1-real</a> ·
-            <a href="sample/real/55A2-real_plan.ohmyhome.json" download="55A2-real_plan.ohmyhome.json">A2-real 도면 파일</a>을 받아
+          <li>‘<span class="xi-mark" aria-hidden="true"></span> 위례자이더파크 불러오기’에서 <b>55㎡ A-1형 실측 (A1-real)</b> · <b>A-2형 실측 (A2-real)</b> · <b>B-1형 실측 (B1-real)</b>을 고르세요.</li>
+          <li class="notice-key"><b>이미 A-1형·A-2형·B-1형에 가구를 배치 중이라면</b> <a href="sample/real/55A1-real_plan.ohmyhome.json" download="55A1-real_plan.ohmyhome.json">A1-real</a> ·
+            <a href="sample/real/55A2-real_plan.ohmyhome.json" download="55A2-real_plan.ohmyhome.json">A2-real</a> ·
+            <a href="sample/real/55B1-real_plan.ohmyhome.json" download="55B1-real_plan.ohmyhome.json">B1-real 도면 파일</a>을 받아
             왼쪽 <b>‘🔁 도면만 바꾸기(json)’</b>로 여세요. 놓아 둔 가구와 배치 안은 그대로 두고 도면만 실측 도면으로 바뀝니다.</li>
-          <li>방마다 벽 안쪽 실측 치수로 맞췄습니다. A1-real은 침실1 붙박이장 · 드레스룸 통로 · 냉장고장 두 칸, A2-real은 양여닫이 문의 대형 팬트리가 있습니다.</li>
-          <li>분양 도면으로 만든 A-1형·A-2형도 그대로 고를 수 있습니다.</li>
+          <li>방마다 벽 안쪽 실측 치수로 맞췄습니다. A1-real은 침실1 붙박이장 · 드레스룸 통로 · 냉장고장 두 칸, A2-real은 양여닫이 문의 대형 팬트리, B1-real은 현관창고가 있습니다.</li>
+          <li>분양 도면으로 만든 A-1형·A-2형·B-1형도 그대로 고를 수 있습니다.</li>
         </ul>
         <button class="primary-soft block" value="real-a1"><span class="xi-mark" aria-hidden="true"></span> A1-real 고르러 가기</button>
         <button class="primary-soft block" value="real"><span class="xi-mark" aria-hidden="true"></span> A2-real 고르러 가기</button>
+        <button class="primary-soft block" value="real-b1"><span class="xi-mark" aria-hidden="true"></span> B1-real 고르러 가기</button>
         <button type="button" id="btn-features" class="block">✨ 추가 기능 보기</button>
       </section>
       </div>
@@ -250,8 +252,12 @@
   <!-- 추가 기능: 공지사항 '새 소식'의 '추가 기능 보기'로 공지 위에 띄운다 -->
   <dialog id="features-dialog" class="features-dialog">
     <form method="dialog">
-      <h3>✨ 추가 기능 <small>2026.11.08</small></h3>
+      <h3>✨ 추가 기능 <small>2026.11.09</small></h3>
       <ul class="feature-list">
+        <li><b><span class="xi-mark" aria-hidden="true"></span> 실측 도면 B1-real</b>
+          <p>55㎡ B-1형을 현장에서 잰 치수(2026.11.06)로 다시 그린 도면입니다. ‘위례자이더파크 불러오기’에서 <b>55㎡ B-1형 실측 (B1-real)</b>을 고르고,
+            그 줄의 <b>📄 실측 기록지</b>로 실측값을 적은 기록지(PDF)를 받을 수 있습니다. 침실2 2,380 · 알파룸 2,220 · 침실1 5,810 × 3,529 · 거실 세로 3,593,
+            현관 폭 1,082와 왼쪽의 현관창고(안쪽 636 × 1,364)를 반영했습니다. 재지 않은 욕실 · 발코니 · 실외기실은 분양 도면 치수(기록지의 파란 숫자) 그대로입니다.</p></li>
         <li><b><span class="xi-mark" aria-hidden="true"></span> 실측 도면 A1-real</b>
           <p>55㎡ A-1형을 현장에서 잰 치수(mm)로 다시 그린 도면입니다. ‘위례자이더파크 불러오기’에서 <b>55㎡ A-1형 실측 (A1-real)</b>을 고르고,
             그 줄의 <b>📄 실측 기록지</b>로 A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지(PDF)를 받을 수 있습니다. 침실1 왼쪽 벽의 붙박이장(깊이 600), 드레스룸으로 가는 폭 710 통로,
