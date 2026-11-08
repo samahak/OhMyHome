@@ -306,6 +306,20 @@ export function rodSpan(f, walls, { min = 300, max = 6000 } = {}) {
 }
 
 /**
+ * 전열교환기 f의 덕트 길이: 본체 양 끝(로컬 -x · +x)에서 그 방향으로 처음 닿는 벽 면까지 (mm). { l, r } — 한쪽이 안 막히거나 max보다 멀면 그쪽은 null.
+ */
+export function ductReach(f, walls, max = 4000) {
+  const polys = walls.map((w) => wallCorners(w));
+  if (polys.some((poly) => pointInPoly(f, poly))) return { l: null, r: null };
+  const u = rotatePt(1, 0, (f.rot || 0) * DEG);
+  const reach = (dx, dy) => {
+    const d = Math.min(...polys.map((poly) => rayHit(f, dx, dy, poly))) - f.w / 2;
+    return isFinite(d) && d >= 0 && d <= max ? Math.round(d) : null;
+  };
+  return { l: reach(-u.x, -u.y), r: reach(u.x, u.y) };
+}
+
+/**
  * 점 p 근처의 문 틈(벽이 끊긴 곳)을 찾는다. 벽 끝에서 벽 방향으로 반직선을 쏘아
  * min~max mm 안에서 다른 벽을 만나면 그 사이를 틈으로 본다. 바깥 방향(out)은 벽 전체의 중심에서 먼 쪽이다.
  * 반환: { a, b, t, out:{x,y} } | null

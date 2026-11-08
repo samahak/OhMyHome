@@ -613,6 +613,42 @@ function bathUpperShelf(g, W, D, H, c) {
 }
 
 /** 에어컨 실외기: 몸통 + 앞면 왼쪽 둥근 팬 그릴 + 오른쪽 서비스 판 + 받침 다리 */
+/**
+ * 전열교환기: 천장에 매단 납작한 본체(앞 +z에 점검구 뚜껑 · 이름판), 가로(x) 양 끝에 둥근 덕트 이음관 둘씩과
+ * 은색 주름 덕트, 네 귀퉁이 매달기 쇠. 위(H)가 천장에 닿는다. 덕트는 f.ductL · f.ductR(mm, 본체 끝 ~ 벽 면 — store.settleRods가 잰다)만큼
+ * 벽까지 이어 벽 관통 마감판을 달고(한쪽은 창 쪽 바깥벽으로 나간다), 값이 없으면 짧은 토막만 그린다. 덕트는 창 위로 지나게 본체 위쪽에 둔다.
+ */
+function erv(g, W, D, H, c, f = {}) {
+  const body = mat(c, { roughness: 0.6 }), metal = METAL(), duct = mat('#c9ced6', { metalness: 0.35, roughness: 0.45 });
+  box(g, W, H, D, 0, H / 2, 0, body);
+  box(g, W * 0.62, 0.004, D * 0.62, 0, -0.002, 0, mat(shade(c, 0.9), { roughness: 0.6 }));                  // 아래 점검구 뚜껑
+  box(g, W * 0.7, H * 0.7, 0.004, 0, H / 2, D / 2 + 0.002, mat(shade(c, 0.95), { roughness: 0.6 }));        // 앞 판
+  box(g, 0.12, 0.05, 0.003, -W * 0.25, H * 0.62, D / 2 + 0.005, mat('#4d6a8a', { roughness: 0.5 }));         // 이름판
+  const r = Math.min(0.075, H * 0.32), y = H - r - 0.012;
+  for (const sx of [-1, 1]) {
+    const reach = (sx < 0 ? f.ductL : f.ductR);
+    const len = reach != null ? Math.max(0.08, reach / 1000) : 0.31;   // 본체 끝 ~ 벽 면 (없으면 짧은 토막)
+    for (const sz of [-1, 1]) {
+      const z = sz * D * 0.25;
+      cylX(g, r, 0.06, sx * (W / 2 + 0.03), y, z, metal);                     // 이음관
+      const n = Math.max(1, Math.round((len - 0.06) / 0.05));                  // 주름 덕트: 굵기를 번갈아 주름처럼
+      const seg = (len - 0.06) / n;
+      for (let k = 0; k < n; k++) cylX(g, r * (k % 2 ? 1.02 : 1.08), seg, sx * (W / 2 + 0.06 + seg * (k + 0.5)), y, z, duct);
+      if (reach != null) cylX(g, r * 1.45, 0.012, sx * (W / 2 + len - 0.006), y, z, metal);   // 벽 관통 마감판
+    }
+    for (const sz of [-1, 1]) box(g, 0.05, 0.03, 0.04, sx * (W / 2 - 0.04), H - 0.015, sz * (D / 2 + 0.02), metal);   // 매달기 쇠
+  }
+}
+
+/** 벽등(벽부등): 벽(-z)에 붙는 받침판 + 앞으로 나온 젖빛 덮개(은은히 빛남) + 위·아래 테 */
+function wallLight(g, W, D, H, c) {
+  const base = mat(c, { roughness: 0.5 }), z0 = -D / 2;
+  box(g, W, H, 0.015, 0, H / 2, z0 + 0.0075, base);
+  const glow = mat('#fff6e2', { emissive: '#ffe9b8', emissiveIntensity: 0.9, roughness: 0.3 });
+  box(g, W * 0.86, H * 0.66, D - 0.03, 0, H / 2, z0 + 0.015 + (D - 0.03) / 2, glow);
+  for (const y of [H * 0.12, H * 0.88]) box(g, W * 0.92, H * 0.1, D - 0.02, 0, y, z0 + 0.01 + (D - 0.02) / 2, base);
+}
+
 function airconOutdoor(g, W, D, H, c) {
   const body = mat(c, { roughness: 0.45 }), foot = 0.04, bh = H - foot;
   box(g, W, bh, D, 0, foot + bh / 2, 0, body);
@@ -1087,7 +1123,7 @@ export function buildWindow(W, H, T, sill) {
 const BUILDERS = {
   fridge_side: (g, W, D, H, c) => fridge(g, W, D, H, c, true),
   fridge_top: (g, W, D, H, c) => fridge(g, W, D, H, c, false),
-  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, curtain_rod: curtainRod, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
+  kimchi, kimchi_stand: kimchiStand, washer, wash_tower: washTower, top_washer: topWasher, wardrobe, shoe_cabinet: shoeCabinet, microwave_cabinet: microwaveCabinet, curtain, curtain_rod: curtainRod, drawer, shelf, wood_shelf: woodShelf, shelf_cabinet: shelfCabinet, shower, plant, tvstand, tv, wallpad, aircon, aircon_outdoor: airconOutdoor, erv, wall_light: wallLight, bath_shelf: bathShelf, bath_upper_shelf: bathUpperShelf,
   bed, sofa, table, desk, chair, vanity, toilet, basin, bathtub, kitchen_counter: kitchenCounter, kitchen_l: kitchenL, water_purifier: waterPurifier, box: plain,
 };
 

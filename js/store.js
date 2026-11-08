@@ -5,7 +5,7 @@
 //   'layouts'   배치 안(1안·2안…) 목록·지금 안이 바뀜
 //   'selection' 선택이 바뀜
 
-import { counterUnder, rodSpan } from './geometry.js';
+import { counterUnder, rodSpan, ductReach } from './geometry.js';
 import { PURIFIER, COUNTER_TOP, ROD_SPAN } from './catalog.js';
 
 const STORAGE_KEY = 'ohmyhome.project.v1';
@@ -74,11 +74,18 @@ function settlePurifiers() {
 }
 
 /**
+ * 전열교환기(erv)는 덕트 길이(ductL · ductR, 본체 양 끝에서 벽까지)를 여기서 함께 맞춘다.
  * 커튼 봉은 벽과 벽 사이에 건다: 가로를 직접 고친 것(manualW) 말고는 봉 방향 양쪽 벽까지 길이·가운데를 맞춘다.
  * 끌거나 돌리면 그 자리 벽 사이로 바로 늘고 줄어든다. 양쪽에 벽이 없으면(트인 곳) 그대로 둔다.
  */
 function settleRods() {
   for (const f of state.furniture) {
+    if (f.type === 'erv') {   // 전열교환기 덕트: 본체 양 끝에서 벽까지 (놓인 자리마다 다시 잰다)
+      const d = ductReach(f, state.plan.walls);
+      if (d.l != null) f.ductL = d.l; else delete f.ductL;
+      if (d.r != null) f.ductR = d.r; else delete f.ductR;
+      continue;
+    }
     if (f.type !== 'curtain_rod' || f.manualW) continue;
     const s = rodSpan(f, state.plan.walls, ROD_SPAN);
     if (!s) continue;

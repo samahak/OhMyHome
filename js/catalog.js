@@ -25,6 +25,8 @@ export const SHAPES = {
   wallpad: { label: '월패드' },
   aircon: { label: '스탠드 에어컨' },
   aircon_outdoor: { label: '에어컨 실외기' },
+  erv: { label: '전열교환기' },
+  wall_light: { label: '벽등' },
   bed: { label: '침대' },
   sofa: { label: '소파' },
   table: { label: '식탁/테이블' },
@@ -213,6 +215,10 @@ export const CATALOG = [
   { type: 'vanity', name: '화장대', icon: '🪞', w: 800, d: 400, h: 1450, color: '#efe6da' },
   { type: 'aircon', name: '스탠드 에어컨', icon: '❄️', w: 400, d: 400, h: 1850, color: '#f6f7f9' },
   { type: 'aircon_outdoor', name: '에어컨 실외기', icon: '🌬️', w: 880, d: 330, h: 640, color: '#e8e9eb' },
+  // 전열교환기(환기 장치): 실외기실·다용도실 천장에 매단다 — 위가 천장(2,300)에 닿도록 띄움 = 천장 높이 − 높이. 양옆(가로 쪽)에 덕트 넷
+  { type: 'erv', name: '전열교환기', icon: '🍃', w: 800, d: 600, h: 270, color: '#eceef1', elev: 2030 },
+  // 벽등(벽부등): 벽에 다는 등. 둘러보기에서 빛을 내고, 벽등이 있는 방에는 천장 LED 방등을 달지 않는다(tour.buildLeds). 등을 벽에 대고(🧲 벽에 붙이기) 쓴다
+  { type: 'wall_light', name: '벽등', icon: '💡', w: 260, d: 110, h: 130, color: '#f4f2ee', elev: 1900 },
   { type: 'kitchen_counter', name: '주방 싱크대', icon: '🍳', w: 2400, d: 600, h: 2200, color: '#eeeae4' },
   { type: 'kitchen_l', name: 'ㄱ자 주방 싱크대', icon: '🍳', w: 2700, d: 1800, h: 2200, color: '#eeeae4' },
   { type: 'water_purifier', name: '정수기', icon: '💧', w: PURIFIER.large.w, d: PURIFIER.large.d, h: PURIFIER.large.h, color: '#f4f5f7' },

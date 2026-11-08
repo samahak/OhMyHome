@@ -228,7 +228,7 @@ export class Tour {
     if ([...t].some((x) => /^(kitchen|microwave)/.test(x))) return '주방';
     if (t.has('wardrobe') || t.has('drawer') || t.has('vanity')) return '드레스룸';
     if (['washer', 'top_washer', 'wash_tower'].some((x) => t.has(x))) return '다용도실';
-    if (t.has('aircon_outdoor')) return '실외기실';
+    if (t.has('aircon_outdoor') || t.has('erv')) return '실외기실';
     if ([...t].some((x) => /^(kimchi|fridge)/.test(x))) return '펜트리';
     if (t.has('desk')) return '서재';
     return '방';
@@ -428,11 +428,14 @@ export class Tour {
   buildLeds(H, coffers) {
     const plan = state.plan;
     const inCoffer = (p) => coffers.some((c) => p.x > c.minX && p.x < c.maxX && p.y > c.minY && p.y < c.maxY);
+    // 벽등(가구 wall_light)이 있는 방은 그 등이 방을 밝히므로 천장 방등을 달지 않는다 (예: 실외기실 — 문 들어가서 오른쪽 벽 등)
+    const wallLights = state.furniture.filter((f) => f.type === 'wall_light' && !f.disabled);
+    const lit = (r) => wallLights.some((f) => G.pointInPoly(f, r.pts));
     // 방 영역이 있으면 방 안쪽 상자 가운데, 없으면 들를 곳(그 공간의 한가운데) 자리. 크기는 둘레 칸의 짧은 변으로
     const cand = plan.rooms.length
-      ? plan.rooms.filter((r) => r !== this.living?.room).map((r) => innerBox(r, plan.walls)).filter(Boolean)
+      ? plan.rooms.filter((r) => r !== this.living?.room && !lit(r)).map((r) => innerBox(r, plan.walls)).filter(Boolean)
         .map((b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, b }))
-      : this.places.map((p) => ({ x: p.x, y: p.y, b: this.spanBox(p) }));
+      : this.places.filter((p) => !wallLights.some((f) => Math.hypot(f.x - p.x, f.y - p.y) < 1500)).map((p) => ({ x: p.x, y: p.y, b: this.spanBox(p) }));
     const spots = [];
     for (const { x, y, b } of cand) {
       const short = b ? Math.min(b.maxX - b.minX, b.maxY - b.minY) : 2000;
@@ -442,6 +445,14 @@ export class Tour {
     const frame = new THREE.MeshBasicMaterial({ color: '#f1f0ec' });
     const panel = new THREE.MeshBasicMaterial({ color: '#fffef8' });
     const edge = new THREE.MeshBasicMaterial({ color: '#dcd9d2' });
+    // 벽등 빛: 등 앞(로컬 +y) 30cm, 등 높이에서. 빛 개수 한도(열 개)는 벽등이 먼저 쓴다
+    for (const f of wallLights.slice(0, 10)) {
+      const fwd = G.rotatePt(0, f.d / 2 + 300, (f.rot || 0) * G.DEG);
+      const light = new THREE.PointLight('#fff1dc', 0.5, 4, 1.5);
+      light.position.set((f.x + fwd.x) * M, ((f.elev || 0) + f.h / 2) * M, (f.y + fwd.y) * M);
+      this.group.add(light);
+    }
+    const lightLeft = Math.max(0, 10 - wallLights.length);
     for (const [i, s] of spots.entries()) {
       const L = s.size * M, x = s.x * M, z = s.y * M;
       const body = new THREE.Mesh(new THREE.BoxGeometry(L + 0.03, 0.035, L + 0.03), frame);   // 테두리 틀
@@ -452,7 +463,7 @@ export class Tour {
       face.rotation.x = Math.PI / 2;
       face.position.set(x, H - 0.039, z);
       this.group.add(body, rim, face);
-      if (i < 10) {   // 빛은 열 개까지만 (많으면 셰이더가 무거워진다)
+      if (i < lightLeft) {   // 빛은 벽등과 합쳐 열 개까지만 (많으면 셰이더가 무거워진다)
         const light = new THREE.PointLight('#fff6e8', 0.45, 4.5, 1.5);
         light.position.set(x, H - 0.25, z);
         this.group.add(light);
