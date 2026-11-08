@@ -31,6 +31,7 @@ copy /y sample\real\*.json "%DEST%\sample\real\" >nul
 copy /y docs\OhMyHome_User_Guide.pdf "%DEST%\docs\" >nul
 copy /y measure\55A1_measured.pdf "%DEST%\measure\" >nul
 copy /y measure\55A2_measured.pdf "%DEST%\measure\" >nul
+copy /y measure\55B1_measured.pdf "%DEST%\measure\" >nul
 
 if not exist dist mkdir dist
 if exist "dist\%NAME%.zip" del "dist\%NAME%.zip"
