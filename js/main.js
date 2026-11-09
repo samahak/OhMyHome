@@ -1527,6 +1527,7 @@ const XI_PARK_SAMPLES = [
   { file: 'plan/55B1_plan.ohmyhome.json', name: '55㎡ B-1형' },
   { file: 'real/55B1-real_plan.ohmyhome.json', name: '55㎡ B-1형 실측 (B1-real)', sheet: 'measure/55B1_measured.pdf' },
   { file: 'plan/55B2_plan.ohmyhome.json', name: '55㎡ B-2형' },
+  { file: 'real/55B2-real_plan.ohmyhome.json', name: '55㎡ B-2형 실측 (B2-real)', sheet: 'measure/55B2_measured.pdf' },
   { file: 'plan/55C_plan.ohmyhome.json', name: '55㎡ C형' },
   { file: 'plan/55D_plan.ohmyhome.json', name: '55㎡ D형' },
 ];
@@ -1719,7 +1720,7 @@ window.__ohmyhome = { state, editor, view, runDetect };
 // 공지 내용이 바뀌면 NOTICE_VER를 올리고 NOTICE_DATE를 바꾼 날로 고친다 — 예전 공지를 '다시 보지 않기' 한 사람에게도 새 공지는 한 번 뜨고,
 // 상단 '📢 공지사항' 버튼에 그날부터 NOTICE_NEW_DAYS일 동안 NEW가 붙는다 — 이 PC(브라우저)에서 이 공지를 한 번 읽으면(창을 닫으면) 지운다
 const NOTICE_KEY = 'ohmyhome.notice.hidden', NOTICE_READ_KEY = 'ohmyhome.notice.read';
-const NOTICE_VER = '4', NOTICE_DATE = '2026-11-09', NOTICE_NEW_DAYS = 7;
+const NOTICE_VER = '5', NOTICE_DATE = '2026-11-09', NOTICE_NEW_DAYS = 7;
 /** 공지가 바뀐 지 NOTICE_NEW_DAYS일이 안 지났는가 (바뀐 날 0시부터, 이 PC 시각 기준) */
 function noticeIsNew(now = new Date()) {
   const [y, m, d] = NOTICE_DATE.split('-').map(Number);
@@ -1751,8 +1752,8 @@ $('notice-dialog').addEventListener('close', () => {
   try { localStorage.setItem(NOTICE_READ_KEY, NOTICE_VER); } catch { /* 저장소를 못 쓰면 NEW가 남는다 */ }
   updateNoticeBadge();
   const v = $('notice-dialog').returnValue;
-  const real = { real: '55A2-real', 'real-a1': '55A1-real', 'real-b1': '55B1-real' }[v];
-  if (real) {   // 새 소식의 'A1-real · A2-real · B1-real 고르러 가기': 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
+  const real = { real: '55A2-real', 'real-a1': '55A1-real', 'real-b1': '55B1-real', 'real-b2': '55B2-real' }[v];
+  if (real) {   // 새 소식의 'A1-real · A2-real · B1-real · B2-real 고르러 가기': 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
     const i = XI_PARK_SAMPLES.findIndex((s) => s.file.split('/').pop().startsWith(`${real}_`));
     const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
     if (r) r.checked = true;
