@@ -219,8 +219,17 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .measure-pop .hint { margin-top: 4px; }
 .notice-dialog, .sample-dialog { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .2); color: var(--text); }
 .notice-dialog::backdrop, .sample-dialog::backdrop { background: rgba(20, 28, 40, .35); }
-.notice-dialog { width: min(860px, calc(100vw - 32px)); line-height: 1.55; }
-.notice-cols { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+.notice-dialog { width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); line-height: 1.55; }
+/* 공지 높이는 왼쪽 소개 칸이 정한다(화면 세로의 2/3쯤). 오른쪽 새 소식(.notice-new)은 크기를 내지 않고(contain: size)
+   그 높이에 맞춰 늘어나 넘치는 만큼 혼자 세로로 스크롤한다. 왼쪽마저 화면에 안 들어가는 작은 화면에서만 두 칸 전체가 스크롤된다 */
+.notice-dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 66px); }
+.notice-cols { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.notice-cols > .notice-new { align-self: stretch; contain: size; overflow-y: auto; overscroll-behavior: contain; }
+.notice-pick { padding: 10px 12px; border: 1px solid #c9d6e2; border-radius: 10px; background: #f3f7fb; }
+.notice-pick h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13.5px; color: #112d43; }
+.notice-pick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.notice-pick-grid button { justify-content: center; }
+@media (max-width: 520px) { .notice-pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .notice-new { padding: 12px 14px; border: 1px solid #f0b48f; border-radius: 10px; background: #fff6ef; }
 .notice-new ul { padding-left: 16px; font-size: 13px; }
 .notice-new li.notice-key { margin: 4px 0 6px; padding: 6px 8px 6px 6px; border-radius: 6px; background: #ffe8d9; color: #7a3208; }
@@ -235,7 +244,7 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .feature-list li .xi-mark { color: #112d43; }
 .feature-list p { margin: 3px 0 0; font-size: 13px; color: #3d4652; }
 .notice-new button.block { justify-content: center; margin: 4px 0 0; }
-@media (max-width: 760px) { .notice-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .notice-cols { grid-template-columns: minmax(0, 1fr); } .notice-cols > .notice-new { contain: none; overflow: visible; } }
 .notice-dialog h3 { margin: 0 0 8px; font-size: 16px; }
 .notice-dialog p { margin: 0 0 8px; }
 .notice-dialog ul { margin: 0 0 10px; padding-left: 18px; }
@@ -243,7 +252,7 @@ output { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 2e
 .notice-warn { padding: 8px 10px; border-radius: 8px; background: #fff6ef; color: #8a3d0a; font-size: 12px; }
 .notice-guide { margin: 4px 0 12px; text-decoration: none; }
 /* 아래 버튼 줄은 위 내용(새 소식 칸)과 띄우고 가는 줄로 나눈다 */
-.notice-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.notice-actions { flex: none; display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .notice-actions .notice-hide { margin: 0 auto 0 0; cursor: pointer; }
 .sample-dialog { width: min(440px, calc(100vw - 32px)); }
 .sample-dialog h3 { margin: 0 0 4px; font-size: 15px; }
