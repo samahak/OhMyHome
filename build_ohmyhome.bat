@@ -2,7 +2,7 @@
 rem OhMyHome 배포 파일 만들기 — dist\OhMyHome-<날짜>.zip
 rem 정해 둔 파일만 담는다: 화면(index.html·css·js), 실행 스크립트, sample\plan·sample\real의 json 전부, 사용 가이드 PDF, LICENSE.
 rem 웹 사용 가이드(docs\OhMyHome_User_Guide.pdf)는 공지사항 창의 내려받기 링크가 가리키므로 같은 자리(docs\)에 담는다.
-rem README(개발용 설명)와 sample의 png(sample\png·sample\real의 그림)는 넣지 않는다. 가이드 PDF(docs\OhMyHome_Guide.pdf)는 미리 만들어 둔다.
+rem README(개발용 설명)와 sample의 png(sample\plan\png·sample\real\png의 그림)는 넣지 않는다. 가이드 PDF(docs\OhMyHome_Guide.pdf)는 미리 만들어 둔다.
 rem 사용자가 작업한 도면·가구는 브라우저 localStorage에만 있으므로 담기지 않는다.
 setlocal
 cd /d "%~dp0"

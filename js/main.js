@@ -1517,7 +1517,7 @@ $('file-project').addEventListener('change', async (e) => {
 });
 // 위례자이더파크 불러오기 — sample 폴더의 도면을 팝업에서 골라 연다.
 // 정적 서버(GitHub Pages 등)는 폴더 목록을 주지 않으므로 파일 이름을 여기 적어 둔다. file은 sample/ 아래 경로 — 분양 도면 plan/, 실측 도면 real/
-// (그림은 png/·real/에 있고 앱은 쓰지 않는다). sample에 json을 더하면 여기에도 더한다
+// (그림은 plan/png/·real/png/에 있고 앱은 쓰지 않는다). sample에 json을 더하면 여기에도 더한다
 const XI_PARK_SAMPLES = [
   { file: 'plan/55A1_plan.ohmyhome.json', name: '55㎡ A-1형' },
   // sheet: 그 형의 실측 기록지 PDF(있는 형만) — 고르는 창에 내려받기 링크를 단다

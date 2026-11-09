@@ -73,8 +73,8 @@ js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
 measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지) · 55B1_measured.pdf(B-1형 현장 실측 사진의 값을 B-1형 도면에 옮긴 기록지 — 빨강 실측, 파랑은 재지 않아 분양 도면 값, ⓐ 나눠 잰 합이 전체와 다른 값)
                        — 위례자이더파크 창 A2-real·A1-real·B1-real 줄의 링크. 기록지마다 왼쪽 위에 자료 출처(제공한 세대)를 적는다
-sample/                실제 세대 예시 (1px = 5mm) — plan/ 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형 프로젝트 JSON · png/ 그 2D·3D 이미지 ·
-                       real/ A-2·A-1·B-1형 실측(A2-real·A1-real·B1-real)의 JSON과 2D·3D 이미지
+sample/                실제 세대 예시 (1px = 5mm) — plan/ 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형 프로젝트 JSON(plan/png/ 그 2D·3D 이미지) ·
+                       real/ A-2·A-1·B-1형 실측(A2-real·A1-real·B1-real)의 JSON(real/png/ 그 2D·3D 이미지)
 ```
 
 ### 좌표와 단위
