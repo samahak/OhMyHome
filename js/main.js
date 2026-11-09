@@ -1753,7 +1753,7 @@ $('notice-dialog').addEventListener('close', () => {
   updateNoticeBadge();
   const v = $('notice-dialog').returnValue;
   const real = { real: '55A2-real', 'real-a1': '55A1-real', 'real-b1': '55B1-real', 'real-b2': '55B2-real' }[v];
-  if (real) {   // 새 소식의 'A1-real · A2-real · B1-real · B2-real 고르러 가기': 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
+  if (real) {   // 공지 왼쪽 '실측 도면 고르러 가기' 상자의 A1-real · A2-real · B1-real · B2-real 버튼: 위례자이더파크 목록을 그 실측 도면에 맞춰 연다
     const i = XI_PARK_SAMPLES.findIndex((s) => s.file.split('/').pop().startsWith(`${real}_`));
     const r = document.querySelector(`input[name="xi-sample"][value="${i}"]`);
     if (r) r.checked = true;

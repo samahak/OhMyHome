@@ -411,10 +411,11 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
 - 단축키는 입력칸에 글자를 넣는 중(`isTyping()`)이거나 팝업(`dialog[open]`)이 열려 있으면 무시한다.
 - **공지사항**(`#notice-dialog`): 처음 접속할 때 `showModal()`. 프로그램 설명 + `docs/OhMyHome_User_Guide.pdf` 내려받기 링크(그래서 배포 zip에도
   `docs/`에 담는다). 아래 `다시 보지 않기` 체크박스(`#notice-hide`)는 바꿀 때 바로 localStorage `ohmyhome.notice.hidden`에 `NOTICE_VER`를 남기거나 지운다 — 남아 있으면 접속 때 띄우지 않는다. 공지를 열 때(`showNotice`)는 저장된 값으로 체크를 맞춘다.
-  왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올리고(예전 공지를 숨긴 사람에게도 한 번 뜬다)
+  왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 높이는 왼쪽 칸이 정하고, 오른쪽 새 소식은 `contain: size`로 크기를 내지 않아 그 높이 안에서 혼자 세로로 스크롤한다(아래 버튼 줄은 늘 보인다). 왼쪽마저 안 들어가는 작은 화면·한 칸 화면(760px 이하)에서만 두 칸(`.notice-cols`) 전체가 스크롤된다. 공지 내용을 바꾸면 `NOTICE_VER`를 올리고(예전 공지를 숨긴 사람에게도 한 번 뜬다)
   `NOTICE_DATE`(바꾼 날, `YYYY-MM-DD`)도 고친다 — 상단 `📢 공지사항`(`#btn-notice`, 언제든 공지를 다시 연다)에 그날부터 `NOTICE_NEW_DAYS`(7)일 동안 `NEW`(`.new-badge`, 통통 튀고 빨간 고리가 퍼지는 CSS 애니메이션 — 동작 줄이기 설정이면 멈춤)가 붙는다.
   공지 창을 닫으면(처음 뜬 공지도) localStorage `ohmyhome.notice.read`에 `NOTICE_VER`를 남겨 NEW를 지운다 — 버전이 바뀌면 다시 붙는다(`updateNoticeBadge`).
-  새 소식의 `A1-real 고르러 가기`(value `real-a1`) · `A2-real 고르러 가기`(value `real`) · `B1-real 고르러 가기`(value `real-b1`) · `B2-real 고르러 가기`(value `real-b2`)는 위례자이더파크 창을 그 실측 도면에 맞춰 연다
+  왼쪽 칸 아래 '위례자이더파크 실측 도면 고르러 가기' 상자(`.notice-pick`)의 `A1-real`(value `real-a1`) · `A2-real`(value `real`) · `B1-real`(value `real-b1`) · `B2-real`(value `real-b2`) 버튼은 위례자이더파크 창을 그 실측 도면에 맞춰 연다
+  (새 소식이 길어지지 않게 왼쪽에 둔다. 실측 도면을 더하면 이 상자에 버튼을 더한다)
   (`XI_PARK_SAMPLES`의 파일 이름 앞부분 `55B1-real_`로 찾는다).
   그 아래 `✨ 추가 기능 보기`(`#btn-features`, type=button이라 공지를 닫지 않는다)는 `#features-dialog`(그날 더한 기능 설명)를 공지 위에 겹쳐 띄운다.
   기능을 더하면 이 목록도 고친다.
