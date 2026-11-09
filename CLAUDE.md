@@ -11,7 +11,7 @@ run_ohmyhome.bat            # Windows
 python3 serve.py 8190      # 직접 띄울 때 (no-cache 정적 서버 + /api/project 작업 저장, 기본 127.0.0.1만)
 HOST=0.0.0.0 ./run_ohmyhome.sh   # 같은 네트워크의 다른 기기에서 접속 (serve.py가 내 PC IP 주소를 찍는다)
 
-# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample/plan·sample/real의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A1-real·A2-real·B1-real 실측 기록지 PDF·LICENSE만.
+# 배포 파일 — dist/OhMyHome-<날짜>.zip (화면·실행 스크립트·sample/plan·sample/real의 json 전부·사용 가이드 PDF·docs/의 웹 사용 가이드 PDF·A1-real·A2-real·B1-real·B2-real 실측 기록지 PDF·LICENSE만.
 #   README와 sample의 png는 넣지 않는다. 작업 데이터 ohmyhome-project.json과 localStorage는 넣지 않는다)
 ./build_ohmyhome.sh         # macOS / Linux
 build_ohmyhome.bat          # Windows (PowerShell Compress-Archive)
@@ -41,7 +41,7 @@ CDN(`three@0.160.0`)에서 받으므로 실행에 인터넷이 필요하다. ES 
 - `window.prompt` / `confirm`(축척 길이·방 이름·새 도면)은 CDP의 `Page.javascriptDialogOpening` →
   `Page.handleJavaScriptDialog({ accept, promptText })`로 처리한다.
 - 처음 접속하면 공지사항(`#notice-dialog`, 모달)이 뜬다 — 시험할 때는 그 `닫기` 버튼을 누르거나 localStorage에
-  `ohmyhome.notice.hidden = '4'`(`main.js`의 `NOTICE_VER`)를 넣고 새로 고친다. 팝업(`dialog[open]`)이 열려 있으면 `main.js` 단축키는 쉰다.
+  `ohmyhome.notice.hidden = '5'`(`main.js`의 `NOTICE_VER`)를 넣고 새로 고친다. 팝업(`dialog[open]`)이 열려 있으면 `main.js` 단축키는 쉰다.
 - 깨끗한 상태에서 시작하려면 `localStorage.clear()` 후 새로 고친다(자동 저장 키 `ohmyhome.project.v1`). serve.py로 띄웠으면
   프로젝트 폴더의 `ohmyhome-project.json`도 지운다 — **이 폴더에서 시험하면 사용자 작업 파일을 덮어쓰므로**, 서버 저장을 시험할 때는
   작업 트리를 임시 폴더에 복사해 다른 포트로 띄운다.
@@ -71,10 +71,10 @@ js/samplePlan.js       체험용 샘플 도면 (캔버스로 그림, 1px = 10mm)
 js/xlsx.js             아주 작은 엑셀(.xlsx) 쓰기 — 시트 하나, 글자·숫자·수식 칸, 서식 몇 개, 무압축 zip     (DOM 없음)
 js/pdf.js              아주 작은 PDF 쓰기 — 쪽마다 JPEG 한 장을 A4(가로·세로)에 꽉 차게 (2D·3D 캡처)          (DOM 없음)
 docs/guide/            배포용 사용 가이드 원본(guide.html, img/) → docs/OhMyHome_Guide.pdf
-measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지) · 55B1_measured.pdf(B-1형 현장 실측 사진의 값을 B-1형 도면에 옮긴 기록지 — 빨강 실측, 파랑은 재지 않아 분양 도면 값, ⓐ 나눠 잰 합이 전체와 다른 값)
-                       — 위례자이더파크 창 A2-real·A1-real·B1-real 줄의 링크. 기록지마다 왼쪽 위에 자료 출처(제공한 세대)를 적는다
+measure/               실측 결과 PDF — 55A2_measured.pdf(현장 실측을 mm로 옮긴 A-2형 기록지) · 55A1_measured.pdf(A-2형 기록지를 좌우로 뒤집어 A-1형 실측값을 적은 기록지) · 55B1_measured.pdf(B-1형 현장 실측 사진의 값을 B-1형 도면에 옮긴 기록지 — 빨강 실측, 파랑은 재지 않아 분양 도면 값, ⓐ 나눠 잰 합이 전체와 다른 값) · 55B2_measured.pdf(B-2형 현장 실측 사진(cm)의 값을 B2-real 도면에 mm로 옮긴 기록지 — 파랑은 재지 않아 B1-real 값)
+                       — 위례자이더파크 창 A2-real·A1-real·B1-real·B2-real 줄의 링크. 기록지마다 왼쪽 위에 자료 출처(제공한 세대)를 적는다
 sample/                실제 세대 예시 (1px = 5mm) — plan/ 55㎡ A-2·A-1(좌우 반전)·B-1·B-2·C·D형 프로젝트 JSON(plan/png/ 그 2D·3D 이미지) ·
-                       real/ A-2·A-1·B-1형 실측(A2-real·A1-real·B1-real)의 JSON(real/png/ 그 2D·3D 이미지)
+                       real/ A-2·A-1·B-1·B-2형 실측(A2-real·A1-real·B1-real·B2-real)의 JSON(real/png/ 그 2D·3D 이미지)
 ```
 
 ### 좌표와 단위
@@ -365,7 +365,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   3D는 `SHOTS`(위 · 앞 왼쪽 · 앞 오른쪽) 세 장을 바닥 도면 그림 그대로 + `floorImage: false`로 한 번 더(여섯 쪽). 각 장은 `shotCamera()`가
   벽·가구 범위를 꽉 차게 잡고, 위에서 본 장은 집이 세로로 길면 세로로 찍는다. 둘러보기 중에는 지금 화면 한 쪽(1인칭 그대로).
 - **도면은 json으로만 연다.** 왼쪽 `📂 도면 불러오기(json)`(`#file-project`)와 그 위 `Xi 위례자이더파크 불러오기`(`#btn-xi-park`, 자이 마크 색 남청 배경 + CSS `.xi-mark`(`css/xi-mark.png` 마스크) → `#sample-dialog`에서
-  라디오로 고른 `sample/` 아래 파일(`plan/…` · `real/…`)을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A1-real·A2-real·B1-real)
+  라디오로 고른 `sample/` 아래 파일(`plan/…` · `real/…`)을 fetch)가 `openProject()` → `loadProject()`를 부른다. 고를 수 있는 파일은 `main.js`의 `XI_PARK_SAMPLES`(항목에 `sheet`가 있으면 그 줄에 실측 기록지 PDF 내려받기 링크 — 지금은 A1-real·A2-real·B1-real·B2-real)
   (정적 서버는 폴더 목록을 주지 않으므로) — sample에 json을 더하면 여기에도 `file: 'plan/…'`(실측은 `'real/…'`)로 더한다. 공지·새 소식의 A1-real·A2-real 내려받기 링크(`index.html`)도 `sample/real/`을 가리킨다. 평면도 그림(PNG·JPG)을 여는 버튼과
   상단 '불러오기' 버튼은 사용자 요청으로 없앴다. `setPlanImage()`는 '샘플 도면으로 해 보기'만 쓴다.
 - **도면만 바꾸기**(`#btn-plan-only` → `confirm` 경고 한 번 → `#file-plan-only`): 같은 집 도면이 조금 고쳐졌을 때 쓴다. `store.replacePlan(data)`가
@@ -414,7 +414,7 @@ ui.selection    { kind: 'furniture'|'wall'|'room'|'window', id, ids? } | null   
   왼쪽 칸(`.notice-main`)이 소개, 오른쪽 칸(`.notice-new`)이 새 소식이다. 공지 내용을 바꾸면 `NOTICE_VER`를 올리고(예전 공지를 숨긴 사람에게도 한 번 뜬다)
   `NOTICE_DATE`(바꾼 날, `YYYY-MM-DD`)도 고친다 — 상단 `📢 공지사항`(`#btn-notice`, 언제든 공지를 다시 연다)에 그날부터 `NOTICE_NEW_DAYS`(7)일 동안 `NEW`(`.new-badge`, 통통 튀고 빨간 고리가 퍼지는 CSS 애니메이션 — 동작 줄이기 설정이면 멈춤)가 붙는다.
   공지 창을 닫으면(처음 뜬 공지도) localStorage `ohmyhome.notice.read`에 `NOTICE_VER`를 남겨 NEW를 지운다 — 버전이 바뀌면 다시 붙는다(`updateNoticeBadge`).
-  새 소식의 `A1-real 고르러 가기`(value `real-a1`) · `A2-real 고르러 가기`(value `real`) · `B1-real 고르러 가기`(value `real-b1`)는 위례자이더파크 창을 그 실측 도면에 맞춰 연다
+  새 소식의 `A1-real 고르러 가기`(value `real-a1`) · `A2-real 고르러 가기`(value `real`) · `B1-real 고르러 가기`(value `real-b1`) · `B2-real 고르러 가기`(value `real-b2`)는 위례자이더파크 창을 그 실측 도면에 맞춰 연다
   (`XI_PARK_SAMPLES`의 파일 이름 앞부분 `55B1-real_`로 찾는다).
   그 아래 `✨ 추가 기능 보기`(`#btn-features`, type=button이라 공지를 닫지 않는다)는 `#features-dialog`(그날 더한 기능 설명)를 공지 위에 겹쳐 띄운다.
   기능을 더하면 이 목록도 고친다.

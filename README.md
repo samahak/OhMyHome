@@ -16,7 +16,7 @@ run_ohmyhome.bat    # Windows
 
 배포용 zip은 `./build_ohmyhome.sh`(Windows는 `build_ohmyhome.bat`)로 `dist/OhMyHome-<날짜>.zip`에 만듭니다.
 화면 파일·실행 스크립트·`sample/plan`·`sample/real`의 json·사용 가이드 PDF(`docs/OhMyHome_Guide.pdf`, 공지사항 창이 내려받게 하는
-`docs/OhMyHome_User_Guide.pdf`)·A1-real·A2-real·B1-real 실측 기록지(`measure/55A1_measured.pdf` · `55A2_measured.pdf` · `55B1_measured.pdf`)만 담고, 이 README와
+`docs/OhMyHome_User_Guide.pdf`)·A1-real·A2-real·B1-real·B2-real 실측 기록지(`measure/55A1_measured.pdf` · `55A2_measured.pdf` · `55B1_measured.pdf` · `55B2_measured.pdf`)만 담고, 이 README와
 브라우저에 저장된 내 작업은 들어가지 않습니다. 가이드를 고치면 `docs/guide/make_pdf.sh`로 PDF를 다시 만드세요.
 
 ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작하지 않습니다. 반드시 웹 서버로 여세요.
@@ -27,7 +27,7 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 처음 접속하면 프로그램 소개와 사용 가이드(PDF) 내려받기가 있는 **공지사항** 창이 뜹니다. 창 아래 `다시 보지 않기`에 체크해 두면 그 브라우저에서는 접속할 때 저절로 뜨지 않고, 위쪽 `📢 공지사항`으로 열어 체크를 풀면 다음 접속부터 다시 뜹니다.
 언제든 위쪽 `📢 공지사항` 버튼으로 다시 볼 수 있고, 공지가 바뀐 뒤 7일 동안 그 공지를 아직 읽지 않았으면 버튼에 **NEW**가 붙습니다(한 번 읽으면 그 브라우저에서는 사라지고, 공지가 또 바뀌면 다시 붙습니다).
 
-1. **① 도면** — `Xi 위례자이더파크 불러오기`로 `sample/`의 예시 세대 도면을 골라 열거나(창에서 형을 고르고 `불러오기`, A1-real·A2-real·B1-real 줄의 `📄 실측 기록지`로 실측 기록지 PDF 내려받기),
+1. **① 도면** — `Xi 위례자이더파크 불러오기`로 `sample/`의 예시 세대 도면을 골라 열거나(창에서 형을 고르고 `불러오기`, A1-real·A2-real·B1-real·B2-real 줄의 `📄 실측 기록지`로 실측 기록지 PDF 내려받기),
    `📂 도면 불러오기(json)`로 저장해 둔 도면 파일(`저장(.json)`으로 받은 것)을 열거나 `샘플 도면으로 해 보기`.
    도면 이름은 상단 되돌리기 왼쪽에 보이고 눌러서 고칠 수 있습니다. `저장(.json)` 파일 이름은 `ohmyhome-{도면이름}-{날짜}.json`입니다.
    평면도 그림(PNG·JPG)을 새로 넣는 기능은 없습니다. 아래 2·3은 연 도면의 크기·벽을 고칠 때 씁니다.
@@ -83,7 +83,7 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 
 ## 샘플 도면 (`sample/`)
 
-분양 도면 프로젝트는 `sample/plan/`(2D·3D 그림은 `sample/plan/png/`), 실측 도면(A1-real·A2-real·B1-real)의 프로젝트는 `sample/real/`(그림은 `sample/real/png/`)에 있습니다.
+분양 도면 프로젝트는 `sample/plan/`(2D·3D 그림은 `sample/plan/png/`), 실측 도면(A1-real·A2-real·B1-real·B2-real)의 프로젝트는 `sample/real/`(그림은 `sample/real/png/`)에 있습니다.
 
 | 파일 | 내용 |
 | --- | --- |
@@ -98,11 +98,12 @@ ES 모듈을 쓰므로 `index.html`을 더블클릭(file://)으로 열면 동작
 | `55B1_plan*` | 55㎡ B-1형(확장형) — 단위세대 평면도의 표기 치수로 다시 그린 2D·3D와 프로젝트. B-2형과 같은 방향(현관 위, 거실·침실1 창 오른쪽)으로 돌려 그림 (침실2·알파룸 꺾인 칸막이, ㄱ자 주방) |
 | `55B1-real_plan*` | 55㎡ B-1형 실측 도면(B1-real) — 2026.11.06 현장 실측(`measure/55B1_measured.pdf`, 자료 출처 5207동l위**)대로 B-1형 샘플을 고친 2D·3D와 프로젝트 (침실2 2,380 × 2,880 · 알파룸 2,220 × 2,880 · 칸막이 꺾임 404 / 1,110, 침실1 5,810 × 3,529 · 창 2,174(위 벽에서 808) · 문 1,024, 거실 세로 3,593 · 창 칸막이에서 447 / 아래 벽에서 516, 현관 폭 1,082 + 현관창고 636 × 1,364, 알파룸/주방 벽이 100 내려가 주방 1,960). 재지 않은 욕실·발코니·실외기실·키큰장은 샘플 그대로 |
 | `55B2_plan*` | 55㎡ B-2형(확장형) — 분양 안내 평면도의 바깥 치수 체인(벽 중심)으로 다시 그린 2D·3D와 프로젝트 (B-1형처럼 침실2·알파룸 꺾인 칸막이) |
+| `55B2-real_plan*` | 55㎡ B-2형 실측 도면(B2-real) — 현장 실측 사진(`measure/55B2_measured.pdf`, 자료 출처 5205동lT*)대로 그린 2D·3D와 프로젝트. B-2 실측은 B-1 실측과 거의 같은 크기라 B1-real 모양에 B-2 값을 넣었다 (침실2 2,370 × 2,880 · 알파룸 2,195 · 칸막이 꺾임 400 · 알파룸 쪽 꺾인 벽 1,100, 침실1 5,810 × 3,490 · 창 위 벽에서 810 · 칸막이에서 310, 거실 세로 3,570 · 창 440 / 450, 냉장고장 깊이 967 · 길이 2,100, 개수대 줄 650 · 인덕션 줄 600의 ㄱ자 싱크대, 침실2 · 알파룸 창 1,790 · 890 × 1,190(위 끝 바닥에서 2,410 · 2,400), 발코니 가로 1,425). 재지 않은 욕실 · 현관 · 현관창고 · 실외기실은 B1-real 치수 |
 | `55C_plan*` | 55㎡ C형(확장형) — 분양 안내 평면도의 바깥 치수 체인으로 다시 그린 2D·3D와 프로젝트 (펜트리 공간) |
 | `55D_plan*` | 55㎡ D형(확장형) — 옆으로 누운 단위세대 평면도를 180° 돌려 거실·침실1 창이 왼쪽, 현관이 위로 오게 다시 그린 2D·3D와 프로젝트 (드레스룸이 트인 침실2, 침실2 쪽으로 늘어난 알파룸과 ㄱ자 칸막이) |
 
 B·C·D형 프로젝트는 문(경첩·여는 쪽·미서기)과 현관문, 욕실·주방 설비·신발장(기본 포함 가구)까지 들어 있어 바로 둘러볼 수 있습니다.
-아홉 json은 왼쪽 `Xi 위례자이더파크 불러오기` 창에 나옵니다. 샘플 json을 더하거나 이름을 바꾸면 `js/main.js`의 `XI_PARK_SAMPLES`도 함께 고치세요
+열 json은 왼쪽 `Xi 위례자이더파크 불러오기` 창에 나옵니다. 샘플 json을 더하거나 이름을 바꾸면 `js/main.js`의 `XI_PARK_SAMPLES`도 함께 고치세요
 (GitHub Pages 같은 정적 서버는 폴더 목록을 주지 않아 파일 이름을 코드에 적어 둡니다).
 
 ## 단축키
@@ -157,7 +158,7 @@ js/scenery.js         둘러보기 창밖 풍경 (층수 · 도로 · 아파트 
 js/xlsx.js            가구 목록 엑셀(.xlsx) 쓰기
 js/pdf.js             2D·3D 캡처 PDF 쓰기
 sample/               위례자이더파크 예시 세대 도면 — plan/ json(png/ 2D·3D 그림) · real/ 실측 도면 json(png/ 그림)
-measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf · 55B1_measured.pdf)
+measure/              실측 기록지 PDF (55A1_measured.pdf · 55A2_measured.pdf · 55B1_measured.pdf · 55B2_measured.pdf)
 docs/                 사용 가이드 PDF와 원본(docs/guide)
 serve.py              정적 파일 서버 (기본 포트 8190) + 작업 저장(/api/project → ohmyhome-project.json)
 build_ohmyhome.sh     배포 zip 만들기 (.bat은 Windows)
