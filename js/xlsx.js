@@ -18,7 +18,7 @@ export const STYLE = {
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   // XML 1.0에 넣을 수 없는 제어 문자는 뺀다
-  .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+  .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, '');
 
 /** 0 → A, 25 → Z, 26 → AA */
 export function colName(i) {

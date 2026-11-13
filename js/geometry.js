@@ -250,7 +250,11 @@ export function snapToWall(f, walls, gap = 5) {
  * 단위가 없고 50보다 작으면 m로 본다(3.8을 3.8mm로 읽으면 도면이 손톱만 해진다).
  */
 export function parseLengthMM(text) {
-  const s = String(text ?? '').trim().toLowerCase().replace(/[,\s]/g, '');
+  let s = String(text ?? '').trim().toLowerCase().replace(/\s/g, '');
+  // 쉼표: 세 자리마다 찍은 것(3,800 · 12,000mm)만 천 단위로 보고 지운다. '3,8' · '2,4m'처럼 쉼표 하나 뒤가 세 자리가 아니면
+  // 소수점으로 쓴 것이다 — 모두 지우면 3,8이 38m(=38,000mm)로 읽혀 도면 전체 축척이 10배로 틀어졌다
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?\D*$/.test(s)) s = s.replace(/,/g, '');
+  else if (/^\d+,\d+\D*$/.test(s)) s = s.replace(',', '.');
   const m = s.match(/^(\d+(?:\.\d+)?)(mm|cm|m|미터|센티)?$/);
   if (!m) return NaN;
   const v = parseFloat(m[1]);

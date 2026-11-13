@@ -123,11 +123,18 @@ export class View3D {
     dom.addEventListener('pointerdown', (e) => this.onDown(e));
     dom.addEventListener('pointermove', (e) => { this.invalidate(); this.onMove(e); });
     dom.addEventListener('pointerup', (e) => this.onUp(e));
+    // 터치·펜 끌기를 OS가 끊으면 pointerup이 안 온다 — 끌기를 끝내고 화면 돌리기를 되살린다(안 그러면 가구가 커서를 따라다닌다)
+    const cancel = () => {
+      if (this.drag) { this.drag = null; this.controls.enabled = true; dom.style.cursor = 'default'; }
+      this.down = null;
+    };
+    dom.addEventListener('pointercancel', cancel);
+    dom.addEventListener('lostpointercapture', cancel);
 
     new ResizeObserver(() => this.resize()).observe(container);
     on('plan', () => { this.buildPlan(); this.syncFurniture(); });
     on('furniture', () => this.syncFurniture());
-    on('library', () => { this.textures.clear(); this.syncFurniture(true); });
+    on('library', () => { for (const t of this.textures.values()) t.dispose(); this.textures.clear(); this.syncFurniture(true); });
     on('selection', () => this.syncFurniture());
     on('layouts', () => this.invalidate());
     // 화면을 바꿀 수 있는 입력(버튼·슬라이더·체크·키·휠)이 오면 몇 장 더 그린다 — 장면을 직접 바꾸는 곳을 하나하나 다 챙기지 않아도 되게
@@ -207,8 +214,8 @@ export class View3D {
     return { x: t.x / M, y: t.z / M };
   }
 
-  setWallOpacity(v) {
-    this.wallOpacity = v;
+  setWallOpacity(v, remember = true) {
+    if (remember) this.wallOpacity = v;
     this.planGroup.traverse((o) => {
       if (o.userData.isWall) {
         o.material.opacity = v;
@@ -245,11 +252,18 @@ export class View3D {
   startTour(hooks) {
     if (this.tour) return;
     select(null);
-    this.tour = new Tour(this, {
+    const tour = new Tour(this, {
       ...hooks,
       onExit: () => { this.tour = null; this.invalidate(); hooks.onExit?.(); },
     });
-    this.tour.start();
+    this.tour = tour;
+    try {
+      tour.start();
+    } catch (err) {
+      // 시작하다 멈추면 반쯤 바뀐 화면(잠금·카메라·안개·둘러보기 장면)을 되돌린다 — 그대로 두면 3D가 멈추고 편집도 못 한다
+      try { if (tour.saved) tour.exit(); else { this.tour = null; hooks.onExit?.(); } } catch { this.tour = null; hooks.onExit?.(); }
+      throw err;
+    }
   }
 
   setTourMode(v) {
@@ -300,8 +314,12 @@ export class View3D {
     this.planGroup.clear();
     const p = state.plan;
     const { cx, cz, size } = this.bounds();
-    this.floorTex?.dispose();
-    this.floorTex = null;
+    // 바닥 도면 그림은 그림이 바뀔 때만 새로 읽는다 — 벽 하나 고칠 때마다 다시 읽으면 읽는 동안 바닥이 검게 깜박인다
+    if (this.floorTex && this.floorTexSrc !== p.image?.src) {
+      this.floorTex.dispose();
+      this.floorTex = null;
+      this.floorTexSrc = null;
+    }
 
     // 바닥
     const floorMat = new THREE.MeshStandardMaterial({ color: this.tourMode ? '#cdb08a' : '#f4f1ec', roughness: this.tourMode ? 0.7 : 0.95 });
@@ -316,11 +334,14 @@ export class View3D {
       fw = p.image.width * p.mmPerPx * M;
       fd = p.image.height * p.mmPerPx * M;
       fx = fw / 2; fz = fd / 2;
-      const tex = new THREE.TextureLoader().load(p.image.src, () => this.invalidate());   // 그림을 다 읽으면 다시 그린다
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      floorMat.map = tex;
-      this.floorTex = tex;
+      if (!this.floorTex) {
+        const tex = new THREE.TextureLoader().load(p.image.src, () => this.invalidate());   // 그림을 다 읽으면 다시 그린다
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        this.floorTex = tex;
+        this.floorTexSrc = p.image.src;
+      }
+      floorMat.map = this.floorTex;
       floorMat.color.set('#ffffff');
       // 도면 바깥 바닥
       const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 4, size * 4), new THREE.MeshStandardMaterial({ color: '#dfe3e8', roughness: 1 }));
@@ -443,7 +464,7 @@ export class View3D {
       }
     }
     if (this.doorsGhost) this.setDoorsGhost(true);
-    this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity);
+    this.setWallOpacity(this.tourMode ? 1 : this.wallOpacity, false);   // 둘러보기의 불투명은 사용자 설정으로 남기지 않는다
 
     // 그림자 범위를 도면에 맞춘다
     const half = size * 0.75;
@@ -601,6 +622,7 @@ export class View3D {
     if (this.tour) return;
     if (this.drag) {
       this.drag = null;
+      this.down = null;   // 남겨 두면 나중에 같은 자리에서 화면을 옮기고 놓을 때 '빈 곳 클릭'으로 읽어 선택이 풀린다
       this.controls.enabled = true;
       this.renderer.domElement.style.cursor = 'grab';
       return;

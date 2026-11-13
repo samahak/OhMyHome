@@ -182,7 +182,8 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.mmPerPx = mmPerPx;
   p.scaleSet = scaleSet;
   p.scaleRef = null;
-  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; }
+  // 앞 도면의 배치 금지 구역(샤프트 빗금)·기본 싱크대도 지운다 — 남으면 새 도면 위에 빗금이 남고 가구가 겹침으로 잡힌다
+  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; p.blocked = []; p.fixtures = []; }
   p.name = image ? '샘플 도면' : '';
   ui.selection = null;
   emit('plan', 'selection');
@@ -404,8 +405,10 @@ async function runDetect() {
   });
   checkpoint();
   p.walls = p.walls.filter((w) => !w.auto).concat(rects.map((r) => ({ id: uid('w'), ...rectToWall(r, mmPerPx), cap: false, auto: true })));
-  p.windows = (await autoWindows()).windows;   // 바뀐 벽에 맞춰 창 자리도 다시 찾는다
-  p.doors = (await autoDoors()).doors;         // 문 기호가 그려진 틈에는 문을 단다
+  // 문 기호가 그려진 틈에는 문을 단다 — 문을 먼저 찾는다. 자동 창은 다시 찾으므로 빼고 보는데, 현관을 정하기 전에는
+  // 현관문 틈이 바깥에 닿아 창으로 잡히고, 그 창에 가려 현관문 기호를 문으로 달지 못했다
+  p.doors = (await autoDoors(p.windows.filter((w) => w.auto === false))).doors;
+  p.windows = (await autoWindows()).windows;   // 바뀐 벽에 맞춰 창 자리도 다시 찾는다(문 자리는 뺀다)
   emit('plan');
   status(rects.length
     ? `벽 ${rects.length}개${p.doors.length ? `, 문 ${p.doors.length}개` : ''}를 찾았습니다.${p.scaleSet ? '' : ' (축척을 맞추지 않아 크기는 어림값입니다)'} 잘못 잡힌 것은 🧽 지우기로, 빠진 벽은 🧱 벽 그리기로 고치세요.`
@@ -521,13 +524,21 @@ const TYPE_ORDER = new Map(Object.keys(SHAPES).map((k, i) => [k, i]));
 const typeRank = (t) => TYPE_ORDER.get(t) ?? TYPE_ORDER.size;
 const byTypeThenName = (a, b) => typeRank(a.type) - typeRank(b.type) || byName(a.name, b.name);
 
-/** 가격 입력 읽기: '1,290,000' · '1290000원' · '129만' · '129만 9천' · '12.9만' → 원. 빈칸은 null, 못 읽으면 NaN */
+/** 가격 입력 읽기: '1,290,000' · '1290000원' · '129만' · '129만 9천' · '12.9만' · '1천만' · '1억 2천만' → 원. 빈칸은 null, 못 읽으면 NaN */
 function parseWon(text) {
   const s = String(text).replace(/[\s,원₩]/g, '');
   if (!s) return null;
-  const m = s.match(/^(?:(\d+(?:\.\d+)?)만)?(?:(\d+(?:\.\d+)?)천)?(\d+)?$/);
-  if (!m || (!m[1] && !m[2] && !m[3])) return NaN;
-  return Math.round((+m[1] || 0) * 10000 + (+m[2] || 0) * 1000 + (+m[3] || 0));
+  const m = s.match(/^(?:([^억만]*)억)?(?:([^억만]*)만)?([^억만]*)$/);
+  if (!m) return NaN;
+  // 억·만 사이 한 토막: '2천' · '2천500' · '12.9' · '1290000' (단위가 붙었는데 비었으면 못 읽음)
+  const part = (x, unit) => {
+    if (x === undefined) return 0;
+    const q = x.match(/^(?:(\d+(?:\.\d+)?)천)?(\d+(?:\.\d+)?)?$/);
+    if (!q || (unit && !q[1] && !q[2])) return NaN;
+    return (+q[1] || 0) * 1000 + (+q[2] || 0);
+  };
+  if (!m[1] && !m[2] && !m[3]) return NaN;
+  return Math.round(part(m[1], true) * 1e8 + part(m[2], true) * 1e4 + part(m[3], false));
 }
 const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 /** 가격 합계에서 빼는 것: 기본 포함 가구(builtin, 집에 딸려 오는 것)와 비활성화한 가구(disabled, 지금은 안 놓은 것) */
@@ -944,6 +955,16 @@ function applyProp(inp) {
   if (!obj) return;
   const k = inp.dataset.f;
   if (sel.kind === 'furniture' && furnitureLocked()) { refreshProps(); return; }
+  // 숫자 칸을 비우면 +'' = 0이라 가구가 (0, 0)으로 가거나 깊이가 최소로 줄었다 — 빈칸은 '바꾸지 않음'으로 읽는다
+  if (inp.type === 'number' && inp.value.trim() === '') {
+    if (k === 'legD' && obj.legD != null) {   // 꺾인 쪽 깊이는 비우면 상판 깊이와 같다(안내 문구대로)
+      checkpoint();
+      delete obj.legD;
+      emit('furniture');
+    }
+    refreshProps();
+    return;
+  }
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
   if (k === 'plant') { applyPlant(obj, v); return; }
@@ -1273,11 +1294,11 @@ $('btn-tour').addEventListener('click', () => startTour());
  * 사용자가 지운 자리(plan.doorsRemoved)에는 기호가 있어도 다시 달지 않는다.
  * state는 바꾸지 않고 { doors(새 목록), added, removed, skipped }를 돌려준다. 이미지가 없으면 지금 그대로다.
  */
-async function autoDoors() {
+async function autoDoors(windows = state.plan.windows) {
   const plan = state.plan;
   if (!plan.image) return { doors: plan.doors, added: 0, removed: 0, skipped: 0 };
   const mid = (d) => ({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 });
-  const all = findDoors(plan, await planImageData());
+  const all = findDoors({ ...plan, windows }, await planImageData());   // windows: 문으로 치지 않을 창 자리
   const found = all.filter((f) => !plan.doorsRemoved.some((r) => G.dist(mid(f), r) < 300));
   const near = (a, b) => G.dist(mid(a), mid(b)) < 150;
   const manual = plan.doors.filter((d) => d.auto === false);
@@ -1359,9 +1380,9 @@ async function doorsForOldProject(data) {
  * 자동 창을 다시 찾는다. 직접 낸 창(auto: false)은 그대로 두고, 예전 자동 창 가운데 지금 찾은 자리에 없는 것은 뺀다.
  * state는 바꾸지 않고 { windows(새 목록), added, removed }를 돌려준다.
  */
-async function autoWindows() {
+async function autoWindows(doors = state.plan.doors) {
   const plan = state.plan;
-  const found = findWindows(plan, plan.image ? await planImageData() : null);
+  const found = findWindows({ ...plan, doors }, plan.image ? await planImageData() : null);   // doors: 창으로 치지 않을 문 자리
   const near = (c, w) => G.distToSegment({ x: (c.a.x + c.b.x) / 2, y: (c.a.y + c.b.y) / 2 }, w.a, w.b).dist < 150;
   const keep = plan.windows.filter((w) => w.auto === false || found.some((f) => near(f, w)));
   const add = found.filter((f) => !keep.some((w) => near(f, w)))
@@ -1390,7 +1411,11 @@ async function startTour() {
   tourStarting = true;
   let win;
   let doors;
-  try { win = await autoWindows(); doors = await autoDoors(); } finally { tourStarting = false; }
+  // 문 먼저(예전 자동 창은 빼고 — 현관문 틈에 잘못 잡힌 창이 문을 가리지 않게), 창은 그 문 자리를 빼고 찾는다
+  try {
+    doors = await autoDoors(plan.windows.filter((w) => w.auto === false));
+    win = await autoWindows(doors.doors);
+  } finally { tourStarting = false; }
   // 현관 신발장, 욕실·주방 이름이 붙은 방의 변기·세면대·욕조·싱크대가 없으면 놓는다. 창 자리는 벽으로 친다
   // 보호 중인 안에는 설비를 더하지 않는다
   const fixtures = currentLayout().locked ? [] : autoFixtures({ ...plan, walls: plan.walls.concat(win.windows) }, state.furniture, uid);
@@ -1410,15 +1435,22 @@ async function startTour() {
     ? `${names}을(를) 자동으로 놓았습니다 (옮기거나 지울 수 있고, 되돌리기도 됩니다). Esc로 나갑니다.`
     : `둘러보기 중 (${plan.floor}층) — Esc로 나갑니다.`) + (win.removed ? ` 잘못 잡혔던 창 ${win.removed}개를 뺐습니다.` : '') + hint);
   lockForTour(true);
-  view.startTour({
-    onExit: () => {
-      lockForTour(false);
-      if (viewBeforeTour) setViewMode(viewBeforeTour);
-      viewBeforeTour = null;
-      status('둘러보기를 마쳤습니다.');
-    },
-    onRepick: () => pickEntrance(),
-  });
+  try {
+    view.startTour({
+      onExit: () => {
+        lockForTour(false);
+        if (viewBeforeTour) setViewMode(viewBeforeTour);
+        viewBeforeTour = null;
+        status('둘러보기를 마쳤습니다.');
+      },
+      onRepick: () => pickEntrance(),
+    });
+  } catch (err) {
+    // view.startTour가 화면을 되돌리고 onExit로 잠금도 풀었다
+    lockForTour(false);
+    console.error(err);
+    status(`둘러보기를 시작하지 못했습니다 (${err.message}). 벽·현관문 자리를 확인해 주세요.`);
+  }
 }
 
 /** 2D 도면에서 현관문 자리를 고르게 한다 */
@@ -1495,6 +1527,8 @@ $('plan-name').addEventListener('keydown', (e) => {
 });
 /** 프로젝트 json(파일·샘플)을 연다. name: 파일에 도면 이름이 없을 때 쓸 이름 */
 function openProject(data, msg = '도면을 불러왔습니다.', name = '') {
+  // 둘러보기 중에도 공지의 실측 도면 버튼으로 열 수 있다 — 둘러보기를 먼저 끝낸다(남으면 옛 도면의 길·현관문으로 걷고, 카메라 거리도 잘린다)
+  if (view.tour) view.tour.exit();
   if (data?.plan) data.plan.name = data.plan.name ? planNameOr(data.plan.name) : name;   // 파일 안 이름이 날짜뿐이면 NewHome
   loadProject(data);
   $('wall-height').value = state.plan.wallHeight;
