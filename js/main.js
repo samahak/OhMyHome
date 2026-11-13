@@ -523,13 +523,21 @@ const TYPE_ORDER = new Map(Object.keys(SHAPES).map((k, i) => [k, i]));
 const typeRank = (t) => TYPE_ORDER.get(t) ?? TYPE_ORDER.size;
 const byTypeThenName = (a, b) => typeRank(a.type) - typeRank(b.type) || byName(a.name, b.name);
 
-/** 가격 입력 읽기: '1,290,000' · '1290000원' · '129만' · '129만 9천' · '12.9만' → 원. 빈칸은 null, 못 읽으면 NaN */
+/** 가격 입력 읽기: '1,290,000' · '1290000원' · '129만' · '129만 9천' · '12.9만' · '1천만' · '1억 2천만' → 원. 빈칸은 null, 못 읽으면 NaN */
 function parseWon(text) {
   const s = String(text).replace(/[\s,원₩]/g, '');
   if (!s) return null;
-  const m = s.match(/^(?:(\d+(?:\.\d+)?)만)?(?:(\d+(?:\.\d+)?)천)?(\d+)?$/);
-  if (!m || (!m[1] && !m[2] && !m[3])) return NaN;
-  return Math.round((+m[1] || 0) * 10000 + (+m[2] || 0) * 1000 + (+m[3] || 0));
+  const m = s.match(/^(?:([^억만]*)억)?(?:([^억만]*)만)?([^억만]*)$/);
+  if (!m) return NaN;
+  // 억·만 사이 한 토막: '2천' · '2천500' · '12.9' · '1290000' (단위가 붙었는데 비었으면 못 읽음)
+  const part = (x, unit) => {
+    if (x === undefined) return 0;
+    const q = x.match(/^(?:(\d+(?:\.\d+)?)천)?(\d+(?:\.\d+)?)?$/);
+    if (!q || (unit && !q[1] && !q[2])) return NaN;
+    return (+q[1] || 0) * 1000 + (+q[2] || 0);
+  };
+  if (!m[1] && !m[2] && !m[3]) return NaN;
+  return Math.round(part(m[1], true) * 1e8 + part(m[2], true) * 1e4 + part(m[3], false));
 }
 const fmtWon = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 /** 가격 합계에서 빼는 것: 기본 포함 가구(builtin, 집에 딸려 오는 것)와 비활성화한 가구(disabled, 지금은 안 놓은 것) */
@@ -946,6 +954,16 @@ function applyProp(inp) {
   if (!obj) return;
   const k = inp.dataset.f;
   if (sel.kind === 'furniture' && furnitureLocked()) { refreshProps(); return; }
+  // 숫자 칸을 비우면 +'' = 0이라 가구가 (0, 0)으로 가거나 깊이가 최소로 줄었다 — 빈칸은 '바꾸지 않음'으로 읽는다
+  if (inp.type === 'number' && inp.value.trim() === '') {
+    if (k === 'legD' && obj.legD != null) {   // 꺾인 쪽 깊이는 비우면 상판 깊이와 같다(안내 문구대로)
+      checkpoint();
+      delete obj.legD;
+      emit('furniture');
+    }
+    refreshProps();
+    return;
+  }
   let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value;
   if (inp.type === 'number' && !isFinite(v)) return;
   if (k === 'plant') { applyPlant(obj, v); return; }
