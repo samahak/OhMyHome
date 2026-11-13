@@ -1410,15 +1410,22 @@ async function startTour() {
     ? `${names}을(를) 자동으로 놓았습니다 (옮기거나 지울 수 있고, 되돌리기도 됩니다). Esc로 나갑니다.`
     : `둘러보기 중 (${plan.floor}층) — Esc로 나갑니다.`) + (win.removed ? ` 잘못 잡혔던 창 ${win.removed}개를 뺐습니다.` : '') + hint);
   lockForTour(true);
-  view.startTour({
-    onExit: () => {
-      lockForTour(false);
-      if (viewBeforeTour) setViewMode(viewBeforeTour);
-      viewBeforeTour = null;
-      status('둘러보기를 마쳤습니다.');
-    },
-    onRepick: () => pickEntrance(),
-  });
+  try {
+    view.startTour({
+      onExit: () => {
+        lockForTour(false);
+        if (viewBeforeTour) setViewMode(viewBeforeTour);
+        viewBeforeTour = null;
+        status('둘러보기를 마쳤습니다.');
+      },
+      onRepick: () => pickEntrance(),
+    });
+  } catch (err) {
+    // view.startTour가 화면을 되돌리고 onExit로 잠금도 풀었다
+    lockForTour(false);
+    console.error(err);
+    status(`둘러보기를 시작하지 못했습니다 (${err.message}). 벽·현관문 자리를 확인해 주세요.`);
+  }
 }
 
 /** 2D 도면에서 현관문 자리를 고르게 한다 */
@@ -1495,6 +1502,8 @@ $('plan-name').addEventListener('keydown', (e) => {
 });
 /** 프로젝트 json(파일·샘플)을 연다. name: 파일에 도면 이름이 없을 때 쓸 이름 */
 function openProject(data, msg = '도면을 불러왔습니다.', name = '') {
+  // 둘러보기 중에도 공지의 실측 도면 버튼으로 열 수 있다 — 둘러보기를 먼저 끝낸다(남으면 옛 도면의 길·현관문으로 걷고, 카메라 거리도 잘린다)
+  if (view.tour) view.tour.exit();
   if (data?.plan) data.plan.name = data.plan.name ? planNameOr(data.plan.name) : name;   // 파일 안 이름이 날짜뿐이면 NewHome
   loadProject(data);
   $('wall-height').value = state.plan.wallHeight;

@@ -157,7 +157,8 @@ export class Tour {
     };
     const centroid = (zone) => { const n = sizes[zone.z]; return { x: zone.sx / n, y: zone.sy / n }; };
     const fzone = state.furniture.map((f) => ({ f, z: zoneAt(f) }));
-    const main = zones.reduce((a, b) => (b.area > a.area ? b : a), zones[0]);
+    // 빈 칸이 하나도 없는 지도(벽이 한 줄뿐인 도면 등)는 구역이 없다 — 빈 구역으로 두어 아래에서 들를 곳만 비게 한다
+    const main = zones.reduce((a, b) => (b.area > a.area ? b : a), zones[0]) || { z: -2, area: 0, cells: [], sx: 0, sy: 0 };
     const entr = zoneAt(this.inside);
 
     const places = [];
@@ -669,6 +670,9 @@ export class Tour {
       keydown: (e) => {
         const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (document.querySelector('dialog[open]')) return;   // 공지 등 팝업이 떠 있으면 팝업이 키를 쓴다(Esc로 팝업 닫기 등)
+        // Cmd·Ctrl·Alt 조합(저장·찾기 등)은 브라우저에 맡긴다. macOS는 Cmd를 누른 채 뗀 글자의 keyup이 안 와서 계속 걸어간다
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
         const key = e.key.toLowerCase();
         // 전체 화면이면 Esc는 전체 화면만 끈다(둘러보기는 그대로). F: 전체 화면 켜기/끄기
         if (key === 'escape') { e.preventDefault(); if (this.isFull()) this.toggleFull(); else this.exit(); return; }
@@ -680,7 +684,7 @@ export class Tour {
           this.keys.add(key);
         }
       },
-      keyup: (e) => this.keys.delete(e.key.toLowerCase()),
+      keyup: (e) => { if (e.key === 'Meta') this.keys.clear(); else this.keys.delete(e.key.toLowerCase()); },
       blur: () => this.keys.clear(),
       full: () => this.updateHud(),   // 전체 화면이 켜지고 꺼질 때(브라우저 Esc 포함) 버튼 글자를 바꾼다
     };

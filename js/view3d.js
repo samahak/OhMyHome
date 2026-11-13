@@ -245,11 +245,18 @@ export class View3D {
   startTour(hooks) {
     if (this.tour) return;
     select(null);
-    this.tour = new Tour(this, {
+    const tour = new Tour(this, {
       ...hooks,
       onExit: () => { this.tour = null; this.invalidate(); hooks.onExit?.(); },
     });
-    this.tour.start();
+    this.tour = tour;
+    try {
+      tour.start();
+    } catch (err) {
+      // 시작하다 멈추면 반쯤 바뀐 화면(잠금·카메라·안개·둘러보기 장면)을 되돌린다 — 그대로 두면 3D가 멈추고 편집도 못 한다
+      try { if (tour.saved) tour.exit(); else { this.tour = null; hooks.onExit?.(); } } catch { this.tour = null; hooks.onExit?.(); }
+      throw err;
+    }
   }
 
   setTourMode(v) {
