@@ -48,6 +48,17 @@ export class PlanEditor {
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    // 터치·펜 끌기를 OS가 끊으면 pointerup이 안 온다 — 끌기·옮기기·사각형 고르기를 끝낸다(안 그러면 가구가 커서를 따라다닌다)
+    const cancel = () => {
+      if (!this.pan && !this.drag && !this.doorDrag && !this.box) return;
+      this.pan = this.drag = this.doorDrag = this.box = null;
+      this.cv.style.cursor = this.tool === 'select' ? 'default' : 'crosshair';
+      this.draw();
+    };
+    canvas.addEventListener('pointercancel', cancel);
+    canvas.addEventListener('lostpointercapture', cancel);
+    // 키를 누른 채 다른 창으로 가면 keyup이 안 온다 — Space(손 모드)·Shift가 눌린 채로 남지 않게
+    window.addEventListener('blur', () => { this.space = this.shift = false; });
     canvas.addEventListener('pointerleave', () => { this.mouse = null; this.hooks.cursor?.(''); this.draw(); });
     canvas.addEventListener('dblclick', (e) => this.onDblClick(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
