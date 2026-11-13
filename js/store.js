@@ -107,6 +107,7 @@ function snapshot() {
     plan: JSON.stringify({ ...state.plan, image: null }),
     furniture: JSON.stringify(state.furniture),
     layouts: JSON.stringify({ list: state.layouts, id: state.layoutId }),
+    library: state.library,   // 내 가구(사진 dataURL) — 배열을 통째로 바꿀 뿐 고치지 않으므로 참조만 든다
   };
 }
 function restore(s) {
@@ -114,9 +115,12 @@ function restore(s) {
   state.furniture = JSON.parse(s.furniture);
   const l = JSON.parse(s.layouts);
   state.layouts = l.list; state.layoutId = l.id;
+  // 다른 프로젝트를 연 것을 되돌리면 내 가구도 돌아와야 한다(안 그러면 자동 저장이 내 가구를 지운 채로 남긴다)
+  const libChanged = s.library && s.library !== state.library;
+  if (libChanged) state.library = s.library;
   if (ui.selection?.ids) ui.selection = furnitureSelection(ui.selection.ids);
   if (ui.selection && !findSelected()) ui.selection = null;
-  emit('plan', 'furniture', 'layouts', 'selection');
+  emit('plan', 'furniture', 'layouts', 'selection', ...(libChanged ? ['library'] : []));
 }
 export function checkpoint() {
   past.push(snapshot());
@@ -341,9 +345,17 @@ export function deleteLayout(id) {
   emit('layouts');
   return true;
 }
+/** 띄움·회전이 빠진 가구(손으로 고친 파일 등)는 0으로 — 없으면 겹침 판정·꼭짓점이 NaN이 되어 조용히 틀린다 */
+const withDefaults = (f) => ({ ...f, elev: f.elev ?? 0, rot: f.rot ?? 0 });
 /** 저장·불러온 데이터의 안 목록을 상태로 (안이 없던 예전 파일은 '1안' 하나) */
 function applyLayouts(data) {
   const list = Array.isArray(data.layouts) && data.layouts.length ? copyOf(data.layouts) : [{ id: 'L1', name: '1안', furniture: [] }];
+  // 손으로 고친 파일 등에서 안의 furniture·id가 빠져 있으면 안을 바꿀 때 가구 목록이 undefined가 되어 화면이 멈춘다
+  list.forEach((l, i) => {
+    l.furniture = Array.isArray(l.furniture) ? l.furniture.map(withDefaults) : [];
+    if (!l.id) l.id = uid('L');
+    if (!l.name) l.name = `${i + 1}안`;
+  });
   const cur = list.find((l) => l.id === data.layoutId) || list[0];
   state.layouts = list;
   state.layoutId = cur.id;
@@ -413,7 +425,7 @@ export function loadProject(data) {
   const base = freshState();
   checkpoint();
   Object.assign(state.plan, base.plan, data.plan, { fixtures: planFixtures(data) });
-  state.furniture = (data.furniture || []).map((f) => ({ elev: 0, rot: 0, ...f }));
+  state.furniture = (data.furniture || []).map(withDefaults);
   state.library = data.library || [];
   applyLayouts(data);
   ui.selection = null;
@@ -442,7 +454,7 @@ export function loadSaved(from = null) {
     if (from) try { localStorage.setItem(STORAGE_KEY, JSON.stringify(from)); } catch { /* 저장 공간 부족: 폴더 파일이 있으니 넘어간다 */ }
     const base = freshState();
     Object.assign(state.plan, base.plan, data.plan);
-    state.furniture = data.furniture || [];
+    state.furniture = (data.furniture || []).map(withDefaults);
     state.library = data.library || [];
     applyLayouts(data);
     return data;   // 불러온 원본 — 문 목록이 없던 예전 저장본인지 main.js가 본다

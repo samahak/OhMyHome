@@ -182,7 +182,8 @@ function setPlanImage(image, mmPerPx, scaleSet) {
   p.mmPerPx = mmPerPx;
   p.scaleSet = scaleSet;
   p.scaleRef = null;
-  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; }
+  // 앞 도면의 배치 금지 구역(샤프트 빗금)·기본 싱크대도 지운다 — 남으면 새 도면 위에 빗금이 남고 가구가 겹침으로 잡힌다
+  if (clear) { p.walls = []; p.rooms = []; p.windows = []; p.doors = []; p.doorsRemoved = []; p.entrance = null; p.blocked = []; p.fixtures = []; }
   p.name = image ? '샘플 도면' : '';
   ui.selection = null;
   emit('plan', 'selection');
