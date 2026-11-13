@@ -74,7 +74,10 @@ export function lightWallRuns(img, mmPerPx, walls) {
  */
 export function findWindows(plan, img) {
   const e = plan.entrance;
-  const skip = e ? [{ x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }] : [];
+  // 현관문과 이미 단 문(plan.doors) 자리는 창이 아니다 — 현관을 아직 안 정한 벽 인식 직후에는 현관문 틈이 바깥에 닿아 창으로 잡혀,
+  // 그 자리의 문 기호를 문으로 달지 못했다(findDoors는 창 자리 틈을 뺀다)
+  const mid = (d) => ({ x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 });
+  const skip = (e ? [mid(e)] : []).concat((plan.doors || []).filter((d) => G.dist(d.a, d.b) > 0).map(mid));
   const gaps = G.findWindowGaps(plan.walls, { skip });
   let runs = img ? lightWallRuns(img, plan.mmPerPx, plan.walls) : [];
   if (runs.length) {
